@@ -4,7 +4,7 @@ import {
   type BlindLevel, type ClockState,
   resolveClock, start, pause, resume, stop, nextLevel, prevLevel,
   adjustTime, formatDuration, formatBlinds, averageStack,
-} from './clock.ts'
+} from './clock'
 
 const T0 = Date.parse('2026-09-06T20:00:00.000Z')
 const iso = (ms: number) => new Date(ms).toISOString()
