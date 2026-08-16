@@ -1,7 +1,8 @@
 -- Tests voor migratie 0005: profielen, leeftijd, aanmeldingen, chipcounts,
 -- inschrijvingen en deals. Draait in een transactie die terugrolt.
 
-\set ON_ERROR_STOP on
+-- Draait in een transactie die aan het eind terugrolt: veilig op een
+-- database met echte data, en plakbaar in de SQL Editor van Supabase.
 begin;
 
 -- ---------------------------------------------------------------------------
@@ -14,13 +15,28 @@ do $$
 declare
   v_club uuid; v_tour uuid; v_struct uuid; v_user uuid; v_season uuid;
 begin
-  insert into clubs (slug, name) values ('testclub', 'Testclub') returning id into v_club;
+  insert into clubs (slug, name) values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Testclub') returning id into v_club;
   insert into seasons (club_id, name, starts_on)
   values (v_club, 'Seizoen', current_date) returning id into v_season;
   insert into tournaments (club_id, season_id, name, scheduled_at, status, buyin_cents)
   values (v_club, v_season, 'Testtornooi', now(), 'running', 2000) returning id into v_tour;
 
-  insert into auth.users (email) values ('speler@test.be') returning id into v_user;
+  -- Leen een bestaande account zonder spelersprofiel. Zelf een rij in
+  -- auth.users maken werkt lokaal wel maar op een echt Supabase-project niet
+  -- betrouwbaar: die tabel heeft kolommen die Supabase zelf invult.
+  select u.id into v_user
+  from auth.users u
+  left join players p on p.auth_user_id = u.id
+  where p.id is null
+  limit 1;
+
+  if v_user is null then
+    -- id expliciet meegeven: op een echt Supabase-project heeft auth.users
+    -- geen standaardwaarde voor die kolom, alleen lokaal wel.
+    v_user := gen_random_uuid();
+    insert into auth.users (id, email)
+    values (v_user, 'test-' || substr(v_user::text, 1, 8) || '@test.invalid');
+  end if;
 
   insert into _t values ('club', v_club), ('tour', v_tour), ('user', v_user), ('season', v_season);
 end $$;
@@ -106,14 +122,14 @@ begin
 
   insert into player_signups (club_id, first_name, last_name, username, email,
                               birthdate, municipality)
-  values (c.club, 'Sofie', 'Maes', 'sofiem', 'sofie@test.be',
+  values (c.club, 'Sofie', 'Maes', 'sofiem', 'sofie.test@test.invalid',
           current_date - interval '28 years', 'Aalst')
   returning id into v_signup;
 
   -- Tweede keer hetzelfde formulier geeft geen tweede aanvraag.
   begin
     insert into player_signups (club_id, first_name, last_name, username, email, birthdate)
-    values (c.club, 'Sofie', 'Maes', 'sofiem2', 'SOFIE@test.be', current_date - interval '28 years');
+    values (c.club, 'Sofie', 'Maes', 'sofiem2', 'SOFIE.TEST@test.invalid', current_date - interval '28 years');
   exception when unique_violation then v_dubbel := true;
   end;
   assert v_dubbel, 'dubbele aanvraag werd toegelaten';
@@ -135,7 +151,7 @@ begin
 
   -- Minderjarige aanvraag wordt geweigerd, gemarkeerd én voorzien van reden.
   insert into player_signups (club_id, first_name, last_name, username, email, birthdate)
-  values (c.club, 'Te', 'Jong', 'tejong', 'jong@test.be', current_date - interval '15 years')
+  values (c.club, 'Te', 'Jong', 'tejong', 'jong.test@test.invalid', current_date - interval '15 years')
   returning id into v_signup;
 
   v_jong := public.approve_signup(v_signup) is null;
@@ -144,7 +160,7 @@ begin
     'geweigerde aanvraag werd niet als rejected gemarkeerd';
   assert (select reject_reason from player_signups where id = v_signup) is not null,
     'geweigerde aanvraag zonder reden';
-  assert not exists (select 1 from players where lower(email) = 'jong@test.be'),
+  assert not exists (select 1 from players where lower(email) = 'jong.test@test.invalid'),
     'er werd toch een spelersprofiel aangemaakt voor een minderjarige';
 
   raise notice 'aanmeldformulier OK';
@@ -158,11 +174,11 @@ do $$
 declare
   v_club2 uuid; v_signup uuid; v_player uuid; v_bestaand uuid;
 begin
-  select id into v_bestaand from players where lower(email) = 'sofie@test.be';
+  select id into v_bestaand from players where lower(email) = 'sofie.test@test.invalid';
 
-  insert into clubs (slug, name) values ('tweede', 'Tweede Club') returning id into v_club2;
+  insert into clubs (slug, name) values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Tweede Club') returning id into v_club2;
   insert into player_signups (club_id, first_name, last_name, username, email, birthdate)
-  values (v_club2, 'Sofie', 'Maes', 'sofie_anders', 'sofie@test.be',
+  values (v_club2, 'Sofie', 'Maes', 'sofie_anders', 'sofie.test@test.invalid',
           current_date - interval '28 years')
   returning id into v_signup;
 
@@ -270,7 +286,18 @@ begin
 
   -- Een echte floormedewerker: eigen account, rol bij de club, en een
   -- gewoon webverzoek. Niet serverside, want dan slaat de trigger over.
-  insert into auth.users (email) values ('floor@test.be') returning id into v_staf;
+  select u.id into v_staf
+  from auth.users u
+  where u.id <> (select v from _t where k = 'user')
+    and not exists (select 1 from club_members m
+                    where m.user_id = u.id and m.club_id = c.club)
+  limit 1;
+
+  if v_staf is null then
+    v_staf := gen_random_uuid();
+    insert into auth.users (id, email)
+    values (v_staf, 'floor-' || substr(v_staf::text, 1, 8) || '@test.invalid');
+  end if;
   insert into club_members (club_id, user_id, role) values (c.club, v_staf, 'floor');
 
   perform set_config('request.jwt.claim.role', 'authenticated', true);

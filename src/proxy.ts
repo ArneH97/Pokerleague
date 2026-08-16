@@ -1,13 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { clubSlugForHost, isPassthroughPath, normalizeHost } from '@/lib/hosts'
 
 /**
- * Ververst de Supabase-sessie bij elk verzoek.
+ * Draait vóór elk verzoek en doet twee dingen.
  *
- * In Next 16 heet dit `proxy` in plaats van `middleware`; de werking is
- * dezelfde. Dit bestand doet bewust GEEN autorisatie — dat hoort thuis bij
- * RLS in de database en bij de paginacontroles. Hier alleen tokens verversen
- * zodat een sessie niet halverwege een tornooiavond verloopt.
+ * 1. De Supabase-sessie verversen, zodat niemand halverwege een tornooiavond
+ *    wordt uitgelogd.
+ * 2. Het domein vertalen naar een clubomgeving. Een verzoek op app.cutoff.be
+ *    voor /floor/123 wordt intern /c/cutoff/floor/123. De club ziet dus schone
+ *    URL's zonder clubnaam, terwijl er maar één app draait.
+ *
+ * Bewust géén autorisatie hier. Dat hoort bij RLS in de database; wat hier
+ * gebeurt is routering en comfort.
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -21,9 +26,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
@@ -37,7 +40,19 @@ export async function proxy(request: NextRequest) {
   // niet en is dus ongeschikt om beslissingen op te baseren.
   await supabase.auth.getClaims()
 
-  return response
+  const { pathname } = request.nextUrl
+  if (isPassthroughPath(pathname)) return response
+
+  const slug = await clubSlugForHost(normalizeHost(request.headers.get('host')))
+  if (!slug) return response
+
+  const url = request.nextUrl.clone()
+  url.pathname = `/c/${slug}${pathname === '/' ? '' : pathname}`
+
+  const rewritten = NextResponse.rewrite(url, { request })
+  // Cookies die het verversen van de sessie heeft gezet moeten mee.
+  response.cookies.getAll().forEach((c) => rewritten.cookies.set(c))
+  return rewritten
 }
 
 export const config = {

@@ -18,7 +18,14 @@ import { useTournament } from '@/lib/useTournament'
  * de zaalweergave. Geen bevestigingsdialogen — op een tornooiavond is een
  * extra klik erger dan een vergissing die je met één klik terugdraait.
  */
-export function FloorControls({ tournamentId }: { tournamentId: string }) {
+export function FloorControls({
+  tournamentId,
+  clockHref,
+}: {
+  tournamentId: string
+  /** Waar het zaalscherm staat; komt van de clubroute zodat de URL klopt. */
+  clockHref: string
+}) {
   const supabase = useMemo(() => createClient(), [])
   const { tournament, club, levels, stats, loading, error, live } = useTournament(tournamentId)
   const { nowMs, nowIso } = useServerTime()
@@ -81,7 +88,7 @@ export function FloorControls({ tournamentId }: { tournamentId: string }) {
             {live ? 'Live' : 'Verbinding kwijt'}
           </span>
           <a
-            href={`/klok/${tournamentId}`}
+            href={clockHref}
             target="_blank"
             rel="noreferrer"
             className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"

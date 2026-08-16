@@ -12,8 +12,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Bewust neutraal en algemeen: elke clubomgeving overschrijft dit met zijn
+// eigen naam via generateMetadata, en de spelerskant zet er PokerLeague neer.
+// Hier hoort geen merknaam, anders staat er "Pokerleague" in het tabblad van
+// een club die daar niets mee te maken heeft.
 export const metadata: Metadata = {
-  title: "Pokerleague",
+  title: { default: "Tornooibeheer", template: "%s" },
   description: "Tornooibeheer en klok voor pokerclubs",
 };
 

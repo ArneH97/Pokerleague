@@ -1,7 +1,8 @@
 -- Droogloop van de tornooi-engine. Draait tegen een lege database met de
 -- drie migraties erop. Elke sectie faalt hard als de uitkomst niet klopt.
 
-\set ON_ERROR_STOP on
+-- Draait in een transactie die aan het eind terugrolt: veilig op een
+-- database met echte data, en plakbaar in de SQL Editor van Supabase.
 begin;
 
 -- ---------------------------------------------------------------------------
@@ -103,7 +104,7 @@ declare
   v_winner   uuid;
 begin
   insert into clubs (slug, name, city)
-  values ('cutoff', 'Cutoff Poker Club', 'Gent')
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Cutoff Poker Club', 'Gent')
   returning id into v_club;
 
   insert into ranking_configs (club_id, name, method, params, bonus_per_ko)
@@ -131,7 +132,7 @@ begin
   -- 21 spelers inschrijven en laten inkopen.
   for i in 1 .. n loop
     insert into players (display_name, email)
-    values (format('Speler %s', i), format('speler%s@test.be', i))
+    values (format('Speler %s', i), format('speler%s.%s@test.invalid', i, substr(gen_random_uuid()::text, 1, 8)))
     returning id into v_player;
     v_ids := v_ids || v_player;
 
@@ -228,7 +229,7 @@ declare
   v_spend int;
 begin
   insert into clubs (slug, name, compliance)
-  values ('strict', 'Strikte Club', jsonb_build_object(
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Strikte Club', jsonb_build_object(
     'profile','be_tolerance','max_buyin_cents',5000,'max_daily_cents',10000,
     'max_reentries',1,'allow_cash_games',false,'min_age',18,'enforce','block'))
   returning id into v_club;
@@ -273,7 +274,7 @@ declare
   v_brussel int; v_utc int;
 begin
   insert into clubs (slug, name, timezone, compliance)
-  values ('nachtclub', 'Late Uurtjes', 'Europe/Brussels',
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Late Uurtjes', 'Europe/Brussels',
           jsonb_build_object('enforce','off'))
   returning id into v_club;
 
@@ -309,7 +310,7 @@ do $$
 declare
   v_club uuid; v_tour uuid; v_season uuid; v_player uuid;
 begin
-  insert into clubs (slug, name) values ('vreemde', 'Vreemde Club') returning id into v_club;
+  insert into clubs (slug, name) values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Vreemde Club') returning id into v_club;
   insert into seasons (club_id, name, starts_on)
   values (v_club, 'Seizoen', current_date) returning id into v_season;
   insert into tournaments (club_id, season_id, name, scheduled_at, status)
