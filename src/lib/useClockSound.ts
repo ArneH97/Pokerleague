@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { formatBlinds, type BlindLevel } from '@/lib/tournament/clock'
+import { type BlindLevel } from '@/lib/tournament/clock'
 
 /**
  * Geluid voor de zaalklok.
@@ -100,9 +100,13 @@ export function useClockSound() {
   }, [enabled, tone])
 
   /**
-   * Spreekt de nieuwe blinds uit, als het apparaat een Nederlandse stem
-   * heeft. Puur bonus: in een luide zaal is dit het verschil tussen wel en
-   * niet gehoord worden. Ontbreekt de stem, dan blijft het bij de toon.
+   * Spreekt de nieuwe blinds uit. Bewust in het Engels, ongeacht de taal van
+   * de rest van het platform: pokertermen zijn Engels, elk toestel heeft een
+   * Engelse stem, en aan tafel begrijpt iedereen "blinds two hundred, four
+   * hundred". Vertaalde bedragen klinken bovendien onnatuurlijk.
+   *
+   * Puur bonus: in een luide zaal is dit het verschil tussen wel en niet
+   * gehoord worden. Ontbreekt de stem, dan blijft het bij de toon.
    */
   const announce = useCallback(
     (level: BlindLevel | null) => {
@@ -110,16 +114,21 @@ export function useClockSound() {
       if (!('speechSynthesis' in window)) return
 
       const text = level.isBreak
-        ? `Pauze. ${Math.round(level.durationS / 60)} minuten.`
-        : `Nieuwe blinds. ${formatBlinds(level).replace('/', 'op')}`
+        ? `Break. ${Math.round(level.durationS / 60)} minutes.`
+        : [
+            'New level.',
+            `Blinds ${level.smallBlind}, ${level.bigBlind}.`,
+            level.ante > 0 ? `Ante ${level.ante}.` : '',
+          ].join(' ').trim()
 
       const utter = new SpeechSynthesisUtterance(text)
-      utter.lang = 'nl-BE'
-      utter.rate = 0.95
+      utter.lang = 'en-GB'
+      utter.rate = 0.92
 
-      const voice = window.speechSynthesis
-        .getVoices()
-        .find((v) => v.lang.startsWith('nl'))
+      const voices = window.speechSynthesis.getVoices()
+      const voice =
+        voices.find((v) => v.lang === 'en-GB') ??
+        voices.find((v) => v.lang.startsWith('en'))
       if (voice) utter.voice = voice
 
       // Na het geluidje, niet eroverheen.

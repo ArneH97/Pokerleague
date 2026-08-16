@@ -10,7 +10,7 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "db:bundle": "node scripts/bundle-sql.mjs",
     "db:reset": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/migrations/0001_schema.sql -f supabase/migrations/0002_functions.sql -f supabase/migrations/0003_rls.sql",
-    "db:test": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/engine_test.sql"
+    "db:test": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/engine_test.sql -f supabase/tests/players_test.sql"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
