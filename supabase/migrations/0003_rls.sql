@@ -3,62 +3,9 @@
 -- data van een andere club zien, en het geldregister is nooit zichtbaar
 -- voor spelers.
 
--- ---------------------------------------------------------------------------
--- Extra helpers
--- ---------------------------------------------------------------------------
-
--- Staat de ingelogde gebruiker als speler op de ledenlijst van deze club?
-create or replace function public.is_club_player(p_club_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1
-    from club_players cp
-    join players p on p.id = cp.player_id
-    where cp.club_id = p_club_id and p.auth_user_id = auth.uid()
-  );
-$$;
-
--- Mag de ingelogde gebruiker dit tornooi zien?
-create or replace function public.can_view_tournament(p_tournament_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1 from tournaments t
-    where t.id = p_tournament_id
-      and (
-        public.is_club_member(t.club_id)
-        or (t.player_visibility = 'public')
-        or (t.player_visibility = 'members' and public.is_club_player(t.club_id))
-      )
-  );
-$$;
-
--- Deelt de ingelogde gebruiker een club met deze speler?
-create or replace function public.shares_club_with(p_player_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select exists (
-    select 1
-    from club_players a
-    join club_players b on b.club_id = a.club_id
-    join players me on me.id = a.player_id
-    where me.auth_user_id = auth.uid()
-      and b.player_id = p_player_id
-  );
-$$;
+-- De helperfuncties (is_club_member, has_club_role, is_club_player,
+-- can_view_tournament, shares_club_with) staan in 0002 en moeten dus eerst
+-- gedraaid zijn.
 
 -- ---------------------------------------------------------------------------
 alter table clubs               enable row level security;
@@ -270,3 +217,32 @@ create policy tournament_results_write on tournament_results
 
 create policy audit_log_read on audit_log
   for select using (public.has_club_role(club_id, array['owner','admin']::club_role[]));
+
+-- ---------------------------------------------------------------------------
+-- Rechten
+-- ---------------------------------------------------------------------------
+-- Supabase zet dit doorgaans al goed via default privileges, maar expliciet
+-- is beter dan hopen. RLS blijft de echte poort: een grant zonder policy
+-- levert nog steeds nul rijen op.
+-- De DO-blokken maken dit ook draaibaar op een kale Postgres, waar de
+-- Supabase-rollen niet bestaan.
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    grant usage on schema public to anon;
+    grant select on all tables in schema public to anon;
+  end if;
+
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant usage on schema public to authenticated;
+    grant select, insert, update, delete on all tables in schema public to authenticated;
+    grant usage, select on all sequences in schema public to authenticated;
+  end if;
+
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant usage on schema public to service_role;
+    grant all on all tables in schema public to service_role;
+    grant all on all sequences in schema public to service_role;
+  end if;
+end $$;

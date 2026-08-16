@@ -8,8 +8,10 @@
 --      club_players is slechts de kijk van één club op een persoon.
 --      Zonder dit is een ranking over clubs heen later niet meer te bouwen.
 
-create extension if not exists "pgcrypto";
-create extension if not exists "citext";
+-- Geen extensies nodig: gen_random_uuid() zit sinds Postgres 13 in de kern,
+-- en voor hoofdletterongevoelige e-mail gebruiken we een lower()-index in
+-- plaats van citext. Dat scheelt een extensie die op Supabase in een apart
+-- schema belandt en dan search_path-verrassingen geeft.
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -79,7 +81,7 @@ create index on club_members (user_id);
 create table players (
   id                 uuid primary key default gen_random_uuid(),
   display_name       text not null,
-  email              citext,
+  email              text,
   auth_user_id       uuid unique references auth.users(id) on delete set null,
   link_state         player_link_state not null default 'shadow',
   country            char(2),
@@ -97,7 +99,9 @@ create table players (
   created_at         timestamptz not null default now()
 );
 
-create unique index players_email_unique on players (email) where email is not null and merged_into_id is null;
+-- Hoofdletterongevoelig uniek: Jan@test.be en jan@test.be zijn dezelfde man.
+create unique index players_email_unique
+  on players (lower(email)) where email is not null and merged_into_id is null;
 create index on players (merged_into_id) where merged_into_id is not null;
 
 -- De kijk van één club op een persoon: lidnummer, bijnaam, status.
@@ -124,7 +128,7 @@ create table player_invites (
   id           uuid primary key default gen_random_uuid(),
   club_id      uuid not null references clubs(id) on delete cascade,
   player_id    uuid not null references players(id) on delete cascade,
-  email        citext not null,
+  email        text not null,
   token        text not null unique,
   expires_at   timestamptz not null,
   accepted_at  timestamptz,

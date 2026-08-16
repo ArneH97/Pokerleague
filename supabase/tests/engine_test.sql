@@ -247,7 +247,7 @@ begin
   insert into buyins (club_id, tournament_id, tournament_player_id, player_id, kind, amount_cents)
   values (v_club, v_tour, v_tp, v_player, 'reentry', 5000);
 
-  v_spend := public.player_daily_spend_cents(v_player, current_date);
+  v_spend := public.player_daily_spend_cents(v_player, public.club_today(v_club));
   assert v_spend = 10000, format('dagtotaal verwacht 10000, kreeg %s', v_spend);
 
   -- De volgende euro moet geweigerd worden.
@@ -260,6 +260,136 @@ begin
   assert v_failed, 'daglimiet werd niet afgedwongen';
 
   raise notice 'compliance OK: daglimiet en re-entrylimiet worden geblokkeerd';
+end $$;
+
+-- Regressie: de dag hoort bij de tijdzone van de club, niet bij die van de
+-- server. Een inkoop om 00:30 Brusselse tijd valt in UTC nog op de vorige
+-- dag — wie dat verwart, telt de daglimiet tegen de verkeerde dag.
+
+do $$
+declare
+  v_club uuid; v_tour uuid; v_player uuid; v_tp uuid;
+  v_laat timestamptz := timestamptz '2026-09-07 00:30:00+02';  -- 22:30 UTC op de 6e
+  v_brussel int; v_utc int;
+begin
+  insert into clubs (slug, name, timezone, compliance)
+  values ('nachtclub', 'Late Uurtjes', 'Europe/Brussels',
+          jsonb_build_object('enforce','off'))
+  returning id into v_club;
+
+  insert into tournaments (club_id, name, scheduled_at, status)
+  values (v_club, 'Nachtsessie', v_laat, 'running') returning id into v_tour;
+  insert into players (display_name) values ('Nachtbraker') returning id into v_player;
+  insert into club_players (club_id, player_id) values (v_club, v_player);
+  insert into tournament_players (club_id, tournament_id, player_id, status)
+  values (v_club, v_tour, v_player, 'active') returning id into v_tp;
+
+  insert into buyins (club_id, tournament_id, tournament_player_id, player_id,
+                      kind, amount_cents, occurred_at)
+  values (v_club, v_tour, v_tp, v_player, 'buyin', 5000, v_laat);
+
+  v_brussel := public.player_daily_spend_cents(v_player, date '2026-09-07', v_club);
+  v_utc     := public.player_daily_spend_cents(v_player, date '2026-09-06', v_club);
+
+  assert v_brussel = 5000,
+    format('inkoop hoort op de Brusselse dag 7 sept, kreeg %s', v_brussel);
+  assert v_utc = 0,
+    format('inkoop mag niet op de UTC-dag 6 sept staan, kreeg %s', v_utc);
+
+  raise notice 'tijdzone OK: dagen volgen de club, niet de server';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 5. Autorisatie op de SECURITY DEFINER-functies
+-- ---------------------------------------------------------------------------
+-- Deze functies omzeilen RLS. Een gewone gebruiker zonder clubrol mag ze
+-- daarom niet kunnen aanroepen voor een club waar hij niets te zoeken heeft.
+
+do $$
+declare
+  v_club uuid; v_tour uuid; v_season uuid; v_player uuid;
+begin
+  insert into clubs (slug, name) values ('vreemde', 'Vreemde Club') returning id into v_club;
+  insert into seasons (club_id, name, starts_on)
+  values (v_club, 'Seizoen', current_date) returning id into v_season;
+  insert into tournaments (club_id, season_id, name, scheduled_at, status)
+  values (v_club, v_season, 'Afgeschermd', now(), 'running') returning id into v_tour;
+  insert into players (display_name) values ('Buitenstaander') returning id into v_player;
+
+  create temporary table _ctx (club uuid, tour uuid, season uuid, player uuid) on commit drop;
+  insert into _ctx values (v_club, v_tour, v_season, v_player);
+end $$;
+
+do $$
+declare
+  v_blocked int := 0;
+  c record;
+  v_day date;
+begin
+  select * into c from _ctx;
+  v_day := public.club_today(c.club);
+
+  -- Doe alsof dit een gewoon webverzoek is van een ingelogde gebruiker die
+  -- niets met deze club te maken heeft. Dit is wat PostgREST per verzoek zet.
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
+
+  assert not public.is_service_context(),
+    'is_service_context() hoort hier onwaar te zijn';
+
+  begin
+    perform public.finalize_tournament(c.tour);
+  exception when insufficient_privilege then v_blocked := v_blocked + 1;
+  end;
+
+  begin
+    perform public.player_daily_spend_cents(c.player, v_day);
+  exception when insufficient_privilege then v_blocked := v_blocked + 1;
+  end;
+
+  begin
+    perform public.player_daily_spend_cents(c.player, v_day, c.club);
+  exception when insufficient_privilege then v_blocked := v_blocked + 1;
+  end;
+
+  begin
+    perform * from public.season_standings(c.season);
+  exception when insufficient_privilege then v_blocked := v_blocked + 1;
+  end;
+
+  assert v_blocked = 4,
+    format('verwacht 4 geblokkeerde aanroepen, kreeg %s', v_blocked);
+
+  -- Terug naar serverkant: geen JWT meer.
+  perform set_config('request.jwt.claim.role', '', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+
+  assert public.is_service_context(), 'zonder JWT hoort dit serverside te zijn';
+  perform public.player_daily_spend_cents(c.player, v_day);
+  perform * from public.season_standings(c.season);
+
+  raise notice 'autorisatie OK: 4 van 4 aanroepen geweigerd voor een buitenstaander';
+end $$;
+
+-- De ongecontroleerde variant mag voor geen enkele webrol aanroepbaar zijn.
+-- Dit is de echte grendel; de rolcontrole hierboven is de tweede laag.
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      assert not has_function_privilege(
+        r, 'public.daily_spend_unchecked(uuid, date, uuid)', 'execute'),
+        format('%s mag daily_spend_unchecked niet kunnen aanroepen', r);
+    end if;
+  end loop;
+
+  assert not has_function_privilege(
+    'public', 'public.daily_spend_unchecked(uuid, date, uuid)', 'execute'),
+    'PUBLIC mag daily_spend_unchecked niet kunnen aanroepen';
+
+  raise notice 'grants OK: interne functie is afgeschermd';
 end $$;
 
 rollback;

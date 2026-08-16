@@ -81,6 +81,36 @@ en `block`. Configureerbaar omdat dit gedoogbeleid is en geen wet — het
 koninklijk besluit dat de voorwaarden vastlegt moet nog komen, en die getallen
 gaan bewegen.
 
+### De dag hoort bij de club, niet bij de server
+
+Een pokeravond loopt door na middernacht en de databaseserver draait op UTC.
+Om 00:30 in Brussel is het in UTC nog de vorige dag. Wie de daglimiet tegen
+`current_date` telt, telt hem tegen de verkeerde dag — en precies bij de late
+re-entries, wanneer het er het meest toe doet.
+
+Daarom bucket `daily_spend_unchecked()` elke inkoop op de lokale dag van de
+club waar hij plaatsvond, en bepaal je de dag met `club_today(club_id)`. Er
+staat een regressietest op in `supabase/tests/engine_test.sql`.
+
+### Functies die RLS omzeilen
+
+`finalize_tournament`, `season_standings` en `player_daily_spend_cents` zijn
+`security definer` en omzeilen dus RLS. Zonder extra grens zou elke ingelogde
+speler ze kunnen aanroepen voor eender welke club.
+
+Ze controleren daarom zelf de rechten via `is_service_context()`, dat kijkt
+naar de **rol uit het JWT** en niet naar `current_user`. Dat onderscheid is
+essentieel: binnen een `security definer`-functie is `current_user` altijd de
+eigenaar van die functie, dus een controle daarop zou voor iedereen slagen.
+
+`daily_spend_unchecked()` heeft die controle bewust niet — de
+compliance-trigger draait midden in een verzoek van een floormedewerker en
+heeft het totaal over alle clubs nodig. De beveiliging zit daar in een
+`revoke` op `anon` en `authenticated`, wat niet te omzeilen is met een
+geknutseld token.
+
+### Append-only
+
 Het register is append-only. Een fout corrigeer je met `is_void = true` en een
 reden, niet met een `delete`. Spelers zien deze tabel nooit; er is geen enkele
 leespolicy voor hen.

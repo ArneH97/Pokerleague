@@ -35,6 +35,36 @@ as $$
   );
 $$;
 
+-- Draait deze aanroep buiten een gebruikerssessie om? Waar: bij migraties,
+-- seeds, serverside code met de secret key, en binnen triggers die als
+-- eigenaar draaien. Onwaar voor elke gewone browseraanvraag.
+--
+-- Nodig omdat de functies hieronder SECURITY DEFINER zijn en dus RLS
+-- omzeilen. Zonder deze grens zou elke ingelogde speler ze kunnen aanroepen
+-- voor eender welke club.
+-- Let op: dit kijkt naar de ROL UIT HET JWT, niet naar current_user. Binnen
+-- een SECURITY DEFINER-functie is current_user altijd de eigenaar van die
+-- functie, waardoor een controle daarop niets doet — hij zou voor iedereen
+-- 'postgres' zien en dus altijd waar zijn.
+--
+-- Geen JWT betekent geen webverzoek: een migratie, een seed of psql.
+create or replace function public.is_service_context()
+returns boolean
+language plpgsql
+stable
+as $$
+declare
+  v_role text;
+begin
+  begin
+    v_role := auth.role();
+  exception when others then
+    v_role := null;
+  end;
+  return coalesce(v_role, 'service_role') = 'service_role';
+end;
+$$;
+
 -- De spelersrij die bij de ingelogde gebruiker hoort (of null voor staf
 -- die zelf niet speelt).
 create or replace function public.current_player_id()
@@ -68,14 +98,121 @@ begin
 end;
 $$;
 
+-- Staat de ingelogde gebruiker als speler op de ledenlijst van deze club?
+create or replace function public.is_club_player(p_club_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1
+    from club_players cp
+    join players p on p.id = cp.player_id
+    where cp.club_id = p_club_id and p.auth_user_id = auth.uid()
+  );
+$$;
+
+-- Deelt de ingelogde gebruiker een club met deze speler?
+create or replace function public.shares_club_with(p_player_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1
+    from club_players a
+    join club_players b on b.club_id = a.club_id
+    join players me on me.id = a.player_id
+    where me.auth_user_id = auth.uid()
+      and b.player_id = p_player_id
+  );
+$$;
+
+-- Mag de ingelogde gebruiker dit tornooi zien?
+create or replace function public.can_view_tournament(p_tournament_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from tournaments t
+    where t.id = p_tournament_id
+      and (
+        public.is_club_member(t.club_id)
+        or (t.player_visibility = 'public')
+        or (t.player_visibility = 'members' and public.is_club_player(t.club_id))
+      )
+  );
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Compliance: gedoogbeleid Kansspelcommissie
 -- ---------------------------------------------------------------------------
 
+-- Welke dag is het nú bij deze club?
+--
+-- Niet overslaan: een pokeravond loopt door na middernacht, en de server
+-- draait op UTC. Om 00:30 in Brussel is het in UTC nog de vorige dag. Wie
+-- hier `current_date` gebruikt, telt de daglimiet tegen de verkeerde dag en
+-- laat precies op het gevaarlijkste moment te veel door.
+create or replace function public.club_today(p_club_id uuid default null)
+returns date
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select (now() at time zone coalesce(
+    (select c.timezone from clubs c where c.id = p_club_id),
+    'Europe/Brussels'
+  ))::date;
+$$;
+
 -- Totale inzet van een speler op één kalenderdag. Standaard over alle clubs
 -- heen: de daglimiet volgt de speler, niet de club. Geef p_club_id mee voor
 -- de clubgebonden variant (wat een club effectief kan controleren).
+--
+-- p_day is de LOKALE dag van de club, niet de serverdatum. Gebruik
+-- public.club_today(club_id) om hem te bepalen.
 create or replace function public.player_daily_spend_cents(
+  p_player_id uuid,
+  p_day       date,
+  p_club_id   uuid default null
+)
+returns int
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Financiële gegevens: alleen staf van de bevraagde club, of serverside.
+  if not public.is_service_context()
+     and not (p_club_id is not null
+              and public.has_club_role(p_club_id, array['owner','admin','floor']::club_role[]))
+  then
+    raise exception 'Geen rechten om de daginzet van deze speler op te vragen'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  return public.daily_spend_unchecked(p_player_id, p_day, p_club_id);
+end;
+$$;
+
+-- Interne variant zonder controle, voor de compliance-trigger — die draait
+-- midden in een verzoek van een floormedewerker en heeft het totaal over
+-- alle clubs heen nodig.
+--
+-- De echte beveiliging zit niet in een rolcontrole maar in de REVOKE
+-- hieronder: anon en authenticated mogen deze functie simpelweg niet
+-- aanroepen. Dat is niet te omzeilen met een geknutseld JWT.
+create or replace function public.daily_spend_unchecked(
   p_player_id uuid,
   p_day       date,
   p_club_id   uuid default null
@@ -94,6 +231,18 @@ as $$
     and (p_club_id is null or b.club_id = p_club_id)
     and (b.occurred_at at time zone c.timezone)::date = p_day;
 $$;
+
+revoke all on function public.daily_spend_unchecked(uuid, date, uuid) from public;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function public.daily_spend_unchecked(uuid, date, uuid) from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function public.daily_spend_unchecked(uuid, date, uuid) from authenticated;
+  end if;
+end $$;
 
 -- Bewaakt de daglimiet en het maximum aantal re-entries bij het inboeken.
 -- Gedrag hangt af van clubs.compliance->>'enforce': off | warn | block.
@@ -126,7 +275,9 @@ begin
   v_max_day := coalesce((v_comp->>'max_daily_cents')::int, 10000);
   v_max_re  := coalesce((v_comp->>'max_reentries')::int, 1);
 
-  v_spent     := public.player_daily_spend_cents(new.player_id, v_day);
+  -- Bewust de ongecontroleerde variant: deze trigger draait tijdens een
+  -- verzoek van een floormedewerker en moet het totaal over alle clubs zien.
+  v_spent     := public.daily_spend_unchecked(new.player_id, v_day);
   v_new_total := v_spent + new.amount_cents + new.fee_cents + new.bounty_cents;
 
   if v_new_total > v_max_day then
@@ -348,6 +499,16 @@ begin
     raise exception 'Tornooi % bestaat niet', p_tournament_id;
   end if;
 
+  -- Deze functie schrijft resultaten weg en omzeilt RLS. Zonder deze check
+  -- zou elke ingelogde gebruiker het tornooi van een willekeurige club
+  -- kunnen afsluiten.
+  if not public.is_service_context()
+     and not public.has_club_role(t.club_id, array['owner','admin','floor']::club_role[])
+  then
+    raise exception 'Geen rechten om dit tornooi af te sluiten'
+      using errcode = 'insufficient_privilege';
+  end if;
+
   select count(distinct player_id) into v_entries
   from tournament_players where tournament_id = p_tournament_id;
 
@@ -443,12 +604,27 @@ as $$
 declare
   v_best_n int;
   v_min    int;
+  v_club   uuid;
 begin
-  select rc.count_best_n, rc.min_tournaments
-  into v_best_n, v_min
+  select s.club_id, rc.count_best_n, rc.min_tournaments
+  into v_club, v_best_n, v_min
   from seasons s
   left join ranking_configs rc on rc.id = s.ranking_config_id
   where s.id = p_season_id;
+
+  if v_club is null then
+    return;
+  end if;
+
+  -- Klassement is voor staf en leden van de club. Een publieke ranking over
+  -- clubs heen komt later en krijgt een eigen, expliciet publieke functie.
+  if not public.is_service_context()
+     and not public.is_club_member(v_club)
+     and not public.is_club_player(v_club)
+  then
+    raise exception 'Geen rechten op het klassement van deze club'
+      using errcode = 'insufficient_privilege';
+  end if;
 
   return query
   with ranked as (
