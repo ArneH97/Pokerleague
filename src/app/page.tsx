@@ -1,69 +1,124 @@
-import Image from "next/image";
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import { formatMoney } from '@/lib/types'
 
-export default function Home() {
+interface Row {
+  id: string
+  name: string
+  scheduled_at: string
+  status: string
+  buyin_cents: number
+  fee_cents: number
+  clubs: { name: string; slug: string; timezone: string } | null
+}
+
+export default async function Page() {
+  const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+
+  const { data, error } = await supabase
+    .from('tournaments')
+    .select('id,name,scheduled_at,status,buyin_cents,fee_cents,clubs(name,slug,timezone)')
+    .order('scheduled_at', { ascending: false })
+    .limit(25)
+    .overrideTypes<Row[]>()
+
+  const tournaments = data ?? []
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="mx-auto min-h-dvh w-full max-w-3xl space-y-8 bg-neutral-950 p-6 text-white">
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm uppercase tracking-widest text-neutral-500">ClubStack</p>
+          <h1 className="text-2xl font-semibold">Tornooien</h1>
+        </div>
+        {claims?.claims ? (
+          <form action="/auth/signout" method="post">
+            <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800">
+              Afmelden
+            </button>
+          </form>
+        ) : (
+          <Link
+            href="/login"
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-500"
+          >
+            Aanmelden
+          </Link>
+        )}
+      </header>
+
+      {error && (
+        <p className="rounded-xl border border-red-900 bg-red-950/50 p-4 text-sm text-red-300">
+          {error.message}
+        </p>
+      )}
+
+      {tournaments.length === 0 && !error && (
+        <div className="rounded-xl border border-neutral-800 p-6 text-neutral-400">
+          <p className="font-medium text-neutral-200">Nog geen tornooien zichtbaar.</p>
+          <p className="mt-2 text-sm">
+            {claims?.claims
+              ? 'Je account is nog aan geen enkele club gekoppeld, of er staat nog niets gepland.'
+              : 'Meld je aan om de tornooien van je club te zien.'}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      )}
+
+      <ul className="space-y-3">
+        {tournaments.map((t) => (
+          <li
+            key={t.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-800 p-4"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+            <div className="min-w-0">
+              <p className="truncate font-medium">{t.name}</p>
+              <p className="text-sm text-neutral-500">
+                {t.clubs?.name} ·{' '}
+                {new Intl.DateTimeFormat('nl-BE', {
+                  dateStyle: 'full',
+                  timeStyle: 'short',
+                  timeZone: t.clubs?.timezone ?? 'Europe/Brussels',
+                }).format(new Date(t.scheduled_at))}
+                {' · '}
+                {formatMoney(t.buyin_cents + t.fee_cents)}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <StatusBadge status={t.status} />
+              <Link
+                href={`/klok/${t.id}`}
+                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+              >
+                Klok
+              </Link>
+              <Link
+                href={`/floor/${t.id}`}
+                className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 hover:bg-white"
+              >
+                Floor
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const label: Record<string, string> = {
+    draft: 'Concept', scheduled: 'Gepland', running: 'Bezig',
+    paused: 'Gepauzeerd', finished: 'Afgelopen', cancelled: 'Geannuleerd',
+  }
+  const tone =
+    status === 'running' ? 'bg-emerald-950 text-emerald-400'
+      : status === 'finished' ? 'bg-neutral-800 text-neutral-400'
+      : 'bg-neutral-800 text-neutral-300'
+
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-xs ${tone}`}>
+      {label[status] ?? status}
+    </span>
+  )
 }
