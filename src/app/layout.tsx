@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ClubStack",
+  title: "Pokerleague",
   description: "Tornooibeheer en klok voor pokerclubs",
 };
 

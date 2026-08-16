@@ -55,14 +55,22 @@ export function levelDurationMs(level: BlindLevel): number {
   return Math.max(0, level.durationS) * 1000
 }
 
-/** Ruwe verstreken tijd binnen het opgeslagen level, zonder doorrollen. */
+/**
+ * Ruwe verstreken tijd binnen het opgeslagen level, zonder doorrollen.
+ *
+ * Altijd afgerond op hele milliseconden. Dat is geen cosmetiek: de kolom
+ * level_elapsed_ms is een bigint, en de tijdcorrectie tegen de server levert
+ * halve milliseconden op omdat we de rondreistijd door twee delen. Een
+ * gebroken getal wordt door Postgres geweigerd, en dan doet de pauzeknop het
+ * niet meer.
+ */
 export function rawElapsedMs(state: ClockState, nowMs: number): number {
   if (state.status !== 'running' || !state.levelStartedAt) {
-    return clamp(state.levelElapsedMs, 0)
+    return Math.round(clamp(state.levelElapsedMs, 0))
   }
   const startedMs = Date.parse(state.levelStartedAt)
-  if (Number.isNaN(startedMs)) return clamp(state.levelElapsedMs, 0)
-  return clamp(state.levelElapsedMs + (nowMs - startedMs), 0)
+  if (Number.isNaN(startedMs)) return Math.round(clamp(state.levelElapsedMs, 0))
+  return Math.round(clamp(state.levelElapsedMs + (nowMs - startedMs), 0))
 }
 
 /**
@@ -189,7 +197,7 @@ export function prevLevel(state: ClockState, levels: BlindLevel[], nowMs: number
  * op de klok. Kan niet voorbij het begin van het level.
  */
 export function adjustTime(state: ClockState, deltaMs: number, nowMs: number, nowIso: string): ClockState {
-  const elapsed = clamp(rawElapsedMs(state, nowMs) - deltaMs, 0)
+  const elapsed = Math.round(clamp(rawElapsedMs(state, nowMs) - deltaMs, 0))
   return {
     ...state,
     levelStartedAt: state.status === 'running' ? nowIso : null,

@@ -29,7 +29,7 @@ export default async function Page() {
     <main className="mx-auto min-h-dvh w-full max-w-3xl space-y-8 bg-neutral-950 p-6 text-white">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-widest text-neutral-500">ClubStack</p>
+          <p className="text-sm uppercase tracking-widest text-neutral-500">Pokerleague</p>
           <h1 className="text-2xl font-semibold">Tornooien</h1>
         </div>
         {claims?.claims ? (

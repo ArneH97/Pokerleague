@@ -1,4 +1,4 @@
--- ClubStack — row level security.
+-- Pokerleague — row level security.
 -- Uitgangspunt: alles dicht, dan gericht openzetten. Een club mag nooit
 -- data van een andere club zien, en het geldregister is nooit zichtbaar
 -- voor spelers.

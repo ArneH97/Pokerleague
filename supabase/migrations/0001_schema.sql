@@ -1,4 +1,4 @@
--- ClubStack — kernschema
+-- Pokerleague — kernschema
 -- Multi-tenant pokerclubplatform: clubbeheer, tornooi-engine, spelersingang.
 --
 -- Twee ontwerpbeslissingen die later niet meer te wijzigen zijn:

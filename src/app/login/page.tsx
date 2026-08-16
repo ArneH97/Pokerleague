@@ -48,7 +48,7 @@ function LoginForm() {
     <main className="flex min-h-dvh items-center justify-center bg-neutral-950 p-6 text-white">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5">
         <div>
-          <p className="text-sm uppercase tracking-widest text-neutral-500">ClubStack</p>
+          <p className="text-sm uppercase tracking-widest text-neutral-500">Pokerleague</p>
           <h1 className="text-2xl font-semibold">Aanmelden</h1>
         </div>
 

@@ -38,7 +38,10 @@ export function useServerTime(resyncMs = 5 * 60_000) {
         if (roundTrip >= bestRoundTripRef.current) return
 
         bestRoundTripRef.current = roundTrip
-        setOffsetMs(now + roundTrip / 2 - received)
+        // Afronden op hele milliseconden: de helft van een oneven rondreis
+        // geeft anders een halve ms, en die belandt uiteindelijk in een
+        // bigint-kolom die daar niets mee kan.
+        setOffsetMs(Math.round(now + roundTrip / 2 - received))
       } catch {
         // Geen verbinding: we blijven op de laatst bekende afwijking staan.
         // Beter een klok die doortikt dan een klok die stilvalt.

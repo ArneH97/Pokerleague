@@ -1,4 +1,4 @@
--- ClubStack — realtime
+-- Pokerleague — realtime
 --
 -- Zonder dit stuurt Supabase geen wijzigingen door en moet elk scherm
 -- pollen. De zaalweergave en het floor-scherm zijn twee losse apparaten die

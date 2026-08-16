@@ -1,4 +1,4 @@
--- ClubStack — startgegevens voor Cutoff Poker Club
+-- Pokerleague — startgegevens voor Cutoff Poker Club
 --
 -- VOORAF: maak in Supabase onder Authentication > Users een gebruiker aan
 -- met e-mailadres en wachtwoord, en vul dat adres hieronder in. Zonder dat

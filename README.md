@@ -1,4 +1,4 @@
-# ClubStack
+# Pokerleague
 
 Platform voor pokerclubs: clubbeheer, tornooiklok, ledenbestand en een
 spelersingang met resultaten en rankings. Multi-tenant vanaf de eerste regel —

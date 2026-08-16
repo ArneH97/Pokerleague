@@ -1,4 +1,4 @@
--- ClubStack — functies: autorisatie, compliance, payouts, punten, afronding.
+-- Pokerleague — functies: autorisatie, compliance, payouts, punten, afronding.
 
 -- ---------------------------------------------------------------------------
 -- Autorisatiehelpers

@@ -33,9 +33,11 @@ export function FloorControls({ tournamentId }: { tournamentId: string }) {
       .from('tournaments')
       .update({
         clock: next.status,
-        level_idx: next.levelIdx,
+        level_idx: Math.round(next.levelIdx),
         level_started_at: next.levelStartedAt,
-        level_elapsed_ms: next.levelElapsedMs,
+        // level_elapsed_ms is een bigint; hier nog eens afronden zodat er
+        // nooit een gebroken getal naar de database kan.
+        level_elapsed_ms: Math.round(next.levelElapsedMs),
         ...(next.status === 'running' ? { status: 'running' as const } : {}),
       })
       .eq('id', tournamentId)

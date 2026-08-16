@@ -1,4 +1,4 @@
--- ClubStack — volledige database-opzet
+-- Pokerleague — volledige database-opzet
 --
 -- GEGENEREERD BESTAND. Bewerk supabase/migrations/*.sql en draai
 -- `npm run db:bundle` opnieuw.
@@ -13,7 +13,7 @@
 -- 0001_schema.sql
 -- =========================================================================
 
--- ClubStack — kernschema
+-- Pokerleague — kernschema
 -- Multi-tenant pokerclubplatform: clubbeheer, tornooi-engine, spelersingang.
 --
 -- Twee ontwerpbeslissingen die later niet meer te wijzigen zijn:
@@ -388,7 +388,7 @@ create index on audit_log (club_id, created_at desc);
 -- 0002_functions.sql
 -- =========================================================================
 
--- ClubStack — functies: autorisatie, compliance, payouts, punten, afronding.
+-- Pokerleague — functies: autorisatie, compliance, payouts, punten, afronding.
 
 -- ---------------------------------------------------------------------------
 -- Autorisatiehelpers
@@ -1049,7 +1049,7 @@ $$;
 -- 0003_rls.sql
 -- =========================================================================
 
--- ClubStack — row level security.
+-- Pokerleague — row level security.
 -- Uitgangspunt: alles dicht, dan gericht openzetten. Een club mag nooit
 -- data van een andere club zien, en het geldregister is nooit zichtbaar
 -- voor spelers.
@@ -1302,7 +1302,7 @@ end $$;
 -- 0004_realtime.sql
 -- =========================================================================
 
--- ClubStack — realtime
+-- Pokerleague — realtime
 --
 -- Zonder dit stuurt Supabase geen wijzigingen door en moet elk scherm
 -- pollen. De zaalweergave en het floor-scherm zijn twee losse apparaten die

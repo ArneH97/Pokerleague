@@ -152,6 +152,41 @@ test('ongeldig starttijdstip valt terug op de opgebouwde tijd', () => {
   assert.equal(resolveClock(broken, levels, T0).remainingMs, 1_080_000)
 })
 
+test('elke overgang levert hele milliseconden op, ook bij een gebroken kloktijd', () => {
+  // Regressie: de tijdcorrectie tegen de server deelt de rondreistijd door
+  // twee en produceerde daardoor halve milliseconden. level_elapsed_ms is een
+  // bigint, dus Postgres weigerde de update en de pauzeknop deed niets.
+  const fractional = T0 + 134_240.5
+  const iso2 = new Date(fractional).toISOString()
+
+  const cases: Record<string, ClockState> = {
+    pause: pause(running(), fractional),
+    stop: stop(running(), fractional),
+    resume: resume(pause(running(), fractional), iso2),
+    plusMinuut: adjustTime(running(), 60_000, fractional, iso2),
+    minMinuut: adjustTime(running(), -60_000, fractional, iso2),
+    halveDelta: adjustTime(running(), 1234.5, fractional, iso2),
+    volgend: nextLevel(running(), levels, fractional, iso2),
+    vorig: prevLevel(running(1), levels, fractional, iso2),
+    start: start(iso2),
+  }
+
+  for (const [naam, s] of Object.entries(cases)) {
+    assert.ok(
+      Number.isInteger(s.levelElapsedMs),
+      `${naam} gaf ${s.levelElapsedMs}, dat is geen geheel getal`,
+    )
+    assert.ok(Number.isInteger(s.levelIdx), `${naam} gaf een gebroken levelIdx`)
+    assert.ok(s.levelElapsedMs >= 0, `${naam} gaf een negatieve tijd`)
+  }
+})
+
+test('gebroken kloktijd verandert niets aan de resterende tijd', () => {
+  const a = resolveClock(running(), levels, T0 + 300_000)
+  const b = resolveClock(running(), levels, T0 + 300_000.5)
+  assert.equal(Math.round(a.remainingMs / 1000), Math.round(b.remainingMs / 1000))
+})
+
 test('weergave', () => {
   assert.equal(formatDuration(0), '00:00')
   assert.equal(formatDuration(59_400), '00:59')

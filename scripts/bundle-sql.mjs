@@ -15,7 +15,7 @@ const out = join(root, 'supabase', 'setup.sql')
 
 const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
 
-const header = `-- ClubStack — volledige database-opzet
+const header = `-- Pokerleague — volledige database-opzet
 --
 -- GEGENEREERD BESTAND. Bewerk supabase/migrations/*.sql en draai
 -- \`npm run db:bundle\` opnieuw.
