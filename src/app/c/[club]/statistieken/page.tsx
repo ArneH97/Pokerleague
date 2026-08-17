@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { BarChart } from '@/components/BarChart'
+import { ClubNav } from '@/components/ClubNav'
 import { Card, EmptyState, Notice, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
@@ -121,14 +122,9 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   const nothing = !s || s.tournaments === 0
 
   return (
-    <Page>
-      <PageHeader
-        backHref={`/c/${slug}`}
-        backLabel={t('result.backToClub')}
-        overline={`${club.name} · ${label}`}
-        title={t('stats.title')}
-        logoUrl={club.logo_url}
-      />
+    <Page width="xl">
+      <PageHeader overline={`${club.name} · ${label}`} title={t('stats.title')} logoUrl={club.logo_url} />
+      <ClubNav slug={slug} active="stats" canManage t={t} />
 
       <div className="flex flex-wrap items-center gap-0.5 self-start rounded-[var(--radius)] border border-[var(--line)] p-0.5">
         {[
@@ -220,14 +216,6 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
             <p className="mt-2 text-xs text-[var(--text-faint)]">{t('stats.onlyFinished')}</p>
           </section>
 
-          <p className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-[var(--text-faint)]">
-            <Link href={`/c/${slug}/leden`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-              {t('members.view')}
-            </Link>
-            <Link href={`/c/${slug}/klassement`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-              {t('standings.view')}
-            </Link>
-          </p>
         </>
       )}
     </Page>

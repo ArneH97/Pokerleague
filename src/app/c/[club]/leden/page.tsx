@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import { ClubNav } from '@/components/ClubNav'
 import { MemberList, type Member } from '@/components/MemberList'
 import { Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
@@ -78,14 +79,9 @@ export default async function Page_({ params }: PageProps<'/c/[club]/leden'>) {
   }))
 
   return (
-    <Page>
-      <PageHeader
-        backHref={`/c/${slug}`}
-        backLabel={t('result.backToClub')}
-        overline={club.name}
-        title={t('members.title')}
-        logoUrl={club.logo_url}
-      />
+    <Page width="xl">
+      <PageHeader overline={club.name} title={t('members.title')} logoUrl={club.logo_url} />
+      <ClubNav slug={slug} active="members" canManage t={t} />
 
       {error && <Notice tone="error">{error.message}</Notice>}
 

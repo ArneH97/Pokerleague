@@ -213,7 +213,7 @@ export default async function Page() {
                 </h2>
                 <p className="mt-4 text-[var(--text-muted)]">{t('site.start.body')}</p>
                 <a
-                  href="mailto:info@pokerleague.be?subject=Interesse%20PokerLeague"
+                  href="mailto:arne@halcoservices.be?subject=Interesse%20PokerLeague"
                   className="mt-7 inline-block rounded-full bg-[var(--brand)] px-6 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
                   {t('site.start.cta')}
@@ -238,10 +238,10 @@ export default async function Page() {
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[var(--text-muted)]">{t('site.cta.body')}</p>
             <a
-              href="mailto:info@pokerleague.be?subject=Interesse%20PokerLeague"
+              href="mailto:arne@halcoservices.be?subject=Interesse%20PokerLeague"
               className="mt-8 inline-block rounded-full bg-[var(--brand)] px-7 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
             >
-              info@pokerleague.be
+              arne@halcoservices.be
             </a>
           </div>
         </section>
@@ -273,7 +273,7 @@ export default async function Page() {
             <ul className="mt-3 space-y-2 text-[var(--text-muted)]">
               <li><Link href="/clubs" className="hover:text-[var(--text)]">{t('site.nav.clubLogin')}</Link></li>
               <li><a href="#clubs" className="hover:text-[var(--text)]">{t('site.footer.whatYouGet')}</a></li>
-              <li><a href="mailto:info@pokerleague.be" className="hover:text-[var(--text)]">info@pokerleague.be</a></li>
+              <li><a href="mailto:arne@halcoservices.be" className="hover:text-[var(--text)]">arne@halcoservices.be</a></li>
             </ul>
           </div>
         </div>

@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ClubHeader } from '@/components/ClubHeader'
+import { ClubNav } from '@/components/ClubNav'
 import {
   Badge, ButtonLink, Card, EmptyState, Notice, Page, SectionTitle,
 } from '@/components/ui'
@@ -84,6 +84,8 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         }
       />
 
+      {role && <ClubNav slug={slug} active="tournaments" canManage={canManage} t={t} />}
+
       {!role && (
         <Notice tone="warn">
           {t('club.notLinked')}
@@ -132,28 +134,6 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         </section>
       )}
 
-      {role && (
-        <p className="flex flex-wrap gap-x-5 gap-y-2 pt-2 text-sm text-[var(--text-faint)]">
-          <Link href={`/c/${slug}/klassement`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-            {t('standings.view')}
-          </Link>
-          {canManage && (
-            <Link href={`/c/${slug}/leden`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-              {t('members.view')}
-            </Link>
-          )}
-          {canManage && (
-            <Link href={`/c/${slug}/statistieken`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-              {t('stats.view')}
-            </Link>
-          )}
-          {canManage && (
-            <Link href={`/c/${slug}/structuren`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-              {t('club.manageStructures')}
-            </Link>
-          )}
-        </p>
-      )}
     </Page>
   )
 }

@@ -105,7 +105,7 @@ export function MemberList({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('members.search')}
           autoComplete="off"
-          className="min-w-0 flex-1 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
+          className="min-w-0 max-w-md flex-1 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
         />
         <p className="tnum text-sm text-[var(--text-faint)]">
           {members.length} {t('members.count')}
@@ -185,7 +185,7 @@ export function MemberList({
         </p>
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--line)]">
-          <table className="w-full min-w-[46rem] text-sm">
+          <table className="w-full min-w-[52rem] text-sm">
             <thead>
               <tr className="border-b border-[var(--line)] text-left text-xs uppercase tracking-widest text-[var(--text-faint)]">
                 <th className="px-4 py-2.5 font-medium">{t('members.player')}</th>

@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import { ClubNav } from '@/components/ClubNav'
 import { ButtonLink, Card, Notice, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
@@ -92,7 +93,8 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
   })
 
   return (
-    <Page>
+    <Page width="lg">
+      <ClubNav slug={slug} active="tournaments" canManage={canSeeMoney} t={t} />
       <PageHeader
         backHref={`/c/${slug}`}
         backLabel={t('result.backToClub')}
@@ -187,12 +189,11 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
         </>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <ButtonLink href={`/c/${slug}/klassement`}>{t('standings.view')}</ButtonLink>
-        {tour.status !== 'finished' && role && (
+      {tour.status !== 'finished' && role && (
+        <div className="flex flex-wrap gap-2">
           <ButtonLink variant="brand" href={`/c/${slug}/floor/${id}`}>{t('club.floor')}</ButtonLink>
-        )}
-      </div>
+        </div>
+      )}
     </Page>
   )
 }

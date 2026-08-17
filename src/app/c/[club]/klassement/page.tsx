@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { ClubNav } from '@/components/ClubNav'
 import { Card, EmptyState, Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator, type T } from '@/lib/i18n/dictionaries'
@@ -108,7 +109,8 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   const { data: claims } = await supabase.auth.getClaims()
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/klassement`)
 
-  await getClubRole(club.id)
+  const role = await getClubRole(club.id)
+  const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
   const locale = isLocale(club.locale) ? club.locale : 'nl'
   const t = translator(locale)
 
@@ -170,6 +172,13 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
     error = err?.message ?? null
   }
 
+  // De volgorde komt al gesorteerd uit de database, maar we leggen hem hier
+  // nog eens vast. Een klassement dat in een andere volgorde staat dan de
+  // puntenkolom is geen klassement, en dat mag niet afhangen van of iemand
+  // ooit de ORDER BY in een functie aanpast.
+  rows = [...rows].sort((a, b) =>
+    Number(b.points) - Number(a.points) || a.best_position - b.best_position)
+
   // De knock-outkolom heeft alleen zin als er bounty gespeeld is. Bij een
   // gewone freezeout staat er anders een kolom streepjes.
   const showKo = rows.some((r) => r.knockouts > 0)
@@ -186,15 +195,13 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
       : `${monthName(month)} ${year}`
 
   return (
-    <Page>
+    <Page width="xl">
       <PageHeader
-        backHref={`/c/${slug}`}
-        backLabel={t('result.backToClub')}
-        overline={`${t('standings.period')} · ${periodLabel}`}
+        overline={`${club.name} · ${periodLabel}`}
         title={t('standings.title')}
-        subtitle={club.name}
         logoUrl={club.logo_url}
       />
+      <ClubNav slug={slug} active="standings" canManage={canManage} t={t} />
 
       {/* -------------------------------------------------------------- filter */}
       <div className="flex flex-wrap items-center gap-2">

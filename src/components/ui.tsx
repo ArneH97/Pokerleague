@@ -68,11 +68,13 @@ export function Card({
   )
 }
 
-export function Page({ children, width = 'md' }: { children: React.ReactNode; width?: 'md' | 'lg' }) {
+export function Page({
+  children, width = 'md',
+}: { children: React.ReactNode; width?: 'md' | 'lg' | 'xl' }) {
   return (
     <main
       className={`mx-auto min-h-dvh w-full ${
-        width === 'lg' ? 'max-w-5xl' : 'max-w-3xl'
+        width === 'xl' ? 'max-w-[92rem]' : width === 'lg' ? 'max-w-5xl' : 'max-w-3xl'
       } space-y-7 px-5 py-8 sm:px-6`}
     >
       {children}

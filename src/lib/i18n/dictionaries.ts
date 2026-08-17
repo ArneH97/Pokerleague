@@ -56,6 +56,7 @@ const nl = {
   'club.manageStructures': 'Blindstructuren beheren',
   'club.clock': 'Klok',
   'club.floor': 'Floor',
+  'club.tournaments': 'Tornooien',
   // Ledenbestand
   'members.title': 'Ledenbestand',
   'members.view': 'Ledenbestand',
@@ -502,6 +503,7 @@ const fr: Record<Key, string> = {
   'club.manageStructures': 'Gérer les structures de blinds',
   'club.clock': 'Horloge',
   'club.floor': 'Floor',
+  'club.tournaments': 'Tournois',
   'members.title': 'Fichier des membres',
   'members.view': 'Fichier des membres',
   'members.search': 'Chercher un nom ou un e-mail',
@@ -935,6 +937,7 @@ const en: Record<Key, string> = {
   'club.manageStructures': 'Manage blind structures',
   'club.clock': 'Clock',
   'club.floor': 'Floor',
+  'club.tournaments': 'Tournaments',
   'members.title': 'Members',
   'members.view': 'Members',
   'members.search': 'Search a name or e-mail',

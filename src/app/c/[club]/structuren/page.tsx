@@ -1,3 +1,4 @@
+import { ClubNav } from '@/components/ClubNav'
 import { notFound, redirect } from 'next/navigation'
 import { NewStructureButton } from '@/components/NewStructureButton'
 import { ButtonLink, Card, EmptyState, Page, PageHeader, SectionTitle } from '@/components/ui'
@@ -41,12 +42,11 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
   return (
     <Page>
       <PageHeader
-        backHref={`/c/${slug}`}
-        backLabel={club.name}
         title={t('struct.title')}
         subtitle={t('struct.subtitle')}
         actions={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
       />
+      <ClubNav slug={slug} active="structures" canManage t={t} />
 
       {own.length === 0 ? (
         <EmptyState

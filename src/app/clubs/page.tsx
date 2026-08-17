@@ -95,10 +95,10 @@ export default async function Page() {
                 {t('site.pick.beFirst')}
               </p>
               <a
-                href="mailto:info@pokerleague.be?subject=Interesse%20PokerLeague"
+                href="mailto:arne@halcoservices.be?subject=Interesse%20PokerLeague"
                 className="mt-6 inline-block rounded-full bg-[var(--brand)] px-6 py-3 font-medium text-[var(--on-brand)] transition hover:brightness-110"
               >
-                info@pokerleague.be
+                arne@halcoservices.be
               </a>
             </div>
           ) : (
@@ -161,10 +161,10 @@ export default async function Page() {
                     {t('site.cta.body')}
                   </p>
                   <a
-                    href="mailto:info@pokerleague.be?subject=Interesse%20PokerLeague"
+                    href="mailto:arne@halcoservices.be?subject=Interesse%20PokerLeague"
                     className="mt-4 inline-flex w-fit items-center gap-1.5 font-medium text-[var(--gold)] hover:underline"
                   >
-                    info@pokerleague.be <span aria-hidden>→</span>
+                    arne@halcoservices.be <span aria-hidden>→</span>
                   </a>
                 </div>
               </li>
