@@ -42,37 +42,50 @@ export default async function Page_({ params }: PageProps<'/c/[club]/kalender'>)
     hour: '2-digit', minute: '2-digit', timeZone: club.timezone,
   })
 
-  const row = (x: PublicTournament, tone: 'live' | 'next' | 'past') => (
+  // Kaarten en geen regels. Een lijst van volle-breedte-regels op een monitor
+  // laat de naam links en de prijs rechts staan met een halve meter niets
+  // ertussen; in een raster staan ze naast elkaar en vult de pagina zich.
+  const card = (x: PublicTournament, tone: 'live' | 'next' | 'past') => (
     <li key={x.id}>
       <Link
         href={`/c/${club.slug}/live/${x.id}`}
-        className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-[var(--surface-hover)]"
+        className={`group flex h-full flex-col justify-between rounded-2xl border p-4 transition sm:p-5 ${
+          tone === 'live'
+            ? 'border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] hover:brightness-110'
+            : 'border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--surface-hover)]'
+        }`}
       >
-        <span className="min-w-0 flex-1">
+        <span>
           <span className="flex items-center gap-2">
             {tone === 'live' && (
-              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-[var(--ok)]" />
+              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-[var(--brand)]" />
             )}
-            <span className="truncate font-medium">{x.name}</span>
+            <span className={`truncate font-medium ${tone === 'past' ? 'text-[var(--text-muted)]' : ''}`}>
+              {x.name}
+            </span>
           </span>
-          <span className="mt-0.5 block text-xs text-[var(--text-faint)]">
+          <span className="mt-1 block text-xs text-[var(--text-faint)]">
             {fmt.format(new Date(x.scheduled_at))}
           </span>
         </span>
-        <span className="tnum shrink-0 text-sm text-[var(--text-muted)]">
-          {formatMoney(x.buyin_cents + x.fee_cents, club.currency)}
+        <span className="mt-4 flex items-baseline justify-between">
+          <span className="tnum text-sm text-[var(--text-muted)]">
+            {formatMoney(x.buyin_cents + x.fee_cents, club.currency)}
+          </span>
+          <span aria-hidden className="text-[var(--text-faint)] transition group-hover:text-[var(--text)]">
+            →
+          </span>
         </span>
-        <span aria-hidden className="shrink-0 text-[var(--text-faint)]">›</span>
       </Link>
     </li>
   )
 
   const block = (title: string, items: PublicTournament[], tone: 'live' | 'next' | 'past') =>
     items.length === 0 ? null : (
-      <section className="mt-5 first:mt-0">
-        <h2 className="mb-2 text-xs uppercase tracking-[0.2em] text-[var(--text-faint)]">{title}</h2>
-        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
-          {items.map((x) => row(x, tone))}
+      <section className="mt-6 first:mt-0">
+        <h2 className="mb-3 text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">{title}</h2>
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((x) => card(x, tone))}
         </ul>
       </section>
     )
@@ -80,7 +93,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/kalender'>)
   return (
     <PublicShell club={club} locale={locale} active="calendar">
       {all.length === 0 && (
-        <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text-muted)]">
+        <p className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text-muted)]">
           {club.opens_on ? t('pub.calendarSoon') : t('pub.noTournaments')}
         </p>
       )}

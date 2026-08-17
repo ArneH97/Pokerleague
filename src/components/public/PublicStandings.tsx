@@ -62,36 +62,59 @@ export async function PublicStandings({
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text-muted)]">
+        <p className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text-muted)]">
           {club.opens_on ? t('pub.standingsSoon') : t('pub.noResult')}
         </p>
       ) : (
-        <ol className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
-          {rows.map((r, i) => (
-            <li key={r.player_name} className="flex items-center gap-3 px-4 py-3">
-              <span
-                className={`tnum w-7 shrink-0 text-sm ${
-                  i < 3 ? 'font-semibold text-[var(--brand)]' : 'text-[var(--text-faint)]'
-                }`}
-              >
-                {i + 1}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{r.player_name}</span>
-                {/* Op een telefoon past er geen tabel met vijf kolommen, dus
-                    de bijzaken staan klein onder de naam in plaats van
-                    afgekapt ernaast. */}
-                <span className="tnum block text-xs text-[var(--text-faint)]">
-                  {r.tournaments} {t('pub.games').toLowerCase()} · {t('pub.best').toLowerCase()} {r.best_position}
-                </span>
-              </span>
-              <span className="tnum shrink-0 text-lg font-semibold">
-                {Math.round(Number(r.points))}
-              </span>
-            </li>
-          ))}
-        </ol>
+        /* Op een telefoon één regel per speler met het bijkomstige klein
+           eronder; vanaf tablet een echte tabel, want dan is er plaats voor
+           kolommen en leest een rij met vijf getallen prettiger dan vijf
+           regels tekst. */
+        <div className="overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--surface)]">
+          <table className="w-full text-left">
+            <thead className="hidden sm:table-header-group">
+              <tr className="border-b border-[var(--line)] text-[0.65rem] uppercase tracking-[0.2em] text-[var(--text-faint)]">
+                <th className="w-14 px-5 py-3 font-medium">#</th>
+                <th className="px-2 py-3 font-medium">{t('pub.player')}</th>
+                <th className="w-24 px-2 py-3 text-right font-medium">{t('pub.games')}</th>
+                <th className="w-24 px-2 py-3 text-right font-medium">{t('pub.best')}</th>
+                <th className="w-28 px-5 py-3 text-right font-medium">{t('pub.pts')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.player_name} className="border-b border-[var(--line)] last:border-0">
+                  <td className="px-5 py-3 align-baseline">
+                    <span
+                      className={`tnum text-sm ${
+                        i < 3 ? 'font-semibold text-[var(--brand)]' : 'text-[var(--text-faint)]'
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                  </td>
+                  <td className="px-2 py-3 align-baseline">
+                    <span className="block truncate font-medium">{r.player_name}</span>
+                    <span className="tnum block text-xs text-[var(--text-faint)] sm:hidden">
+                      {r.tournaments} {t('pub.games').toLowerCase()} · {t('pub.best').toLowerCase()} {r.best_position}
+                    </span>
+                  </td>
+                  <td className="tnum hidden px-2 py-3 text-right align-baseline text-sm text-[var(--text-muted)] sm:table-cell">
+                    {r.tournaments}
+                  </td>
+                  <td className="tnum hidden px-2 py-3 text-right align-baseline text-sm text-[var(--text-muted)] sm:table-cell">
+                    {r.best_position}
+                  </td>
+                  <td className="tnum px-5 py-3 text-right align-baseline text-lg font-semibold">
+                    {Math.round(Number(r.points))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
     </PublicShell>
   )
 }
