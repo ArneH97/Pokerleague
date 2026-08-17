@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FloorPlayers } from '@/components/FloorPlayers'
 import { createClient } from '@/lib/supabase/client'
 import {
-  resolveClock, formatDuration, formatBlinds, breakLabel,
+  resolveClock, levelsForClock, formatDuration, formatBlinds, breakLabel,
   start, pause, resume, nextLevel, prevLevel, adjustTime, normalise,
   type ClockState,
 } from '@/lib/tournament/clock'
@@ -33,13 +33,20 @@ export function FloorControls({
   backHref: string
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const { tournament, club, levels, stats, loading, error, live } = useTournament(tournamentId)
+  const { tournament, club, levels: planned, stats, loading, error, live } = useTournament(tournamentId)
   const { nowMs, nowIso } = useServerTime()
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const t = useT()
   const rolledRef = useRef<number | null>(null)
   useTicker(250)
+
+  // Zit de klok aan het laatste level van de structuur, dan komen er levels
+  // bij in hetzelfde ritme. Zonder dat loopt een tornooi dat uitloopt vast op
+  // 00:00 met stilstaande blinds — en dan raakt het nooit meer uitgespeeld.
+  const levels = tournament
+    ? levelsForClock(planned, toClockState(tournament), nowMs())
+    : planned
 
   async function apply(next: ClockState) {
     setBusy(true)

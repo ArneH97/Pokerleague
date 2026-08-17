@@ -42,13 +42,6 @@ interface MonthRow {
   club_cents: number
 }
 
-interface Season {
-  id: string
-  name: string
-  starts_on: string
-  ends_on: string | null
-}
-
 export default async function Page_({ params, searchParams }: PageProps<'/c/[club]/statistieken'>) {
   const { club: slug } = await params
   const q = await searchParams
@@ -79,27 +72,44 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   }
 
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
-  const mode = one(q.p) === 'year' ? 'year' : one(q.p) === 'all' ? 'all' : 'season'
 
-  const { data: seasonData } = await supabase
-    .from('seasons')
-    .select('id,name,starts_on,ends_on')
-    .eq('club_id', club.id)
-    .order('starts_on', { ascending: false })
-    .overrideTypes<Season[]>()
+  // Vier vensters, en het seizoen zit er bewust niet meer bij. Een seizoen is
+  // een begrip van het klassement — daar bepaalt het wie er meedingt. Voor de
+  // cijfers wil je kalendertijd: dit jaar tegenover vorig jaar, deze maand
+  // tegenover vorige maand. Wie iets anders nodig heeft, bijvoorbeeld een
+  // boekjaar of één toernooireeks, geeft zelf twee data in.
+  const wanted = one(q.p)
+  const mode: 'year' | 'month' | 'all' | 'custom' =
+    wanted === 'month' ? 'month'
+      : wanted === 'all' ? 'all'
+        : wanted === 'custom' ? 'custom'
+          : 'year'
 
-  const season = seasonData?.[0]
   const now = new Date()
   const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const lastDay = new Date(year, month, 0).getDate()
+
+  // Een datum die niet klopt hoort de pagina niet stuk te maken; dan valt hij
+  // terug op het hele jaar.
+  const isDate = (v: string | undefined): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v)
+  const rawFrom = one(q.from)
+  const rawTo = one(q.to)
+  const customFrom = isDate(rawFrom) ? rawFrom : `${year}-01-01`
+  const customTo = isDate(rawTo) ? rawTo : `${year}-${pad(month)}-${pad(lastDay)}`
+
+  const monthLabelLong = new Intl.DateTimeFormat(`${locale}-BE`, { month: 'long', year: 'numeric' })
 
   const [from, to, label] =
-    mode === 'year'
-      ? [`${year}-01-01`, `${year}-12-31`, String(year)]
+    mode === 'month'
+      ? [`${year}-${pad(month)}-01`, `${year}-${pad(month)}-${pad(lastDay)}`,
+         monthLabelLong.format(now)]
       : mode === 'all'
         ? ['1900-01-01', '2999-12-31', t('stats.allTime')]
-        : season
-          ? [season.starts_on, season.ends_on ?? '2999-12-31', season.name]
-          : ['1900-01-01', '2999-12-31', t('stats.allTime')]
+        : mode === 'custom'
+          ? [customFrom, customTo, `${customFrom} — ${customTo}`]
+          : [`${year}-01-01`, `${year}-12-31`, String(year)]
 
   const [statRes, monthRes] = await Promise.all([
     supabase.rpc('club_stats', { p_club_id: club.id, p_from: from, p_to: to }),
@@ -128,9 +138,14 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
 
       <div className="flex flex-wrap items-center gap-0.5 self-start rounded-[var(--radius)] border border-[var(--line)] p-0.5">
         {[
-          { href: `${base}?p=season`, label: t('stats.thisSeason'), on: mode === 'season' },
           { href: `${base}?p=year`, label: t('stats.thisYear'), on: mode === 'year' },
+          { href: `${base}?p=month`, label: t('stats.thisMonth'), on: mode === 'month' },
           { href: `${base}?p=all`, label: t('stats.allTime'), on: mode === 'all' },
+          {
+            href: `${base}?p=custom&from=${customFrom}&to=${customTo}`,
+            label: t('stats.custom'),
+            on: mode === 'custom',
+          },
         ].map((i) => (
           <Link
             key={i.href}
@@ -145,6 +160,38 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
           </Link>
         ))}
       </div>
+
+      {/* Een gewoon GET-formulier: geen JavaScript nodig, en de periode staat
+          daarna in de URL zodat je hem kan bewaren of doorsturen. */}
+      {mode === 'custom' && (
+        <form method="get" action={base} className="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="p" value="custom" />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--text-faint)]">{t('stats.from')}</span>
+            <input
+              type="date"
+              name="from"
+              defaultValue={customFrom}
+              className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--text-faint)]">{t('stats.to')}</span>
+            <input
+              type="date"
+              name="to"
+              defaultValue={customTo}
+              className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-[var(--radius)] bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
+          >
+            {t('stats.apply')}
+          </button>
+        </form>
+      )}
 
       {error && <Notice tone="error">{error}</Notice>}
 

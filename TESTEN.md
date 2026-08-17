@@ -26,9 +26,10 @@ de losse migraties die je nog niet had, in volgorde:
 0019_round_euros.sql        alles in hele euro's
 0020_stop_clock_on_finish.sql  de klok stopt zodra het tornooi dicht is
 0021_payout_list.sql        de uitbetaallijst voor aan de kassa
+0022_whole_points.sql       punten zonder cijfers na de komma
 ```
 
-Alle veertien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
+Alle vijftien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
 na elkaar over een gevulde database gehaald. Weet je niet meer waar je stond,
 draai ze dan gewoon allemaal.
 
@@ -143,6 +144,12 @@ puntenformule eronder uitgelegd), **Leden** (met bovenaan wie er geen mailadres
 heeft) en **Cijfers** (avonden, deelnames, geld, en twee grafieken over de
 laatste twaalf maanden).
 
+De cijfers lopen over **dit jaar, deze maand, alles** of een periode die je
+zelf ingeeft. Het seizoen zit er niet meer bij: dat is een begrip van het
+klassement — daar bepaalt het wie er meedingt — terwijl je bij de cijfers
+kalendertijd wil vergelijken. De gekozen periode staat in de URL, dus je kan
+ze bewaren of doorsturen.
+
 ---
 
 ## 3. Wat je onthoudt over hoe het werkt
@@ -176,6 +183,16 @@ speler met één historie.
 mét de reden. Dat register is je verantwoording tegenover het gedoogbeleid.
 
 **Prijzengeld gaat in hele euro's.** Nooit centen, en de som blijft exact de pot.
+Komt een even split niet rond uit, dan gaat de euro die overblijft naar de
+grootste stapel — de kortste stapel krijgt er een minder.
+
+**Punten zijn hele getallen.** Afgerond bij de bron en niet in het scherm:
+anders tonen drie avonden van 10,5 punten elk 11 terwijl het totaal 32 is.
+
+**Loopt een tornooi voorbij zijn structuur, dan groeit ze mee.** De klok maakt
+levels bij in het ritme dat de club zelf hanteert, zodat de blinds blijven
+stijgen in plaats van stil te vallen op 00:00. Die levels komen niet in de
+database — een structuur wordt gedeeld tussen avonden.
 
 ---
 
@@ -211,6 +228,12 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
       zaalscherm, en sluit af. Hij hoort te vragen welk voorstel het geworden
       is, en de klok hoort daarna stil te staan. Daarna hoort de
       uitbetaallijst de afgesproken bedragen per naam te tonen.
+- [ ] Pauzeer en hervat: het zaalscherm hoort "tornooi gepauzeerd" en
+      "tornooi hervat" te tonen en om te roepen.
+- [ ] Zet de klok op het laatste level en laat het aflopen. Er hoort een
+      nieuw level bij te komen met hogere blinds, niet 00:00.
+- [ ] Cijfers: klik door dit jaar, deze maand en alles, en geef daarna zelf
+      twee data in.
 - [ ] Bekijk de uitslag en daarna het klassement, het ledenbestand en de cijfers.
 - [ ] Ledenbestand: vul het mailadres aan van Marcel Vandeputte.
 

@@ -4,6 +4,7 @@ import {
   type BlindLevel, type ClockState,
   resolveClock, start, pause, resume, stop, nextLevel, prevLevel,
   adjustTime, formatDuration, formatBlinds, averageStack, breakLabel,
+  extendLevels, levelsForClock,
 } from './clock'
 
 const T0 = Date.parse('2026-09-06T20:00:00.000Z')
@@ -311,4 +312,37 @@ test('stoppen zet de stand ook gelijk', () => {
   const stopped = stop(running(), levels, laat)
   assert.equal(stopped.levelIdx, 1)
   assert.equal(stopped.levelElapsedMs, 5 * 60_000)
+})
+
+test('de structuur groeit door als het tornooi uitloopt', () => {
+  // Het laatste speellevel is 100/200 met ante 25; het vorige 50/100. De
+  // sprong is dus dubbel, en die sprong hoort door te lopen.
+  const extra = extendLevels(levels, 3)
+  assert.equal(extra.length, levels.length + 3)
+
+  const nieuw = extra.slice(levels.length)
+  assert.deepEqual(nieuw.map((l) => l.bigBlind), [400, 800, 1600])
+  assert.deepEqual(nieuw.map((l) => l.smallBlind), [200, 400, 800])
+  assert.deepEqual(nieuw.map((l) => l.ante), [50, 100, 200], 'de ante volgt dezelfde verhouding')
+  assert.ok(nieuw.every((l) => !l.isBreak), 'bijgemaakte levels zijn geen pauzes')
+  assert.ok(nieuw.every((l) => l.durationS === 1200), 'ze duren even lang als het laatste level')
+  assert.deepEqual(nieuw.map((l) => l.idx), [4, 5, 6], 'de nummering loopt gewoon door')
+})
+
+test('er komen pas levels bij als de klok het einde bereikt', () => {
+  // Middenin de structuur blijft het aantal levels wat de club instelde;
+  // anders staat er de hele avond "level 3 van 28" op het bord.
+  const midden = running(0, T0, 0)
+  assert.equal(levelsForClock(levels, midden, T0 + 60_000).length, levels.length)
+
+  // Maar loopt hij voorbij het laatste level, dan groeit hij mee en staat er
+  // geen 00:00 met stilstaande blinds.
+  const uitgelopen = running(0, T0, 0)
+  const uit = levelsForClock(levels, uitgelopen, T0 + 10 * 3600_000)
+  assert.ok(uit.length > levels.length, 'de structuur is verlengd')
+
+  const r = resolveClock(uitgelopen, uit, T0 + 10 * 3600_000)
+  assert.equal(r.finished, false, 'de klok loopt gewoon door')
+  assert.ok(r.remainingMs > 0, 'en er staat tijd op')
+  assert.ok((r.level?.bigBlind ?? 0) > 200, 'met hogere blinds dan het laatste geplande level')
 })

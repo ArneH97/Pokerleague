@@ -212,11 +212,31 @@ export function chipChopCents(chips: number[], prizes: number[]): number[] {
  * vergelijkbare stapels het vaakst afspreekt: even splitten en naar huis. De
  * grootste stapel gaat er zelden mee akkoord als hij ver voorloopt, en dan
  * dient dit als ondergrens in de discussie.
+ *
+ * Deelt de pot niet rond op, dan gaat de euro die overblijft naar de grootste
+ * stapel — en is het de kleinste die er een minder krijgt. Dat is de enige
+ * volgorde die aan tafel zonder uitleg aanvaard wordt: € 290 over vier
+ * spelers wordt 73 · 73 · 72 · 72, van chipleader naar kortste stapel. Wie
+ * hier op rijvolgorde verdeelt krijgt gegarandeerd de vraag waarom nummer
+ * vier een euro meer heeft dan nummer drie.
+ *
+ * `chips` is optioneel: zonder telling — even split mag zonder tellen — valt
+ * hij terug op de volgorde waarin de spelers aan tafel staan.
  */
-export function evenSplitCents(n: number, prizes: number[]): number[] {
+export function evenSplitCents(n: number, prizes: number[], chips?: number[]): number[] {
   if (n <= 0) return []
   const pool = sum(prizes.slice(0, Math.min(n, prizes.length)))
-  return distributeCents(pool, new Array(n).fill(1), PAYOUT_STEP_CENTS)
+
+  // Gelijke gewichten, dus het restant valt op volgorde. Door die volgorde
+  // naar chips te leggen komt de extra euro bij de grootste stapel terecht.
+  const order = Array.from({ length: n }, (_, i) => i)
+    .sort((a, b) => (chips?.[b] ?? 0) - (chips?.[a] ?? 0) || a - b)
+
+  const shares = distributeCents(pool, new Array(n).fill(1), PAYOUT_STEP_CENTS)
+
+  const out = new Array<number>(n).fill(0)
+  order.forEach((seat, rank) => { out[seat] = shares[rank] })
+  return out
 }
 
 /**
@@ -235,7 +255,7 @@ export function computeDeal(seats: DealSeat[], prizes: number[]): DealResult {
   const rawIcm = icmEquityCents(chips, prizes)
   const icm = rawIcm ? distributeCents(poolCents, rawIcm, PAYOUT_STEP_CENTS) : null
   const chop = chipChopCents(chips, prizes)
-  const even = evenSplitCents(seats.length, prizes)
+  const even = evenSplitCents(seats.length, prizes, chips)
 
   return {
     poolCents,

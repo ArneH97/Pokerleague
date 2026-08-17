@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { resolveClock, formatDuration, averageStack, breakLabel } from '@/lib/tournament/clock'
+import { resolveClock, levelsForClock, formatDuration, averageStack, breakLabel } from '@/lib/tournament/clock'
 import { expectedChipsInPlay, formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
@@ -25,11 +25,18 @@ const ANNOUNCE_MS = 8_000
  * scheelt paniek als iemand tegen de laptop stoot.
  */
 export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
-  const { tournament, club, levels, stats, loading, error, live, deal, prizes } = useTournament(tournamentId)
+  const { tournament, club, levels: planned, stats, loading, error, live, deal, prizes } = useTournament(tournamentId)
   const { nowMs } = useServerTime()
   const sound = useClockSound()
   const t = useT()
   useTicker(200)
+
+  // Loopt het tornooi voorbij het einde van de structuur, dan maakt de klok
+  // levels bij in hetzelfde ritme. Beide schermen doen dezelfde berekening,
+  // dus ze blijven gelijk lopen.
+  const levels = tournament
+    ? levelsForClock(planned, toClockState(tournament), nowMs())
+    : planned
 
   const resolved = tournament
     ? resolveClock(toClockState(tournament), levels, nowMs())
@@ -43,6 +50,43 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const warnedLevelRef = useRef<number | null>(null)
   const armedLevelRef = useRef<number | null>(null)
   const lastCallRef = useRef<number | null>(null)
+
+  // Pauzeren en hervatten omroepen. Een stilstaande klok is van achteraan de
+  // zaal niet te onderscheiden van een klok die loopt — je ziet pas na een
+  // paar seconden staren dat de seconden niet veranderen. Vandaar een
+  // boodschap in beeld én een toon, zodat de tafels het meteen weten.
+  const clockStatus = tournament?.clock ?? null
+  const [seenStatus, setSeenStatus] = useState<string | null>(null)
+  const [statusNote, setStatusNote] = useState<'paused' | 'resumed' | null>(null)
+
+  // Afgeleid tijdens het tekenen en niet in een effect: dit is een reactie op
+  // een veranderde waarde, geen bijwerking. Zo staat de melding er meteen bij
+  // de eerste tekening in plaats van een frame later.
+  if (clockStatus !== null && clockStatus !== seenStatus) {
+    setSeenStatus(clockStatus)
+    // De eerste keer dat dit scherm opengaat is geen overgang; anders zou
+    // elke refresh tijdens een pauze de melding opnieuw laten opkomen.
+    if (seenStatus !== null) {
+      setStatusNote(
+        clockStatus === 'paused' ? 'paused'
+          : clockStatus === 'running' && seenStatus === 'paused' ? 'resumed'
+            : null,
+      )
+    }
+  }
+
+  useEffect(() => {
+    if (statusNote === null) return
+    sound.playAttention()
+    sound.say(statusNote === 'paused' ? t('clock.pausedSpoken') : t('clock.resumedSpoken'))
+    // De melding bij hervatten gaat vanzelf weg: de klok loopt weer en dat
+    // ziet iedereen. Een pauze blijft staan zolang ze duurt — dat is precies
+    // de informatie die de zaal nodig heeft.
+    if (statusNote === 'resumed') {
+      const id = setTimeout(() => setStatusNote(null), ANNOUNCE_MS)
+      return () => clearTimeout(id)
+    }
+  }, [statusNote, sound, t])
 
   useEffect(() => {
     if (!running || !resolved?.level) return
@@ -317,6 +361,21 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             <BlindChip label={t('clock.bigBlind')} value={level.bigBlind} big accent={accent} />
             {level.ante > 0 && <BlindChip label={t('clock.ante')} value={level.ante} />}
           </div>
+        )}
+
+        {/* Gepauzeerd of net hervat. Staat boven de inkoopmelding: dit gaat
+            over of er gespeeld wordt, en dat komt eerst. */}
+        {statusNote && (
+          <p
+            className="mt-[2.2vh] rounded-full px-[2.4vw] py-[0.9vh] text-[2.6vh] font-bold uppercase tracking-[0.18em]"
+            style={
+              statusNote === 'paused'
+                ? { color: '#fbbf24', border: '1px solid #fbbf2455', background: '#fbbf2414' }
+                : { color: '#4ade80', border: '1px solid #4ade8055', background: '#4ade8014' }
+            }
+          >
+            {statusNote === 'paused' ? t('clock.pausedBanner') : t('clock.resumedBanner')}
+          </p>
         )}
 
         {/* Niet alleen omroepen maar ook tonen: in een volle zaal hoort de

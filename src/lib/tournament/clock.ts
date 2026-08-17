@@ -81,6 +81,109 @@ export function rawElapsedMs(state: ClockState, nowMs: number): number {
  * stond een kwartier uit. De klok loopt gewoon door in plaats van te bevriezen
  * op 00:00.
  */
+// ---------------------------------------------------------------------------
+// Doorspelen voorbij het einde van de structuur
+// ---------------------------------------------------------------------------
+
+/** Hoeveel levels er hoogstens bij verzonnen worden. */
+const OVERFLOW_LEVELS = 24
+
+/**
+ * Een bedrag op twee betekenisvolle cijfers zetten.
+ *
+ * Een blind van 25.637 roept een dealer niet af. Twee cijfers is wat clubs
+ * zelf gebruiken — Cutoff speelt 700/1400 en 8000/16000 — dus grover afronden
+ * zou de sprong die de club hanteert onnodig verstoren.
+ */
+function niceBlind(n: number): number {
+  if (n <= 0) return 0
+  const mag = Math.max(1, Math.pow(10, Math.floor(Math.log10(n)) - 1))
+  return Math.round(n / mag) * mag
+}
+
+/**
+ * Levels bijmaken in het ritme van de structuur zelf.
+ *
+ * Waarom dit bestaat: een structuur is een plan, en een tornooi houdt zich er
+ * niet altijd aan. Zit je aan het laatste level en is er nog niemand
+ * uitgespeeld, dan liep de klok vroeger dood op 00:00 en stonden de blinds
+ * stil — precies op het moment dat ze juist moeten blijven stijgen om de
+ * avond af te maken.
+ *
+ * De bijgemaakte levels volgen de sprong die de club zelf hanteert: de
+ * verhouding tussen de laatste twee speellevels, begrensd tussen anderhalf en
+ * dubbel zodat één rare sprong achteraan de structuur niet doorwerkt. Duur
+ * en ante volgen het laatste level.
+ *
+ * Ze staan niet in de database. Een blindstructuur wordt gedeeld tussen
+ * tornooien en tussen seizoenen; er levels aan toevoegen omdat één avond
+ * uitloopt zou het plan van alle volgende avonden veranderen. Dit is een
+ * berekening, en beide schermen komen uit hetzelfde antwoord omdat het
+ * dezelfde functie is.
+ */
+export function extendLevels(levels: BlindLevel[], extra = OVERFLOW_LEVELS): BlindLevel[] {
+  const sorted = [...levels].sort((a, b) => a.idx - b.idx)
+  const play = sorted.filter((l) => !l.isBreak)
+  if (play.length === 0 || extra <= 0) return sorted
+
+  const last = play[play.length - 1]
+  const prev = play.length > 1 ? play[play.length - 2] : null
+
+  const ratio = prev && prev.bigBlind > 0
+    ? Math.min(2, Math.max(1.5, last.bigBlind / prev.bigBlind))
+    : 1.5
+
+  // Speelde de club met een ante gelijk aan de big blind, dan blijft dat zo;
+  // anders houden we de verhouding tot de big blind aan.
+  const anteRatio = last.bigBlind > 0 ? last.ante / last.bigBlind : 0
+
+  const out = [...sorted]
+  let bb = last.bigBlind
+  let idx = sorted.length > 0 ? sorted[sorted.length - 1].idx : -1
+
+  for (let i = 0; i < extra; i += 1) {
+    bb = niceBlind(bb * ratio)
+    idx += 1
+    out.push({
+      idx,
+      isBreak: false,
+      label: null,
+      smallBlind: niceBlind(bb / 2),
+      bigBlind: bb,
+      ante: anteRatio > 0 ? niceBlind(bb * anteRatio) : 0,
+      durationS: last.durationS,
+    })
+  }
+  return out
+}
+
+/**
+ * De levels zoals ze nú gelden, met bijgemaakte levels als de klok het einde
+ * van de structuur nadert.
+ *
+ * Pas bijmaken als het nodig is. Zou je altijd verlengen, dan stond er de
+ * hele avond "level 3 van 41" op het bord en zou niemand nog weten hoe lang
+ * het nog duurt.
+ */
+export function levelsForClock(
+  levels: BlindLevel[], state: ClockState, nowMs: number,
+): BlindLevel[] {
+  if (levels.length === 0) return levels
+
+  // In rondes bijmaken tot de klok er weer binnen valt. Eén ronde dekt acht
+  // uur doorspelen; dat is ruim voor een avond die uitloopt. Meer rondes zijn
+  // er voor het geval dat niemand het scherm de hele nacht heeft aangeraakt —
+  // ook dan hoort het bord iets zinnigs te tonen in plaats van 00:00.
+  let out = levels
+  for (let round = 0; round < 4; round += 1) {
+    const here = resolveClock(state, out, nowMs)
+    const lastIdx = Math.max(...out.map((l) => l.idx))
+    if (!here.finished && here.levelIdx < lastIdx) return out
+    out = extendLevels(out)
+  }
+  return out
+}
+
 export function resolveClock(
   state: ClockState,
   levels: BlindLevel[],

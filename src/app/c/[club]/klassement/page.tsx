@@ -281,7 +281,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
                   </td>
                   <td className="px-4 py-2.5 font-medium">{r.display_name}</td>
                   <td className="tnum px-4 py-2.5 text-right font-semibold">
-                    {Number(r.points).toLocaleString('nl-BE', { maximumFractionDigits: 2 })}
+                    {Math.round(Number(r.points)).toLocaleString('nl-BE')}
                   </td>
                   <td className="tnum px-4 py-2.5 text-right text-[var(--text-muted)]">{r.tournaments}</td>
                   {showCounted && (

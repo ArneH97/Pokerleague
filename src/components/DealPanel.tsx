@@ -108,9 +108,12 @@ export function DealPanel({
     [seats, counts, prizes],
   )
 
-  const even = useMemo(() => evenSplitCents(n, remaining),
+  // De chips gaan mee zodat een restant van een euro bij de grootste stapel
+  // terechtkomt en niet bij wie toevallig bovenaan de lijst staat.
+  const even = useMemo(
+    () => evenSplitCents(n, remaining, seats.map((s) => counts[s.id] ?? 0)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [n, prizes])
+    [n, prizes, seats, counts])
 
   /** Wat een bepaald voorstel voor deze zitplaats uitkeert. */
   function valueOf(col: Col, i: number): number {

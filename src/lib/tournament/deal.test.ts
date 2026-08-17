@@ -257,3 +257,23 @@ test('een pot met centen erin verliest die centen niet', () => {
   const out = distributeCents(1250, [3, 1], 100)
   assert.equal(out.reduce((a, b) => a + b, 0), 1250)
 })
+
+test('even split geeft de overschietende euro aan de grootste stapel', () => {
+  // € 290 over vier spelers is 72,50 per persoon. Dat kan niet in hele euro's,
+  // dus twee spelers krijgen 73 en twee 72 — en dan hoort de chipleader bij de
+  // 73 te zitten en de kortste stapel bij de 72. Op rijvolgorde verdelen
+  // levert de vraag op waarom nummer vier een euro meer heeft dan nummer drie.
+  const chips = [194_400, 56_900, 30_900, 28_300]
+  const even = evenSplitCents(4, [15_000, 8_000, 3_500, 2_500], chips)
+
+  assert.equal(even.reduce((a, b) => a + b, 0), 29_000)
+  assert.deepEqual(even, [7_300, 7_300, 7_200, 7_200])
+})
+
+test('even split zonder telling houdt de rijvolgorde aan', () => {
+  // Even split mag zonder tellen. Dan is er geen chipvolgorde om op te
+  // steunen en blijft het bij de volgorde aan tafel; de som klopt nog altijd.
+  const even = evenSplitCents(3, [10_000, 6_000, 4_000])
+  assert.equal(even.reduce((a, b) => a + b, 0), 20_000)
+  assert.deepEqual(even, [6_700, 6_700, 6_600])
+})

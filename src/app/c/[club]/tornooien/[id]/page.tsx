@@ -165,7 +165,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
                         {r.knockouts > 0 ? r.knockouts : '—'}
                       </td>
                       <td className="tnum px-4 py-2.5 text-right text-[var(--text-muted)]">
-                        {Number(r.points).toLocaleString('nl-BE', { maximumFractionDigits: 2 })}
+                        {Math.round(Number(r.points)).toLocaleString('nl-BE')}
                       </td>
                       <td className="tnum px-4 py-2.5 text-right font-medium">
                         {r.prize_cents > 0 ? formatMoney(r.prize_cents, club.currency) : '—'}

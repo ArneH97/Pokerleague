@@ -74,9 +74,15 @@ begin
   p1 := public.calc_points('linear', '{"base":100,"decrement":5,"floor":1}', 30, 30);
   assert p1 = 1, format('linear bodem verwacht 1, kreeg %s', p1);
 
-  -- Bonus per knock-out telt erbij op.
+  -- Bonus per knock-out telt erbij op. Halve punten uit een bonus verdwijnen
+  -- in de afronding: 30 + 7,5 + 1 = 38,5 en dat wordt 39. Bewust — een
+  -- klassement met komma's leest als een berekening en telt niet meer op.
   p1 := public.calc_points('sqrt_ratio', '{"multiplier":10}', 1, 9, 3, 2500, 2.5, 1);
-  assert p1 = 30 + 7.5 + 1, format('bonussen kloppen niet: %s', p1);
+  assert p1 = 39, format('bonussen kloppen niet: %s', p1);
+
+  -- En elke uitkomst is een heel getal, ook als de formule dat niet is.
+  p1 := public.calc_points('sqrt_ratio', '{"multiplier":10}', 3, 27);
+  assert p1 = round(p1, 0), format('punten horen rond te zijn: %s', p1);
 
   raise notice 'punten OK';
 end $$;
