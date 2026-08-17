@@ -1,0 +1,115 @@
+import { notFound, redirect } from 'next/navigation'
+import { NewStructureButton } from '@/components/NewStructureButton'
+import { ButtonLink, Card, EmptyState, Page, PageHeader, SectionTitle } from '@/components/ui'
+import { getClub, getClubRole } from '@/lib/club'
+import { createClient } from '@/lib/supabase/server'
+
+export const metadata = { title: 'Blindstructuren' }
+
+interface Row {
+  id: string
+  name: string
+  club_id: string | null
+  blind_levels: { duration_s: number; is_break: boolean }[]
+}
+
+export default async function Page_({ params }: PageProps<'/c/[club]/structuren'>) {
+  const { club: slug } = await params
+  const club = await getClub(slug)
+  if (!club) notFound()
+
+  const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+  if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/structuren`)
+
+  const role = await getClubRole(club.id)
+  const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
+
+  const { data } = await supabase
+    .from('blind_structures')
+    .select('id,name,club_id,blind_levels(duration_s,is_break)')
+    .or(`club_id.eq.${club.id},club_id.is.null`)
+    .order('name')
+    .overrideTypes<Row[]>()
+
+  const rows = data ?? []
+  const own = rows.filter((r) => r.club_id === club.id)
+  const templates = rows.filter((r) => r.club_id === null)
+
+  return (
+    <Page>
+      <PageHeader
+        backHref={`/c/${slug}`}
+        backLabel={club.name}
+        title="Blindstructuren"
+        subtitle="Bepalen wat de klok aftelt tijdens een tornooi"
+        actions={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
+      />
+
+      {own.length === 0 ? (
+        <EmptyState
+          title="Nog geen eigen structuur"
+          action={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
+        >
+          Maak er een aan, of kopieer een sjabloon hieronder als vertrekpunt.
+        </EmptyState>
+      ) : (
+        <section>
+          <SectionTitle>Van {club.name}</SectionTitle>
+          <List items={own} slug={slug} clubId={club.id} />
+        </section>
+      )}
+
+      {templates.length > 0 && (
+        <section>
+          <SectionTitle>Sjablonen</SectionTitle>
+          <List items={templates} slug={slug} clubId={club.id} template />
+        </section>
+      )}
+    </Page>
+  )
+}
+
+function List({
+  items, slug, clubId, template,
+}: {
+  items: Row[]
+  slug: string
+  clubId: string
+  template?: boolean
+}) {
+  return (
+    <Card padded={false} className="overflow-hidden">
+      {items.map((s) => {
+        const minutes = Math.round(s.blind_levels.reduce((a, l) => a + l.duration_s, 0) / 60)
+        const play = s.blind_levels.filter((l) => !l.is_break).length
+        return (
+          <div
+            key={s.id}
+            className="hairline flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <div className="min-w-0">
+              <p className="truncate font-medium">{s.name}</p>
+              <p className="tnum mt-0.5 text-sm text-[var(--text-muted)]">
+                {play} levels
+                <span className="mx-1.5 text-[var(--text-faint)]">·</span>
+                {Math.floor(minutes / 60)}u{String(minutes % 60).padStart(2, '0')} speelduur
+              </p>
+            </div>
+            {template ? (
+              <NewStructureButton
+                clubId={clubId}
+                clubSlug={slug}
+                copyFrom={s.id}
+                label="Kopiëren"
+                suggestedName={`${s.name} (kopie)`}
+              />
+            ) : (
+              <ButtonLink size="sm" href={`/c/${slug}/structuren/${s.id}`}>Bewerken</ButtonLink>
+            )}
+          </div>
+        )
+      })}
+    </Card>
+  )
+}

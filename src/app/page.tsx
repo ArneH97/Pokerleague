@@ -46,22 +46,22 @@ export default async function Page() {
   const staffClubs = (memberships ?? []).filter((m) => m.clubs)
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-3xl space-y-8 bg-neutral-950 p-6 text-white">
+    <main className="mx-auto min-h-dvh w-full max-w-3xl space-y-8 bg-[var(--bg)] p-6 text-white">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-widest text-neutral-500">PokerLeague</p>
+          <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">PokerLeague</p>
           <h1 className="text-2xl font-semibold">Tornooien in België</h1>
         </div>
         {loggedIn ? (
           <form action="/auth/signout" method="post">
-            <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800">
+            <button className="rounded-lg border border-[var(--line-strong)] px-3 py-1.5 text-sm hover:bg-[var(--surface-hover)]">
               Afmelden
             </button>
           </form>
         ) : (
           <Link
             href="/login"
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-500"
+            className="rounded-lg bg-[var(--brand)] px-3 py-1.5 text-sm hover:brightness-110"
           >
             Aanmelden
           </Link>
@@ -69,14 +69,14 @@ export default async function Page() {
       </header>
 
       {staffClubs.length > 0 && (
-        <section className="rounded-xl border border-neutral-800 p-4">
-          <p className="text-sm text-neutral-400">Je beheert:</p>
+        <section className="rounded-xl border border-[var(--line)] p-4">
+          <p className="text-sm text-[var(--text-muted)]">Je beheert:</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {staffClubs.map((m) => (
               <li key={m.clubs!.slug}>
                 <Link
                   href={`/c/${m.clubs!.slug}`}
-                  className="inline-block rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 hover:bg-white"
+                  className="inline-block rounded-lg bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--bg)] hover:bg-white"
                 >
                   {m.clubs!.name} →
                 </Link>
@@ -87,8 +87,8 @@ export default async function Page() {
       )}
 
       {tournaments.length === 0 && (
-        <div className="rounded-xl border border-neutral-800 p-6 text-neutral-400">
-          <p className="font-medium text-neutral-200">Nog geen tornooien zichtbaar.</p>
+        <div className="rounded-xl border border-[var(--line)] p-6 text-[var(--text-muted)]">
+          <p className="font-medium text-[var(--text)]">Nog geen tornooien zichtbaar.</p>
           <p className="mt-2 text-sm">
             {loggedIn
               ? 'Je bent nog geen lid van een club, of er staat nog niets gepland.'
@@ -99,9 +99,9 @@ export default async function Page() {
 
       <ul className="space-y-3">
         {tournaments.map((t) => (
-          <li key={t.id} className="rounded-xl border border-neutral-800 p-4">
+          <li key={t.id} className="rounded-xl border border-[var(--line)] p-4">
             <p className="font-medium">{t.name}</p>
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-[var(--text-faint)]">
               {t.clubs?.name} ·{' '}
               {new Intl.DateTimeFormat('nl-BE', {
                 dateStyle: 'full',

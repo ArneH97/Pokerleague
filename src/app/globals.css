@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
+/**
+ * Ontwerpsysteem.
+ *
+ * Geen zwart-op-zwart met dunne grijze lijntjes: dat leest slecht in een
+ * verlichte zaal en ziet er onaf uit. In plaats daarvan gelaagde oppervlakken
+ * met een lichte blauwzweem, zodat kaarten zich van de achtergrond lossnijden
+ * zonder dat er een rand omheen hoeft te schreeuwen.
+ *
+ * --brand is de kleur van de club en wordt per clubomgeving overschreven.
+ * Alles wat je hier aanpast slaat dus door naar elk scherm.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg:            #0a0c10;
+  --surface:       #12151b;
+  --surface-2:     #181c24;
+  --surface-hover: #1e232c;
+  --line:          #252b36;
+  --line-strong:   #333b49;
+
+  --text:          #eceef2;
+  --text-muted:    #98a1b0;
+  --text-faint:    #646d7c;
+
+  --brand:         #10b981;
+  --on-brand:      #04120c;
+
+  --danger:        #f87171;
+  --warn:          #fbbf24;
+  --ok:            #34d399;
+
+  --radius:        0.875rem;
+  --radius-lg:     1.25rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg:            var(--bg);
+  --color-surface:       var(--surface);
+  --color-surface-2:     var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-line:          var(--line);
+  --color-line-strong:   var(--line-strong);
+  --color-text:          var(--text);
+  --color-muted:         var(--text-muted);
+  --color-faint:         var(--text-faint);
+  --color-brand:         var(--brand);
+  --color-on-brand:      var(--on-brand);
+  --color-danger:        var(--danger);
+  --color-warn:          var(--warn);
+  --color-ok:            var(--ok);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Getallen die naast elkaar staan mogen niet dansen bij het aftellen. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Zachte scheiding tussen rijen in een lijst, zonder harde kaders. */
+.hairline + .hairline {
+  border-top: 1px solid var(--line);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--brand) 35%, transparent);
+}
+
+/* Consistente focusring, ook op donkere vlakken zichtbaar. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--brand) 70%, white 10%);
+  outline-offset: 2px;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* Donkere datumkiezer in plaats van het witte systeemicoon. */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
 }

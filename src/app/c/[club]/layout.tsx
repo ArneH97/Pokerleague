@@ -26,8 +26,10 @@ export default async function ClubLayout({ children, params }: LayoutProps<'/c/[
       className="min-h-dvh"
       style={
         {
-          '--club-brand': brand,
-          '--club-on-brand': readableTextOn(brand),
+          // Overschrijft de standaardkleur uit globals.css voor alles onder
+          // deze club. Elke knop en elk accent volgt vanzelf.
+          '--brand': brand,
+          '--on-brand': readableTextOn(brand),
         } as React.CSSProperties
       }
     >

@@ -1,0 +1,318 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Button, Card, Field, Notice, SectionTitle, inputClass } from '@/components/ui'
+
+/**
+ * Blindstructuur bewerken.
+ *
+ * De volgorde is de lijst zelf — er is geen apart nummerveld dat uit de pas
+ * kan lopen. Bij opslaan krijgt elk level zijn index op basis van waar het
+ * staat, wat betekent dat verslepen of verwijderen nooit gaten laat.
+ */
+
+export interface EditorLevel {
+  key: string
+  isBreak: boolean
+  label: string
+  smallBlind: number
+  bigBlind: number
+  ante: number
+  minutes: number
+}
+
+let counter = 0
+const newKey = () => `l${counter++}`
+
+export function makeLevel(p: Partial<EditorLevel> = {}): EditorLevel {
+  return {
+    key: newKey(),
+    isBreak: false,
+    label: '',
+    smallBlind: 25,
+    bigBlind: 50,
+    ante: 0,
+    minutes: 20,
+    ...p,
+  }
+}
+
+/** Volgende blindniveau: ongeveer anderhalf keer, afgerond op iets leesbaars. */
+function nextBlinds(bb: number): { sb: number; bb: number } {
+  const target = bb * 1.5
+  const step = target < 200 ? 25 : target < 1000 ? 50 : target < 5000 ? 500 : 1000
+  const rounded = Math.max(bb + step, Math.round(target / step) * step)
+  return { sb: Math.round(rounded / 2), bb: rounded }
+}
+
+interface Props {
+  structureId: string
+  clubSlug: string
+  initialName: string
+  initialLevels: EditorLevel[]
+}
+
+export function StructureEditor({ structureId, clubSlug, initialName, initialLevels }: Props) {
+  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
+
+  const [name, setName] = useState(initialName)
+  const [levels, setLevels] = useState<EditorLevel[]>(
+    initialLevels.length > 0 ? initialLevels : [makeLevel()],
+  )
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const totalMinutes = levels.reduce((s, l) => s + (l.minutes || 0), 0)
+  const playLevels = levels.filter((l) => !l.isBreak).length
+
+  function patch(key: string, p: Partial<EditorLevel>) {
+    setLevels((ls) => ls.map((l) => (l.key === key ? { ...l, ...p } : l)))
+    setSaved(false)
+  }
+
+  function addLevel() {
+    setLevels((ls) => {
+      const last = [...ls].reverse().find((l) => !l.isBreak)
+      const n = last ? nextBlinds(last.bigBlind) : { sb: 25, bb: 50 }
+      return [...ls, makeLevel({
+        smallBlind: n.sb,
+        bigBlind: n.bb,
+        ante: last && last.ante > 0 ? n.bb : 0,
+        minutes: last?.minutes ?? 20,
+      })]
+    })
+    setSaved(false)
+  }
+
+  function addBreak() {
+    setLevels((ls) => [...ls, makeLevel({ isBreak: true, label: 'Pauze', minutes: 10 })])
+    setSaved(false)
+  }
+
+  function move(key: string, dir: -1 | 1) {
+    setLevels((ls) => {
+      const i = ls.findIndex((l) => l.key === key)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= ls.length) return ls
+      const copy = [...ls]
+      ;[copy[i], copy[j]] = [copy[j], copy[i]]
+      return copy
+    })
+    setSaved(false)
+  }
+
+  function remove(key: string) {
+    setLevels((ls) => (ls.length <= 1 ? ls : ls.filter((l) => l.key !== key)))
+    setSaved(false)
+  }
+
+  /** Vult de structuur aan tot een gewenste speelduur, met pauze per vier levels. */
+  function generate(hours: number) {
+    const perLevel = 20
+    const wanted = Math.max(4, Math.round((hours * 60) / perLevel))
+    const out: EditorLevel[] = []
+    let sb = 25
+    let bb = 50
+    for (let i = 0; i < wanted; i++) {
+      out.push(makeLevel({
+        smallBlind: sb, bigBlind: bb,
+        ante: i >= 5 ? bb : 0,
+        minutes: perLevel,
+      }))
+      if ((i + 1) % 4 === 0 && i + 1 < wanted) {
+        out.push(makeLevel({ isBreak: true, label: 'Pauze', minutes: 10 }))
+      }
+      const n = nextBlinds(bb)
+      sb = n.sb
+      bb = n.bb
+    }
+    setLevels(out)
+    setSaved(false)
+  }
+
+  async function save() {
+    setBusy(true)
+    setError(null)
+
+    const { error: nameErr } = await supabase
+      .from('blind_structures')
+      .update({ name: name.trim() || 'Naamloos' })
+      .eq('id', structureId)
+
+    if (nameErr) {
+      setError(nameErr.message)
+      setBusy(false)
+      return
+    }
+
+    const { error: err } = await supabase.rpc('replace_blind_levels', {
+      p_structure_id: structureId,
+      p_levels: levels.map((l) => ({
+        is_break: l.isBreak,
+        label: l.isBreak ? (l.label || 'Pauze') : null,
+        small_blind: l.isBreak ? 0 : l.smallBlind,
+        big_blind: l.isBreak ? 0 : l.bigBlind,
+        ante: l.isBreak ? 0 : l.ante,
+        duration_s: Math.max(1, l.minutes) * 60,
+      })),
+    })
+
+    if (err) {
+      setError(err.message)
+      setBusy(false)
+      return
+    }
+
+    setSaved(true)
+    setBusy(false)
+    router.refresh()
+  }
+
+  return (
+    <div className="space-y-6">
+      <Field label="Naam van de structuur">
+        <input
+          value={name}
+          onChange={(e) => { setName(e.target.value); setSaved(false) }}
+          className={inputClass}
+          placeholder="Standaard 20 min"
+        />
+      </Field>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+        <div className="tnum text-sm">
+          <span className="text-[var(--text-muted)]">Speelduur</span>{' '}
+          <span className="font-semibold">
+            {Math.floor(totalMinutes / 60)}u{String(totalMinutes % 60).padStart(2, '0')}
+          </span>
+          <span className="mx-2 text-[var(--text-faint)]">·</span>
+          <span className="text-[var(--text-muted)]">{playLevels} levels</span>
+          <span className="mx-2 text-[var(--text-faint)]">·</span>
+          <span className="text-[var(--text-muted)]">
+            {levels.length - playLevels} pauze{levels.length - playLevels === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <span className="self-center text-xs text-[var(--text-faint)]">Snel opzetten:</span>
+          {[3, 4, 5, 6].map((h) => (
+            <Button key={h} size="sm" onClick={() => generate(h)} type="button">{h} uur</Button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionTitle>Levels</SectionTitle>
+        <Card padded={false} className="overflow-hidden">
+          <div className="hidden grid-cols-[2.5rem_1fr_1fr_1fr_5rem_5.5rem] gap-2 border-b border-[var(--line)] px-4 py-2.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)] sm:grid">
+            <span>#</span><span>Small blind</span><span>Big blind</span><span>Ante</span>
+            <span>Minuten</span><span />
+          </div>
+
+          {levels.map((l, i) => {
+            const playIdx = levels.slice(0, i + 1).filter((x) => !x.isBreak).length
+            return (
+              <div
+                key={l.key}
+                className={`hairline grid grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-[2.5rem_1fr_1fr_1fr_5rem_5.5rem] ${
+                  l.isBreak ? 'bg-[color-mix(in_oklab,var(--brand)_7%,transparent)]' : ''
+                }`}
+              >
+                <span className="tnum text-sm text-[var(--text-faint)]">
+                  {l.isBreak ? '—' : playIdx}
+                </span>
+
+                {l.isBreak ? (
+                  <input
+                    value={l.label}
+                    onChange={(e) => patch(l.key, { label: e.target.value })}
+                    placeholder="Pauze"
+                    className={`${inputClass} col-span-1 sm:col-span-3`}
+                  />
+                ) : (
+                  <>
+                    <NumberCell value={l.smallBlind} onChange={(v) => patch(l.key, { smallBlind: v })} />
+                    <NumberCell value={l.bigBlind} onChange={(v) => patch(l.key, { bigBlind: v })} />
+                    <NumberCell value={l.ante} onChange={(v) => patch(l.key, { ante: v })} />
+                  </>
+                )}
+
+                <NumberCell value={l.minutes} onChange={(v) => patch(l.key, { minutes: v })} />
+
+                <div className="flex items-center justify-end gap-1">
+                  <IconButton label="Omhoog" disabled={i === 0} onClick={() => move(l.key, -1)}>↑</IconButton>
+                  <IconButton label="Omlaag" disabled={i === levels.length - 1} onClick={() => move(l.key, 1)}>↓</IconButton>
+                  <IconButton label="Verwijderen" disabled={levels.length <= 1} onClick={() => remove(l.key)} danger>×</IconButton>
+                </div>
+              </div>
+            )
+          })}
+        </Card>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button type="button" onClick={addLevel}>+ Level</Button>
+          <Button type="button" onClick={addBreak}>+ Pauze</Button>
+        </div>
+      </div>
+
+      {error && <Notice tone="error">{error}</Notice>}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="brand" size="lg" onClick={save} disabled={busy}>
+          {busy ? 'Opslaan…' : 'Opslaan'}
+        </Button>
+        {saved && <span className="text-sm text-[var(--ok)]">Opgeslagen</span>}
+        <a
+          href={`/c/${clubSlug}/structuren`}
+          className="text-sm text-[var(--text-faint)] underline underline-offset-4 hover:text-[var(--text-muted)]"
+        >
+          Terug naar overzicht
+        </a>
+      </div>
+    </div>
+  )
+}
+
+function NumberCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <input
+      inputMode="numeric"
+      value={value}
+      onChange={(e) => {
+        const n = Number.parseInt(e.target.value.replace(/\D/g, ''), 10)
+        onChange(Number.isFinite(n) ? n : 0)
+      }}
+      className={`${inputClass} tnum px-2.5 py-1.5 text-sm`}
+    />
+  )
+}
+
+function IconButton({
+  children, label, onClick, disabled, danger,
+}: {
+  children: React.ReactNode
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={`grid size-7 place-items-center rounded-md border border-[var(--line)] text-sm transition-colors disabled:opacity-25 ${
+        danger
+          ? 'text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_15%,transparent)]'
+          : 'text-[var(--text-muted)] hover:bg-[var(--surface-hover)]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}

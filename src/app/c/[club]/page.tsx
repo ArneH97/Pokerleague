@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import {
+  Badge, ButtonLink, Card, EmptyState, Notice, Page, PageHeader, SectionTitle,
+} from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
@@ -13,12 +16,16 @@ interface Row {
   fee_cents: number
 }
 
-const STATUS: Record<string, string> = {
-  draft: 'Concept', scheduled: 'Gepland', running: 'Bezig',
-  paused: 'Gepauzeerd', finished: 'Afgelopen', cancelled: 'Geannuleerd',
+const STATUS: Record<string, { label: string; tone: 'neutral' | 'live' | 'ok' }> = {
+  draft: { label: 'Concept', tone: 'neutral' },
+  scheduled: { label: 'Gepland', tone: 'neutral' },
+  running: { label: 'Bezig', tone: 'live' },
+  paused: { label: 'Gepauzeerd', tone: 'neutral' },
+  finished: { label: 'Afgelopen', tone: 'neutral' },
+  cancelled: { label: 'Geannuleerd', tone: 'neutral' },
 }
 
-export default async function Page({ params }: PageProps<'/c/[club]'>) {
+export default async function Page_({ params }: PageProps<'/c/[club]'>) {
   const { club: slug } = await params
   const club = await getClub(slug)
   if (!club) notFound()
@@ -37,88 +44,134 @@ export default async function Page({ params }: PageProps<'/c/[club]'>) {
     .limit(50)
     .overrideTypes<Row[]>()
 
-  const tournaments = data ?? []
+  const all = data ?? []
+  const live = all.filter((t) => t.status === 'running' || t.status === 'paused')
+  const upcoming = all
+    .filter((t) => t.status === 'scheduled' || t.status === 'draft')
+    .reverse()
+  const past = all.filter((t) => t.status === 'finished' || t.status === 'cancelled')
+
   const fmt = new Intl.DateTimeFormat('nl-BE', {
-    dateStyle: 'full', timeStyle: 'short', timeZone: club.timezone,
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    timeZone: club.timezone,
   })
 
+  const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
+
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-3xl space-y-8 bg-neutral-950 p-6 text-white">
-      <header className="flex items-start justify-between gap-4">
+    <Page>
+      <PageHeader
+        overline={club.city ?? undefined}
+        title={club.name}
+        subtitle="Tornooibeheer"
+        actions={
+          <>
+            {canManage && (
+              <ButtonLink variant="brand" href={`/c/${slug}/tornooien/nieuw`}>
+                Nieuw tornooi
+              </ButtonLink>
+            )}
+            <form action="/auth/signout" method="post">
+              <button className="inline-flex items-center rounded-[var(--radius)] border border-[var(--line-strong)] px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]">
+                Afmelden
+              </button>
+            </form>
+          </>
+        }
+      />
+
+      {club.logo_url && (
         <div className="flex items-center gap-3">
-          {club.logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={club.logo_url} alt="" className="size-11 rounded object-contain" />
-          )}
-          <div>
-            <h1 className="text-2xl font-semibold">{club.name}</h1>
-            <p className="text-sm text-neutral-500">
-              {club.city ? `${club.city} · ` : ''}Tornooibeheer
-            </p>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={club.logo_url} alt="" className="size-12 rounded-[var(--radius)] object-contain" />
         </div>
-        <form action="/auth/signout" method="post">
-          <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800">
-            Afmelden
-          </button>
-        </form>
-      </header>
+      )}
 
       {!role && (
-        <p className="rounded-xl border border-amber-900 bg-amber-950/50 p-4 text-sm text-amber-300">
+        <Notice tone="warn">
           Je account is niet gekoppeld aan deze club, dus je ziet hier niets.
           Vraag een beheerder om je toe te voegen.
+        </Notice>
+      )}
+
+      {role && all.length === 0 && (
+        <EmptyState
+          title="Nog geen tornooien"
+          action={
+            canManage && (
+              <ButtonLink variant="brand" href={`/c/${slug}/tornooien/nieuw`}>
+                Eerste tornooi aanmaken
+              </ButtonLink>
+            )
+          }
+        >
+          Maak er een aan om de klok te kunnen gebruiken.
+        </EmptyState>
+      )}
+
+      {live.length > 0 && (
+        <section>
+          <SectionTitle>Nu bezig</SectionTitle>
+          <Card padded={false} className="overflow-hidden ring-1 ring-[color-mix(in_oklab,var(--ok)_25%,transparent)]">
+            {live.map((t) => <Item key={t.id} t={t} club={club} fmt={fmt} />)}
+          </Card>
+        </section>
+      )}
+
+      {upcoming.length > 0 && (
+        <section>
+          <SectionTitle>Gepland</SectionTitle>
+          <Card padded={false} className="overflow-hidden">
+            {upcoming.map((t) => <Item key={t.id} t={t} club={club} fmt={fmt} />)}
+          </Card>
+        </section>
+      )}
+
+      {past.length > 0 && (
+        <section>
+          <SectionTitle>Eerder</SectionTitle>
+          <Card padded={false} className="overflow-hidden">
+            {past.slice(0, 10).map((t) => <Item key={t.id} t={t} club={club} fmt={fmt} />)}
+          </Card>
+        </section>
+      )}
+
+      {canManage && (
+        <p className="pt-2 text-sm text-[var(--text-faint)]">
+          <Link href={`/c/${slug}/structuren`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
+            Blindstructuren beheren
+          </Link>
         </p>
       )}
+    </Page>
+  )
+}
 
-      {role && tournaments.length === 0 && (
-        <div className="rounded-xl border border-neutral-800 p-6 text-neutral-400">
-          <p className="font-medium text-neutral-200">Nog geen tornooien.</p>
-          <p className="mt-2 text-sm">Maak er een aan om de klok te kunnen gebruiken.</p>
+function Item({
+  t, club, fmt,
+}: {
+  t: Row
+  club: { slug: string; currency: string }
+  fmt: Intl.DateTimeFormat
+}) {
+  const s = STATUS[t.status] ?? { label: t.status, tone: 'neutral' as const }
+  return (
+    <div className="hairline flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="truncate font-medium">{t.name}</p>
+          <Badge tone={s.tone}>{s.label}</Badge>
         </div>
-      )}
-
-      <ul className="space-y-3">
-        {tournaments.map((t) => (
-          <li
-            key={t.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-800 p-4"
-          >
-            <div className="min-w-0">
-              <p className="truncate font-medium">{t.name}</p>
-              <p className="text-sm text-neutral-500">
-                {fmt.format(new Date(t.scheduled_at))}
-                {' · '}
-                {formatMoney(t.buyin_cents + t.fee_cents, club.currency)}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs ${
-                  t.status === 'running'
-                    ? 'bg-emerald-950 text-emerald-400'
-                    : 'bg-neutral-800 text-neutral-300'
-                }`}
-              >
-                {STATUS[t.status] ?? t.status}
-              </span>
-              <Link
-                href={`/c/${club.slug}/klok/${t.id}`}
-                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
-              >
-                Klok
-              </Link>
-              <Link
-                href={`/c/${club.slug}/floor/${t.id}`}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium"
-                style={{ background: 'var(--club-brand)', color: 'var(--club-on-brand)' }}
-              >
-                Floor
-              </Link>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </main>
+        <p className="tnum mt-0.5 text-sm text-[var(--text-muted)]">
+          {fmt.format(new Date(t.scheduled_at))}
+          <span className="mx-1.5 text-[var(--text-faint)]">·</span>
+          {formatMoney(t.buyin_cents + t.fee_cents, club.currency)}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <ButtonLink size="sm" href={`/c/${club.slug}/klok/${t.id}`}>Klok</ButtonLink>
+        <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/floor/${t.id}`}>Floor</ButtonLink>
+      </div>
+    </div>
   )
 }

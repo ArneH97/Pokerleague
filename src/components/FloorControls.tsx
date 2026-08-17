@@ -59,9 +59,9 @@ export function FloorControls({
     setBusy(false)
   }
 
-  if (loading) return <Shell><p className="text-neutral-400">Laden…</p></Shell>
+  if (loading) return <Shell><p className="text-[var(--text-muted)]">Laden…</p></Shell>
   if (error || !tournament) {
-    return <Shell><p className="text-red-400">{error ?? 'Onbekend tornooi'}</p></Shell>
+    return <Shell><p className="text-[var(--danger)]">{error ?? 'Onbekend tornooi'}</p></Shell>
   }
 
   const state = toClockState(tournament)
@@ -73,7 +73,7 @@ export function FloorControls({
     <Shell>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-widest text-neutral-500">
+          <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
             {club?.name} · Floor
           </p>
           <h1 className="text-2xl font-semibold">{tournament.name}</h1>
@@ -81,25 +81,25 @@ export function FloorControls({
         <div className="flex items-center gap-3">
           <span
             className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${
-              live ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'
+              live ? 'bg-[color-mix(in_oklab,var(--ok)_14%,transparent)] text-[var(--ok)]' : 'bg-[color-mix(in_oklab,var(--warn)_14%,transparent)] text-[var(--warn)]'
             }`}
           >
-            <span className={`size-2 rounded-full ${live ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className={`size-2 rounded-full ${live ? 'bg-[var(--ok)]' : 'bg-[var(--warn)]'}`} />
             {live ? 'Live' : 'Verbinding kwijt'}
           </span>
           <a
             href={clockHref}
             target="_blank"
             rel="noreferrer"
-            className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+            className="rounded-lg border border-[var(--line-strong)] px-3 py-1.5 text-sm hover:bg-[var(--surface-hover)]"
           >
             Zaalscherm openen ↗
           </a>
         </div>
       </header>
 
-      <section className="rounded-2xl bg-neutral-900 p-6 text-center">
-        <p className="text-sm uppercase tracking-widest text-neutral-500">
+      <section className="rounded-2xl bg-[var(--surface)] p-6 text-center">
+        <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
           {resolved.level?.isBreak
             ? (resolved.level.label ?? 'Pauze')
             : `Level ${resolved.levelIdx + 1} van ${levels.length || '—'}`}
@@ -107,12 +107,12 @@ export function FloorControls({
         <p className="my-2 text-7xl font-bold tabular-nums leading-none">
           {formatDuration(resolved.remainingMs)}
         </p>
-        <p className="text-2xl text-neutral-300">{formatBlinds(resolved.level)}</p>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="text-2xl text-[var(--text-muted)]">{formatBlinds(resolved.level)}</p>
+        <p className="mt-1 text-sm text-[var(--text-faint)]">
           {resolved.nextLevel ? `Hierna: ${formatBlinds(resolved.nextLevel)}` : 'Laatste level'}
         </p>
         {resolved.rolledOver > 0 && running && (
-          <p className="mt-3 text-sm text-amber-400">
+          <p className="mt-3 text-sm text-[var(--warn)]">
             {resolved.rolledOver} level{resolved.rolledOver > 1 ? 's' : ''} automatisch
             doorgerold — de klok liep door zonder dat er geklikt werd.
           </p>
@@ -120,7 +120,7 @@ export function FloorControls({
       </section>
 
       {levels.length === 0 && (
-        <p className="rounded-xl border border-amber-900 bg-amber-950/50 p-4 text-sm text-amber-300">
+        <p className="rounded-xl border border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] p-4 text-sm text-[var(--warn)]">
           Dit tornooi heeft nog geen blindstructuur. Koppel er een aan voor je start,
           anders heeft de klok niets om af te tellen.
         </p>
@@ -174,7 +174,7 @@ export function FloorControls({
       </section>
 
       {actionError && (
-        <p className="rounded-xl border border-red-900 bg-red-950/50 p-4 text-sm text-red-300">
+        <p className="rounded-xl border border-[color-mix(in_oklab,var(--danger)_35%,transparent)] bg-[color-mix(in_oklab,var(--danger)_10%,transparent)] p-4 text-sm text-[var(--danger)]">
           {actionError}
         </p>
       )}
@@ -197,20 +197,20 @@ export function FloorControls({
 
       {levels.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm uppercase tracking-widest text-neutral-500">Structuur</h2>
-          <ol className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-800">
+          <h2 className="mb-2 text-sm uppercase tracking-widest text-[var(--text-faint)]">Structuur</h2>
+          <ol className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
             {levels.map((l) => (
               <li
                 key={l.idx}
                 className={`flex items-center justify-between px-4 py-2 text-sm ${
-                  l.idx === resolved.levelIdx ? 'bg-neutral-800' : ''
-                } ${l.isBreak ? 'text-sky-300' : ''}`}
+                  l.idx === resolved.levelIdx ? 'bg-[var(--surface-2)]' : ''
+                } ${l.isBreak ? 'text-[#7dd3fc]' : ''}`}
               >
-                <span className="w-16 text-neutral-500">
+                <span className="w-16 text-[var(--text-faint)]">
                   {l.isBreak ? 'Pauze' : `#${l.idx + 1}`}
                 </span>
                 <span className="flex-1 tabular-nums">{formatBlinds(l)}</span>
-                <span className="tabular-nums text-neutral-500">
+                <span className="tabular-nums text-[var(--text-faint)]">
                   {Math.round(l.durationS / 60)} min
                 </span>
               </li>
@@ -224,7 +224,7 @@ export function FloorControls({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 bg-neutral-950 p-6 text-white">
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 bg-[var(--bg)] p-6 text-white">
       {children}
     </main>
   )
@@ -245,8 +245,8 @@ function Button({
       disabled={disabled}
       className={`rounded-xl px-4 py-4 text-base font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
         primary
-          ? 'bg-emerald-600 hover:bg-emerald-500'
-          : 'border border-neutral-700 hover:bg-neutral-800'
+          ? 'bg-[var(--brand)] text-[var(--on-brand)] hover:brightness-110'
+          : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
       }`}
     >
       {children}
@@ -256,8 +256,8 @@ function Button({
 
 function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-neutral-800 p-4">
-      <p className="text-xs uppercase tracking-widest text-neutral-500">{label}</p>
+    <div className="rounded-xl border border-[var(--line)] p-4">
+      <p className="text-xs uppercase tracking-widest text-[var(--text-faint)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   )

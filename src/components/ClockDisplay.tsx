@@ -86,22 +86,22 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       : 'idle'
 
   const timeColor =
-    urgency === 'critical' ? 'text-red-400'
-      : urgency === 'soon' ? 'text-amber-300'
-      : isBreak ? 'text-sky-300'
+    urgency === 'critical' ? 'text-[var(--danger)]'
+      : urgency === 'soon' ? 'text-[var(--warn)]'
+      : isBreak ? 'text-[#7dd3fc]'
       : 'text-white'
 
   return (
-    <main className="relative min-h-dvh select-none bg-neutral-950 text-white flex flex-col">
+    <main className="relative min-h-dvh select-none bg-[var(--bg)] text-white flex flex-col">
       <header className="flex items-baseline justify-between px-[3vw] pt-[2.5vh]">
         <div className="min-w-0">
-          <p className="truncate text-[2.2vh] uppercase tracking-[0.25em] text-neutral-500">
+          <p className="truncate text-[2.2vh] uppercase tracking-[0.25em] text-[var(--text-faint)]">
             {club?.name ?? ''}
           </p>
           <h1 className="truncate text-[3.4vh] font-semibold">{tournament.name}</h1>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[2.2vh] uppercase tracking-[0.25em] text-neutral-500">
+          <p className="text-[2.2vh] uppercase tracking-[0.25em] text-[var(--text-faint)]">
             {isBreak ? 'Pauze' : `Level ${levelIdx + 1}`}
           </p>
           <p className="text-[3.4vh] font-semibold tabular-nums">
@@ -115,7 +115,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
       <section className="flex flex-1 flex-col items-center justify-center gap-[1vh] px-[3vw]">
         {isBreak && (
-          <p className="text-[6vh] font-semibold uppercase tracking-[0.2em] text-sky-300">
+          <p className="text-[6vh] font-semibold uppercase tracking-[0.2em] text-[#7dd3fc]">
             {resolved.level?.label ?? 'Pauze'}
           </p>
         )}
@@ -130,12 +130,12 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
         </p>
 
         {!isBreak && (
-          <p className="text-[9vh] font-semibold leading-none tabular-nums text-neutral-100">
+          <p className="text-[9vh] font-semibold leading-none tabular-nums text-[var(--text)]">
             {formatBlinds(resolved.level)}
           </p>
         )}
 
-        <p className="mt-[1vh] text-[2.8vh] text-neutral-500">
+        <p className="mt-[1vh] text-[2.8vh] text-[var(--text-faint)]">
           {resolved.nextLevel
             ? `Hierna — ${formatBlinds(resolved.nextLevel)}`
             : 'Laatste level'}
@@ -168,15 +168,15 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
       {/* Aankondiging bij een nieuw level. */}
       {announcing && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/92">
-          <p className="text-[4vh] uppercase tracking-[0.3em] text-neutral-400">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_92%,transparent)]">
+          <p className="text-[4vh] uppercase tracking-[0.3em] text-[var(--text-muted)]">
             {isBreak ? 'Pauze' : `Level ${levelIdx + 1}`}
           </p>
           <p className="mt-[2vh] text-center font-bold leading-none" style={{ fontSize: 'min(18vh, 14vw)' }}>
             {isBreak ? (resolved.level?.label ?? 'Pauze') : formatBlinds(resolved.level)}
           </p>
           {!isBreak && resolved.level && resolved.level.ante > 0 && (
-            <p className="mt-[2vh] text-[4vh] text-neutral-400">
+            <p className="mt-[2vh] text-[4vh] text-[var(--text-muted)]">
               Ante {resolved.level.ante.toLocaleString('nl-BE')}
             </p>
           )}
@@ -189,14 +189,14 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
         <button
           type="button"
           onClick={() => void sound.enable()}
-          className="absolute bottom-[2vh] left-1/2 -translate-x-1/2 rounded-full bg-white px-6 py-3 text-[2vh] font-medium text-neutral-900 shadow-lg hover:bg-neutral-200"
+          className="absolute bottom-[2vh] left-1/2 -translate-x-1/2 rounded-full bg-white px-6 py-3 text-[2vh] font-medium text-[var(--bg)] shadow-lg hover:brightness-95"
         >
           Geluid aanzetten
         </button>
       )}
 
       {!live && (
-        <p className="absolute bottom-2 right-3 text-[1.6vh] text-amber-500">
+        <p className="absolute bottom-2 right-3 text-[1.6vh] text-[var(--warn)]">
           Verbinding kwijt — scherm ververst trager
         </p>
       )}
@@ -207,7 +207,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="truncate text-[1.9vh] uppercase tracking-[0.2em] text-neutral-500">{label}</p>
+      <p className="truncate text-[1.9vh] uppercase tracking-[0.2em] text-[var(--text-faint)]">{label}</p>
       <p className="truncate text-[4.4vh] font-semibold tabular-nums">{value}</p>
     </div>
   )
@@ -217,8 +217,8 @@ function Centered({
   children, tone = 'normal',
 }: { children: React.ReactNode; tone?: 'normal' | 'error' }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-neutral-950 p-8">
-      <p className={`text-2xl ${tone === 'error' ? 'text-red-400' : 'text-neutral-400'}`}>
+    <main className="flex min-h-dvh items-center justify-center bg-[var(--bg)] p-8">
+      <p className={`text-2xl ${tone === 'error' ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]'}`}>
         {children}
       </p>
     </main>
