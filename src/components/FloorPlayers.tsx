@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DealPanel } from '@/components/DealPanel'
 import { PayoutList, InTheMoneyNotice } from '@/components/PayoutList'
 import { PayoutPanel } from '@/components/PayoutPanel'
@@ -72,6 +72,11 @@ export function FloorPlayers({
   /** Het tweede scherm bij een onbekende speler: naam plus mailadres. */
   const [draft, setDraft] = useState<{ name: string; email: string } | null>(null)
 
+  /** Iemand die elders op het platform bestaat, gevonden op mailadres. */
+  const [elsewhere, setElsewhere] = useState<
+    { playerId: string; name: string; isMember: boolean } | null
+  >(null)
+
   const [openMoney, setOpenMoney] = useState<string | null>(null)
   const [killing, setKilling] = useState<string | null>(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
@@ -118,6 +123,30 @@ export function FloorPlayers({
           (m.email ?? '').toLowerCase().includes(needle))
         .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
         .slice(0, 6)
+
+  // Iemand die op het platform bestaat maar hier nog nooit speelde staat niet
+  // in het ledenbestand van deze club, en werd dus niet gevonden. Op een
+  // volledig mailadres kijken we verder dan de eigen club — zie de uitleg bij
+  // floor_find_by_email waarom dat wel mag en zoeken op naam niet.
+  const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(needle)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!isEmail || matches.length > 0) { setElsewhere(null); return }
+    let cancelled = false
+    const id = setTimeout(async () => {
+      const { data } = await supabase.rpc('floor_find_by_email', {
+        p_club_id: clubId, p_email: needle,
+      })
+      const row = ((data ?? []) as { player_id: string; display_name: string; is_member: boolean }[])[0]
+      if (cancelled) return
+      // Buiten de rendercyclus: dit is het antwoord op een netwerkvraag, geen
+      // afgeleide van de invoer.
+      setElsewhere(row ? { playerId: row.player_id, name: row.display_name, isMember: row.is_member } : null)
+    }, 300)
+    return () => { cancelled = true; clearTimeout(id) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmail, needle, matches.length, clubId])
+
   const exactMatch = members.some(
     (m) => m.name.toLowerCase() === needle || (m.email ?? '').toLowerCase() === needle,
   )
@@ -412,7 +441,29 @@ export function FloorPlayers({
                 )
               })}
 
-              {matches.length === 0 && (
+              {/* Bestaat wel op het platform, maar nog niet bij deze club.
+                  Hem hier tonen scheelt niet alleen typwerk: de floor ziet dat
+                  het om een bestaande speler gaat, en dat zijn historie
+                  meekomt in plaats van dat er een dubbel profiel ontstaat. */}
+              {elsewhere && !elsewhere.isMember && !inTournament.has(elsewhere.playerId) && (
+                <li className="border-b border-[var(--line)] last:border-0">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void addExisting(elsewhere.playerId)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate">{elsewhere.name}</span>
+                      <span className="block truncate text-xs text-[var(--brand)]">
+                        {t('players.onPlatform')}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              )}
+
+              {matches.length === 0 && !elsewhere && (
                 <li className="px-3 py-2.5 text-sm text-[var(--text-faint)]">
                   {t('players.noMatches')}
                 </li>

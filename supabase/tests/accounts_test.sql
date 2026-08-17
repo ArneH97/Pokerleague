@@ -132,3 +132,55 @@ begin
 end $$;
 
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- De floor vindt iemand die elders op het platform speelt
+-- ---------------------------------------------------------------------------
+-- Zonder dit tikt de floor een bestaande speler in als nieuwe man. Dat gaat
+-- goed dankzij het mailadres als sleutel, maar hij ziet het niet — en wat je
+-- niet ziet, controleer je niet.
+
+begin;
+do $$
+declare
+  v_club uuid; v_ander uuid; v_owner uuid; v_p uuid;
+  v_naam text; v_lid boolean; v_n int;
+begin
+  insert into clubs (slug, name, city, country, locale, timezone)
+  values ('t29', 'Testclub 29', 'Gent', 'BE', 'nl', 'Europe/Brussels') returning id into v_club;
+  insert into clubs (slug, name, city, country, locale, timezone)
+  values ('t29b', 'Andere club', 'Aalst', 'BE', 'nl', 'Europe/Brussels') returning id into v_ander;
+
+  insert into auth.users (email) values ('baas@t29.be') returning id into v_owner;
+  insert into club_members (club_id, user_id, role) values (v_club, v_owner, 'owner');
+
+  -- Iemand die bij de ándere club speelt.
+  insert into players (display_name, email) values ('Reiziger Vanelders', 'reiziger@t29.be')
+  returning id into v_p;
+  insert into club_players (club_id, player_id) values (v_ander, v_p);
+
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_owner, 'role', 'authenticated', 'email', 'baas@t29.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  set local role authenticated;
+
+  select display_name, is_member into v_naam, v_lid
+  from public.floor_find_by_email(v_club, 'reiziger@t29.be');
+  if v_naam is null then raise exception 'FOUT: bestaande speler niet gevonden op mailadres'; end if;
+  if v_lid then raise exception 'FOUT: hij hoort geen lid van deze club te zijn'; end if;
+  raise notice 'OK  de floor vindt % en ziet dat hij hier nog geen lid is', v_naam;
+
+  -- Maar niet op een halve zoekterm: anders is dit een zoekmachine door de
+  -- ledenbestanden van alle andere clubs.
+  select count(*) into v_n from public.floor_find_by_email(v_club, 'reiziger');
+  if v_n <> 0 then raise exception 'FOUT: een naamfragment gaf resultaten'; end if;
+  select count(*) into v_n from public.floor_find_by_email(v_club, '@t29.be');
+  if v_n <> 0 then raise exception 'FOUT: een half adres gaf resultaten'; end if;
+  raise notice 'OK  alleen een volledig mailadres geeft een resultaat';
+
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end $$;
+rollback;
