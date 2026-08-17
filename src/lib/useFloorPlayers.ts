@@ -18,7 +18,9 @@ export interface FloorPlayer {
   status: string
   chipCount: number | null
   finishPosition: number | null
+  /** Re-entries en rebuys samen: voor de floor is dat één cijfer. */
   reentriesUsed: number
+  rebuysUsed: number
   bountiesWon: number
   registeredAt: string
   email: string | null
@@ -37,6 +39,7 @@ interface Row {
   chip_count: number | null
   finish_position: number | null
   reentries_used: number
+  rebuys_used: number
   bounties_won: number
   registered_at: string
   players: { display_name: string; email: string | null } | null
@@ -59,7 +62,7 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
       supabase
         .from('tournament_players')
         .select(
-          'id,player_id,status,chip_count,finish_position,reentries_used,bounties_won,registered_at,players(display_name,email)',
+          'id,player_id,status,chip_count,finish_position,reentries_used,rebuys_used,bounties_won,registered_at,players(display_name,email)',
         )
         .eq('tournament_id', tournamentId)
         .overrideTypes<Row[]>(),
@@ -85,6 +88,7 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
         chipCount: r.chip_count,
         finishPosition: r.finish_position,
         reentriesUsed: r.reentries_used,
+        rebuysUsed: r.rebuys_used,
         bountiesWon: r.bounties_won,
         registeredAt: r.registered_at,
         email: r.players?.email ?? null,

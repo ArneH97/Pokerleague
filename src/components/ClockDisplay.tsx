@@ -42,6 +42,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const prevLevelRef = useRef<number | null>(null)
   const warnedLevelRef = useRef<number | null>(null)
   const armedLevelRef = useRef<number | null>(null)
+  const lastCallRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!running || !resolved?.level) return
@@ -64,6 +65,27 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       sound.playOneMinute()
     }
   }, [running, levelIdx, secondsLeft, resolved?.level, sound])
+
+  // Vijf minuten voor het einde van het laatste level waarop je nog kan
+  // inkopen: één keer omroepen. Daarna weet de zaal het, en een tweede keer
+  // is alleen maar storend — vandaar de ref die per level onthoudt of het al
+  // gezegd is. Blijft de klok even stilstaan en loopt hij weer verder, dan
+  // komt de melding niet opnieuw.
+  useEffect(() => {
+    if (!running || !tournament || !resolved?.level || resolved.level.isBreak) return
+    if (tournament.late_reg_level === null) return
+    if (secondsLeft > 300 || secondsLeft <= 0) return
+    if (lastCallRef.current === levelIdx) return
+
+    // De floor typt "late reg t/m level 6" in als gewoon levelnummer, dus we
+    // tellen de speellevels en niet de index — die telt de pauzes mee.
+    const playNo = levels.slice(0, levelIdx + 1).filter((l) => !l.isBreak).length
+    if (playNo !== tournament.late_reg_level) return
+
+    lastCallRef.current = levelIdx
+    sound.playAttention()
+    sound.say(t('clock.lastCallSpoken'))
+  }, [running, tournament, resolved?.level, secondsLeft, levelIdx, levels, sound, t])
 
   if (loading) return <Centered>{t('common.loading')}</Centered>
   if (error || !tournament || !resolved) {
@@ -101,6 +123,16 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
     ? averageStack(stats.totalChips, stats.playersLeft)
     : tournament.starting_stack ?? 0
   const bigBlind = level && !level.isBreak ? level.bigBlind : (resolved.nextLevel?.bigBlind ?? 0)
+
+  // Het laatste level waarop nog ingekocht mag worden. De floor typt dat in
+  // als gewoon levelnummer, dus we vergelijken met de speeltelling en niet
+  // met de index (die telt pauzes mee).
+  const lateReg = tournament.late_reg_level
+  // De waarschuwing hoort bij de laatste vijf minuten, niet bij het hele
+  // level: twintig minuten lang "nog 5 minuten" laten staan is onzin.
+  const lastEntryOpen =
+    lateReg !== null && !isBreak && playIdx === lateReg && secondsLeft <= 300 && secondsLeft > 0
+  const entriesClosed = lateReg !== null && playIdx > lateReg
 
   const elapsedTotal = tournament.started_at
     ? Math.max(0, nowMs() - Date.parse(tournament.started_at))
@@ -188,7 +220,36 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
         </div>
       </header>
 
-      <section className="relative flex flex-1 flex-col items-center justify-center px-[3vw]">
+      {/* Klok in het midden, cijfers langs de zijkanten.
+          Alles onderaan op één rij persen werkte niet: zeven blokken naast
+          elkaar maakt elk cijfer klein en kapt "32.667" af tot "32.6…",
+          terwijl links en rechts van de klok het scherm leeg staat. Nu heeft
+          elk cijfer een hele kolombreedte en kan het groot. */}
+      <div className="relative flex flex-1 items-stretch gap-[1.5vw] px-[2vw] pb-[1vh]">
+        <aside className="flex w-[19vw] shrink-0 flex-col justify-center gap-[1.4vh]">
+          <Stat
+            label={t('clock.playersLeft')}
+            value={String(stats.playersLeft)}
+            sub={`${t('common.of')} ${stats.entriesTotal}`}
+            big
+            accent={accent}
+          />
+          <Stat label={t('clock.buyins')} value={String(stats.buyins)} />
+          {/* Rebuy en re-entry zijn technisch twee dingen — de ene legt chips
+              bij iemand die nog zit, de andere haalt een uitgevallen speler
+              terug — maar voor de zaal is het één vraag: hoeveel keer is er
+              opnieuw ingekocht. Twee tegels met elk een 1 erin zegt niemand
+              iets. Op het floor-scherm blijven ze wel apart, want daar hangt
+              het van de situatie af welke knop je ziet. */}
+          {stats.rebuys + stats.reentries > 0 && (
+            <Stat label={t('clock.rebuys')} value={String(stats.rebuys + stats.reentries)} />
+          )}
+          {stats.addons > 0 && (
+            <Stat label={t('clock.addons')} value={String(stats.addons)} />
+          )}
+        </aside>
+
+      <section className="relative flex flex-1 flex-col items-center justify-center px-[1vw]">
         {/* De naam van de club, centraal boven de tijd. Als tekst en niet als
             beeld: dan schaalt hij mee met het scherm, blijft hij scherp op
             een beamer, en botst hij niet met het watermerk erachter.
@@ -242,7 +303,26 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           </div>
         )}
 
-        <p className="mt-[2.5vh] text-[2.5vh] text-[var(--text-faint)]">
+        {/* Niet alleen omroepen maar ook tonen: in een volle zaal hoort de
+            helft het niet, en dit is de mededeling waar geld aan vastzit. */}
+        {(lastEntryOpen || entriesClosed) && (
+          <p
+            className="mt-[2.2vh] rounded-full px-[2vw] py-[0.8vh] text-[2.2vh] font-semibold uppercase tracking-[0.16em]"
+            style={
+              entriesClosed
+                ? { color: 'var(--text-faint)', border: '1px solid rgba(255,255,255,0.1)' }
+                : {
+                    color: '#fbbf24',
+                    border: '1px solid #fbbf2455',
+                    background: '#fbbf2414',
+                  }
+            }
+          >
+            {entriesClosed ? t('clock.lastCallOver') : t('clock.lastCallBanner')}
+          </p>
+        )}
+
+        <p className="mt-[2vh] text-[2.5vh] text-[var(--text-faint)]">
           {resolved.nextLevel
             ? resolved.nextLevel.isBreak
               ? `${t('clock.next')} — ${breakLabel(resolved.nextLevel.label, t('clock.break'))}`
@@ -250,6 +330,27 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             : t('clock.lastLevel')}
         </p>
       </section>
+
+        <aside className="flex w-[19vw] shrink-0 flex-col justify-center gap-[1.4vh]">
+          <Stat
+            label={t('clock.prizePool')}
+            value={stats.prizePoolCents > 0
+              ? formatMoney(stats.prizePoolCents, club?.currency ?? 'EUR')
+              : '—'}
+            big
+            accent={accent}
+          />
+          <Stat
+            label={t('clock.avgStack')}
+            value={avg.toLocaleString('nl-BE')}
+            // Het aantal big blinds zegt een speler meer dan het aantal chips:
+            // twintig bb is kort, honderd bb is diep. Bij een pauze staat de
+            // big blind op nul, dus dan tonen we niets.
+            sub={bigBlind > 0 ? `${formatBb(avg / bigBlind)} bb` : undefined}
+          />
+          <Stat label={t('clock.elapsed')} value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
+        </aside>
+      </div>
 
       {sound.supported && !sound.enabled && (
         <div className="relative flex justify-center pb-[1.5vh]">
@@ -266,48 +367,6 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
       <LevelPips levels={levels} current={levelIdx} accent={accent} />
 
-      {/* De onderste balk is wat de zaal het vaakst bekijkt. Spelers,
-          inkopen en rebuys staan daarom als aparte blokken naast elkaar en
-          niet samengeperst in één cijfer: "24 inkopen" bij 18 spelers zegt
-          iets heel anders dan 24 spelers. De rebuykolommen verschijnen alleen
-          als er ook echt rebuys of addons geboekt zijn, zodat een gewone
-          freezeout niet volstaat met lege nullen. */}
-      <footer className="relative flex items-stretch gap-[1.2vw] px-[3vw] pb-[3vh] pt-[1.6vh]">
-        <Stat
-          label={t('clock.playersLeft')}
-          value={String(stats.playersLeft)}
-          sub={`${t('common.of')} ${stats.entriesTotal}`}
-          wide
-          accent={accent}
-        />
-        <Stat label={t('clock.buyins')} value={String(stats.buyins)} />
-        {stats.reentries > 0 && (
-          <Stat label={t('clock.reentries')} value={String(stats.reentries)} />
-        )}
-        {stats.rebuys > 0 && (
-          <Stat label={t('clock.rebuys')} value={String(stats.rebuys)} />
-        )}
-        {stats.addons > 0 && (
-          <Stat label={t('clock.addons')} value={String(stats.addons)} />
-        )}
-        <Stat
-          label={t('clock.avgStack')}
-          value={avg.toLocaleString('nl-BE')}
-          // Het aantal big blinds zegt een speler meer dan het aantal chips:
-          // twintig bb is kort, honderd bb is diep. Bij een pauze staat de
-          // big blind op nul, dus dan tonen we niets.
-          sub={bigBlind > 0 ? `${formatBb(avg / bigBlind)} bb` : undefined}
-        />
-        <Stat
-          label={t('clock.prizePool')}
-          value={stats.prizePoolCents > 0
-            ? formatMoney(stats.prizePoolCents, club?.currency ?? 'EUR')
-            : '—'}
-          wide
-          accent={accent}
-        />
-        <Stat label={t('clock.elapsed')} value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
-      </footer>
 
       {announcing && level && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-sm">
@@ -395,44 +454,45 @@ function LevelPips({
 }
 
 /**
- * Eén cijfer in de onderbalk.
+ * Eén cijfer in een zijkolom.
  *
- * `wide` krijgt meer breedte en een gekleurde rand: dat zijn de twee dingen
+ * `big` krijgt de clubkleur en een groter cijfer: dat zijn de twee dingen
  * waar vanaf de andere kant van de zaal naar gekeken wordt — hoeveel spelers
- * er nog zitten, en hoeveel er in de pot ligt.
+ * er nog zitten, en hoeveel er in de pot ligt. De rest is context.
+ *
+ * Het cijfer wordt niet afgekapt maar krimpt mee: "32.667" is een antwoord,
+ * "32.6…" is er geen.
  */
 function Stat({
-  label, value, sub, wide, accent,
+  label, value, sub, big, accent,
 }: {
   label: string
   value: string
   sub?: string
-  wide?: boolean
+  big?: boolean
   accent?: string
 }) {
   return (
     <div
-      className={`min-w-0 rounded-[1.4vh] border px-[1.1vw] py-[1.5vh] text-center backdrop-blur-sm ${
-        wide ? 'flex-[1.6]' : 'flex-1'
-      }`}
+      className="rounded-[1.4vh] border px-[0.9vw] py-[1.2vh] text-center backdrop-blur-sm"
       style={{
-        borderColor: wide && accent ? `${accent}55` : 'rgba(255,255,255,0.07)',
-        background: wide && accent ? `${accent}12` : 'rgba(255,255,255,0.035)',
+        borderColor: big && accent ? `${accent}55` : 'rgba(255,255,255,0.07)',
+        background: big && accent ? `${accent}12` : 'rgba(255,255,255,0.035)',
       }}
     >
-      <p className="truncate text-[1.6vh] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
+      <p className="truncate text-[1.5vh] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
         {label}
       </p>
       <p
-        className="tnum truncate font-bold leading-tight"
+        className="tnum font-bold leading-tight"
         style={{
-          fontSize: wide ? '6.4vh' : '5.2vh',
-          color: wide && accent ? accent : undefined,
+          fontSize: big ? 'min(6.6vh, 4.6vw)' : 'min(4.8vh, 3.4vw)',
+          color: big && accent ? accent : undefined,
         }}
       >
         {value}
       </p>
-      {sub && <p className="tnum text-[1.7vh] text-[var(--text-faint)]">{sub}</p>}
+      {sub && <p className="tnum text-[1.6vh] text-[var(--text-faint)]">{sub}</p>}
     </div>
   )
 }

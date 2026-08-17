@@ -65,8 +65,11 @@ export function TournamentForm({
   const [stack, setStack] = useState(String(defaults?.startingStack ?? 20000))
   const [reentries, setReentries] = useState('1')
   const [lateReg, setLateReg] = useState('6')
+  const [rebuyPrice, setRebuyPrice] = useState(centsToEuro(defaults?.buyinCents ?? 2000))
+  const [rebuyFee, setRebuyFee] = useState(centsToEuro(defaults?.feeCents ?? 500))
   const [addonOn, setAddonOn] = useState(false)
   const [addonPrice, setAddonPrice] = useState('10.00')
+  const [addonFee, setAddonFee] = useState('0.00')
   const [addonStack, setAddonStack] = useState('20000')
   const [bountyOn, setBountyOn] = useState(false)
   const [bounty, setBounty] = useState('5.00')
@@ -79,6 +82,10 @@ export function TournamentForm({
 
   const buyinCents = euroToCents(buyin)
   const feeCents = euroToCents(fee)
+  const rebuyCents = euroToCents(rebuyPrice)
+  const rebuyFeeCents = euroToCents(rebuyFee)
+  const addonCents = euroToCents(addonPrice)
+  const addonFeeCents = euroToCents(addonFee)
   const bountyCents = bountyOn ? euroToCents(bounty) : 0
   const totalCents = buyinCents + feeCents + bountyCents
 
@@ -108,13 +115,19 @@ export function TournamentForm({
         player_visibility: 'public',
         buyin_cents: buyinCents,
         fee_cents: feeCents,
+        // Een rebuy en een re-entry volgen dezelfde afspraak: opnieuw
+        // inkopen. Wat naar de pot gaat en wat naar de club, staat hier los
+        // van de buy-in — clubs doen dat niet allemaal hetzelfde.
+        rebuy_cents: rebuyCents,
+        rebuy_fee_cents: rebuyFeeCents,
+        addon_fee_cents: addonOn ? addonFeeCents : null,
         bounty_mode: bountyOn ? 'fixed' : 'none',
         bounty_cents: bountyCents,
         starting_stack: Number.parseInt(stack, 10) || 0,
         // Leeg laten betekent: een addon kost de buy-in en geeft een
         // startstack. Wie hem aanzet mag beide apart zetten, want een addon
         // is bij de meeste clubs goedkoper én meer chips dan een buy-in.
-        addon_cents: addonOn ? euroToCents(addonPrice) : null,
+        addon_cents: addonOn ? addonCents : null,
         addon_stack: addonOn ? (Number.parseInt(addonStack, 10) || null) : null,
         max_reentries: Number.parseInt(reentries, 10) || 0,
         late_reg_level: lateReg === '' ? null : Number.parseInt(lateReg, 10),
@@ -158,14 +171,58 @@ export function TournamentForm({
         />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`${t('tour.buyin')} (${currency})`} hint={t('tour.buyinHint')}>
-          <input inputMode="decimal" value={buyin} onChange={(e) => setBuyin(e.target.value)} className={inputClass} />
-        </Field>
-        <Field label={`${t('tour.fee')} (${currency})`} hint={t('tour.feeHint')}>
-          <input inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} className={inputClass} />
-        </Field>
-      </div>
+      {/* Het geld, in één overzicht.
+          Per soort inkoop twee bedragen: wat naar de prijzenpot gaat en wat
+          de club houdt. Dat waren eerst twee losse velden voor de buy-in en
+          één afspraak die stilzwijgend ook voor rebuys gold — maar clubs
+          doen dat niet allemaal hetzelfde, en je moet kunnen aantonen wat
+          een speler betaald heeft. Naast elke rij staat het totaal dat de
+          speler afrekent, want dát is het cijfer aan de kassa. */}
+      <Card>
+        <div className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-x-3 gap-y-3">
+          <span />
+          <span className="text-center text-xs uppercase tracking-widest text-[var(--text-faint)]">
+            {t('tour.toPot')}
+          </span>
+          <span className="text-center text-xs uppercase tracking-widest text-[var(--text-faint)]">
+            {t('tour.toClub')}
+          </span>
+          <span className="text-right text-xs uppercase tracking-widest text-[var(--text-faint)]">
+            {t('tour.total')}
+          </span>
+
+          <MoneyRow
+            label={t('tour.buyin')}
+            sub={t('tour.buyinAlsoReentry')}
+            pot={buyin} onPot={setBuyin}
+            fee={fee} onFee={setFee}
+            totalCents={buyinCents + feeCents + bountyCents}
+            currency={currency}
+          />
+
+          <MoneyRow
+            label={t('tour.rebuy')}
+            pot={rebuyPrice} onPot={setRebuyPrice}
+            fee={rebuyFee} onFee={setRebuyFee}
+            totalCents={rebuyCents + rebuyFeeCents + (bountyOn ? bountyCents : 0)}
+            currency={currency}
+          />
+
+          {addonOn && (
+            <MoneyRow
+              label={t('tour.addonRow')}
+              pot={addonPrice} onPot={setAddonPrice}
+              fee={addonFee} onFee={setAddonFee}
+              totalCents={addonCents + addonFeeCents}
+              currency={currency}
+            />
+          )}
+        </div>
+
+        <p className="mt-3 text-xs leading-relaxed text-[var(--text-faint)]">
+          {t('tour.moneyHint')}
+        </p>
+      </Card>
 
       <Card>
         <label className="flex items-center gap-3">
@@ -178,18 +235,11 @@ export function TournamentForm({
           <span>{t('tour.addon')}</span>
         </label>
         {addonOn && (
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <Field label={`${t('tour.addonPrice')} (${currency})`}>
-              <input inputMode="decimal" value={addonPrice}
-                     onChange={(e) => setAddonPrice(e.target.value)} className={inputClass} />
-            </Field>
-            <Field label={t('tour.addonStack')}>
+          <div className="mt-3">
+            <Field label={t('tour.addonStack')} hint={t('tour.addonHint')}>
               <input inputMode="numeric" value={addonStack}
                      onChange={(e) => setAddonStack(e.target.value)} className={inputClass} />
             </Field>
-            <p className="text-xs text-[var(--text-faint)] sm:col-span-2">
-              {t('tour.addonHint')}
-            </p>
           </div>
         )}
       </Card>
@@ -296,3 +346,49 @@ export function TournamentForm({
   )
 }
 
+/**
+ * Eén regel in het geldoverzicht: wat naar de pot gaat, wat de club houdt,
+ * en wat de speler in totaal afrekent.
+ *
+ * Het totaal is berekend en niet in te tikken. Anders krijg je drie velden
+ * die elkaar tegenspreken, en dan is het de vraag welke van de drie klopt op
+ * het moment dat je het aan iemand moet uitleggen.
+ */
+function MoneyRow({
+  label, sub, pot, onPot, fee, onFee, totalCents, currency,
+}: {
+  label: string
+  sub?: string
+  pot: string
+  onPot: (v: string) => void
+  fee: string
+  onFee: (v: string) => void
+  totalCents: number
+  currency: string
+}) {
+  return (
+    <>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{label}</span>
+        {sub && <span className="block text-xs text-[var(--text-faint)]">{sub}</span>}
+      </span>
+      <input
+        inputMode="decimal"
+        aria-label={label}
+        value={pot}
+        onChange={(e) => onPot(e.target.value)}
+        className={`${inputClass} w-24 text-right tabular-nums`}
+      />
+      <input
+        inputMode="decimal"
+        aria-label={label}
+        value={fee}
+        onChange={(e) => onFee(e.target.value)}
+        className={`${inputClass} w-24 text-right tabular-nums`}
+      />
+      <span className="w-24 text-right text-sm font-semibold tabular-nums">
+        {new Intl.NumberFormat('nl-BE', { style: 'currency', currency }).format(totalCents / 100)}
+      </span>
+    </>
+  )
+}

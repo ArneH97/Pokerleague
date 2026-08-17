@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { type BlindLevel } from '@/lib/tournament/clock'
+import { useLocale } from '@/lib/i18n/context'
 
 /**
  * Geluid voor de zaalklok.
@@ -24,7 +25,11 @@ function getAudioContextCtor(): Ctor | null {
   return w.AudioContext ?? w.webkitAudioContext ?? null
 }
 
+/** Stemcodes per taal, in de vorm die browsers verwachten. */
+const SPEECH_LANG: Record<string, string> = { nl: 'nl-BE', fr: 'fr-BE', en: 'en-GB' }
+
 export function useClockSound() {
+  const locale = useLocale()
   const ctxRef = useRef<AudioContext | null>(null)
   const [enabled, setEnabled] = useState(false)
   // Niet vooraf detecteren: dat zou tijdens het renderen naar `window` moeten
@@ -121,20 +126,26 @@ export function useClockSound() {
             level.ante > 0 ? `Ante ${level.ante}.` : '',
           ].join(' ').trim()
 
-      const utter = new SpeechSynthesisUtterance(text)
-      utter.lang = 'en-GB'
-      utter.rate = 0.92
-
-      const voices = window.speechSynthesis.getVoices()
-      const voice =
-        voices.find((v) => v.lang === 'en-GB') ??
-        voices.find((v) => v.lang.startsWith('en'))
-      if (voice) utter.voice = voice
-
-      // Na het geluidje, niet eroverheen.
-      window.setTimeout(() => window.speechSynthesis.speak(utter), 900)
+      speak(text, 'en-GB', 900)
     },
     [enabled],
+  )
+
+  /**
+   * Een zin uitspreken in de taal van de club.
+   *
+   * De blinds blijven Engels — dat zijn pokertermen en getallen, daar wordt
+   * niemand wijzer van in vertaling. Een mededeling áán de zaal is iets
+   * anders: "opgelet, de rebuys stoppen zo meteen" moet iedereen begrijpen,
+   * ook wie geen Engels spreekt.
+   */
+  const say = useCallback(
+    (text: string) => {
+      if (!enabled || typeof window === 'undefined') return
+      if (!('speechSynthesis' in window)) return
+      speak(text, SPEECH_LANG[locale] ?? 'en-GB', 700)
+    },
+    [enabled, locale],
   )
 
   useEffect(() => {
@@ -146,6 +157,27 @@ export function useClockSound() {
 
   return {
     enabled, supported, enable, disable,
-    playOneMinute, playLevelUp, playAttention, announce,
+    playOneMinute, playLevelUp, playAttention, announce, say,
   }
+}
+
+/**
+ * Eén zin laten uitspreken, met een stem in de gevraagde taal als die er is.
+ *
+ * De vertraging is er zodat de spraak ná het geluidje komt en niet
+ * eroverheen; twee dingen tegelijk versta je in een zaal niet.
+ */
+function speak(text: string, lang: string, delayMs: number) {
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.lang = lang
+  utter.rate = 0.92
+
+  const voices = window.speechSynthesis.getVoices()
+  const base = lang.split('-')[0]
+  const voice =
+    voices.find((v) => v.lang === lang) ??
+    voices.find((v) => v.lang.replace('_', '-').startsWith(base))
+  if (voice) utter.voice = voice
+
+  window.setTimeout(() => window.speechSynthesis.speak(utter), delayMs)
 }

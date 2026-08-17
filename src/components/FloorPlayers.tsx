@@ -14,9 +14,19 @@ import { useT } from '@/lib/i18n/context'
  * en een eindplaats die de browser zou berekenen loopt mis zodra er twee
  * toestellen tegelijk iemand wegklikken. De server telt, de browser toont.
  *
- * Ontwerpregel zoals bij de klokknoppen: één klik per handeling, geen
- * bevestigingsvensters. De enige uitzondering is het afsluiten van het
- * tornooi — dat kan je niet met één klik terugdraaien.
+ * Drie dingen sturen de indeling hier, en het duurde een paar pogingen voor
+ * ze alle drie klopten:
+ *
+ * 1. Iemand tóevoegen en iemand een rebuy geven zijn twee verschillende
+ *    dingen. Eén zoekveld dat allebei deed leek slim en was het niet — je
+ *    zag niet meer waar je mee bezig was. Toevoegen zit nu achter een eigen
+ *    knop met een eigen paneel; een rebuy hoort bij de rij van die speler.
+ * 2. Eén speler per rij, over de volle breedte, met zijn mailadres eronder.
+ *    Twee kolommen paste er wel op maar kapte elke naam af, en een half
+ *    afgekapte naam is precies wat je niet wil op het moment dat je iemand
+ *    moet uitschakelen.
+ * 3. Geldknoppen niet naast "Uitschakelen". Eén misser aan een volle tafel
+ *    kost anders twintig euro in de pot die niemand betaald heeft.
  */
 export function FloorPlayers({
   tournamentId,
@@ -39,15 +49,20 @@ export function FloorPlayers({
   const { players, members, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
   const t = useT()
 
-  const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [killing, setKilling] = useState<string | null>(null)
-  const [confirmFinish, setConfirmFinish] = useState(false)
+
+  /** Filtert alleen de lijst hieronder. Voegt niets toe. */
+  const [filter, setFilter] = useState('')
+  /** Staat het toevoegpaneel open, en wat is er ingetypt. */
+  const [adding, setAdding] = useState(false)
+  const [query, setQuery] = useState('')
   /** Het tweede scherm bij een onbekende speler: naam plus mailadres. */
   const [draft, setDraft] = useState<{ name: string; email: string } | null>(null)
-  /** Welke rij zijn geldknoppen open heeft staan. */
+
   const [openMoney, setOpenMoney] = useState<string | null>(null)
+  const [killing, setKilling] = useState<string | null>(null)
+  const [confirmFinish, setConfirmFinish] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
 
   const active = players
@@ -61,31 +76,32 @@ export function FloorPlayers({
     .filter((p) => p.status === 'eliminated')
     .sort((a, b) => (a.finishPosition ?? 0) - (b.finishPosition ?? 0))
 
+  // ------------------------------------------------------------ filteren
+  const f = filter.trim().toLowerCase()
+  const shown = (list: typeof players) =>
+    f === '' ? list : list.filter((p) =>
+      p.name.toLowerCase().includes(f) || (p.email ?? '').toLowerCase().includes(f))
+  const visibleActive = shown(active)
+  const visibleOut = shown(out)
+  const hiddenCount = (active.length + out.length) - (visibleActive.length + visibleOut.length)
+
+  // ------------------------------------------------------------ toevoegen
   const inTournament = new Set(players.map((p) => p.playerId))
   const needle = query.trim().toLowerCase()
   // Zoeken op naam én op mailadres. Aan de deur zegt iemand zijn naam, dus
   // dat is het gewone geval — maar met twee keer een Jan Peeters in het
   // bestand is het mailadres het enige waarmee je ze uit elkaar houdt.
-  const matches = needle
-    ? members
+  const matches = needle === ''
+    ? []
+    : members
         .filter((m) =>
           m.name.toLowerCase().includes(needle) ||
           (m.email ?? '').toLowerCase().includes(needle))
         .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
         .slice(0, 6)
-    : []
   const exactMatch = members.some(
     (m) => m.name.toLowerCase() === needle || (m.email ?? '').toLowerCase() === needle,
   )
-
-  // Hetzelfde veld filtert ook de lijst eronder. Bij veertig spelers is
-  // scrollen naar de juiste naam het traagste wat er is; drie letters typen
-  // is sneller, en je hoeft er geen tweede zoekveld voor te leren kennen.
-  const shown = (list: typeof players) =>
-    needle === '' ? list : list.filter((p) => p.name.toLowerCase().includes(needle))
-  const visibleActive = shown(active)
-  const visibleOut = shown(out)
-  const hiddenCount = (active.length + out.length) - (visibleActive.length + visibleOut.length)
 
   // PromiseLike en niet Promise: de bouwers van supabase-js zijn "thenables"
   // die pas een echt verzoek doen zodra je erop wacht.
@@ -104,16 +120,21 @@ export function FloorPlayers({
     setBusy(false)
   }
 
-  async function addExisting(playerId: string) {
+  function closeAdd() {
+    setAdding(false)
     setQuery('')
+    setDraft(null)
+  }
+
+  async function addExisting(playerId: string) {
+    closeAdd()
     await run(() => supabase.rpc('floor_add_entry', {
       p_tournament_id: tournamentId, p_player_id: playerId,
     }))
   }
 
   async function addNew(name: string, email: string | null, reason: string | null) {
-    setDraft(null)
-    setQuery('')
+    closeAdd()
     await run(() => supabase.rpc('floor_add_entry', {
       p_tournament_id: tournamentId,
       p_new_name: name,
@@ -165,9 +186,6 @@ export function FloorPlayers({
         <h2 className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
           {t('players.title')}
         </h2>
-        {/* Alleen wat hier op het scherm staat: aan tafel van het totaal.
-            Het aantal inkopen staat al bij de tegels boven — daar komt het
-            uit het geldregister en klopt het ook met rebuys en addons. */}
         <div className="flex items-center gap-3">
           {/* Op naam om iemand te vinden, op chips om te zien wie er kort
               staat. Twee vragen, twee volgordes. */}
@@ -201,38 +219,67 @@ export function FloorPlayers({
         </p>
       )}
 
-      {/* ------------------------------------------------------- toevoegen */}
-      {/* Zoekveld óf formulier, nooit allebei. Het uitklaplijstje zweeft over
-          de pagina heen; laat je dat openstaan terwijl het formulier eronder
-          verschijnt, dan overlappen ze elkaar. */}
-      {!finished && !draft && (
-        <div className="relative">
+      {/* ------------------------------------------------- filter + toevoegen */}
+      {/* Twee losse dingen naast elkaar, en dat is precies de bedoeling: links
+          zoek je iemand die er al staat, rechts zet je iemand nieuw aan tafel.
+          Eén veld dat allebei deed was korter maar niet duidelijker. */}
+      {!finished && (
+        <div className="flex flex-wrap items-center gap-2">
+          {players.length > 6 && (
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder={t('players.filter')}
+              autoComplete="off"
+              name="speler-filter"
+              className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => (adding ? closeAdd() : setAdding(true))}
+            disabled={busy}
+            className={`rounded-xl px-4 py-2.5 text-sm font-medium transition disabled:opacity-45 ${
+              adding
+                ? 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                : 'bg-[var(--brand)] text-[var(--on-brand)] hover:brightness-110'
+            } ${players.length > 6 ? '' : 'w-full'}`}
+          >
+            {adding ? t('common.cancel') : `＋ ${t('players.add')}`}
+          </button>
+        </div>
+      )}
+
+      {/* Het toevoegpaneel staat in de gewone stroom van de pagina en niet als
+          zwevende lijst. Dat zweven zorgde ervoor dat het over het formulier
+          eronder viel; zo kan dat niet meer gebeuren. */}
+      {adding && !draft && (
+        <div className="rounded-xl border border-[var(--brand)] bg-[var(--surface)] p-4">
           <input
+            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('players.searchPlaceholder')}
             autoComplete="off"
             name="speler-zoeken"
             disabled={busy}
-            className="w-full rounded-xl border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-3 text-base outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
+            className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-4 py-3 text-base outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
           />
 
           {needle !== '' && (
-            <ul className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-[var(--line-strong)] bg-[var(--surface-2)] shadow-2xl">
+            <ul className="mt-2 overflow-hidden rounded-lg border border-[var(--line)]">
               {matches.map((m) => {
                 const already = inTournament.has(m.playerId)
                 return (
-                  <li key={m.playerId}>
+                  <li key={m.playerId} className="border-b border-[var(--line)] last:border-0">
                     <button
                       type="button"
                       disabled={busy || already}
                       onClick={() => void addExisting(m.playerId)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
                     >
                       <span className="min-w-0">
                         <span className="block truncate">{m.name}</span>
-                        {/* Het adres erbij, want twee keer dezelfde naam is
-                            geen uitzondering in een ledenbestand. */}
                         {m.email && (
                           <span className="block truncate text-xs text-[var(--text-faint)]">
                             {m.email}
@@ -240,7 +287,9 @@ export function FloorPlayers({
                         )}
                       </span>
                       {already && (
-                        <span className="text-xs text-[var(--text-faint)]">{t('players.alreadyIn')}</span>
+                        <span className="shrink-0 text-xs text-[var(--text-faint)]">
+                          {t('players.alreadyIn')}
+                        </span>
                       )}
                     </button>
                   </li>
@@ -248,7 +297,7 @@ export function FloorPlayers({
               })}
 
               {matches.length === 0 && (
-                <li className="px-4 py-2.5 text-sm text-[var(--text-faint)]">
+                <li className="px-3 py-2.5 text-sm text-[var(--text-faint)]">
                   {t('players.noMatches')}
                 </li>
               )}
@@ -266,7 +315,7 @@ export function FloorPlayers({
                         ? { name: '', email: query.trim() }
                         : { name: query.trim(), email: '' },
                     )}
-                    className="w-full px-4 py-3 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
+                    className="w-full px-3 py-2.5 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
                   >
                     <span className="font-medium text-[var(--brand)]">＋ {query.trim()}</span>{' '}
                     <span className="text-sm text-[var(--text-faint)]">{t('players.addNew')}</span>
@@ -282,7 +331,7 @@ export function FloorPlayers({
         <NewPlayerForm
           draft={draft}
           busy={busy}
-          onCancel={() => setDraft(null)}
+          onCancel={closeAdd}
           onSubmit={(name, email, reason) => void addNew(name, email, reason)}
         />
       )}
@@ -303,28 +352,35 @@ export function FloorPlayers({
           <p className="mt-1 text-sm text-[var(--text-muted)]">{t('players.noneBody')}</p>
         </div>
       ) : (
-        <ul className="grid gap-px overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--line)] lg:grid-cols-2">
+        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
           {visibleActive.map((p) => (
-            <li key={p.id} className="bg-[var(--bg)] px-3 py-2.5">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {p.name}
-                  {/* Zonder mailadres kan je hem volgend seizoen niet
-                      terugvinden. Hier staan zodat je het na de avond
-                      alsnog kan aanvullen. */}
-                  {p.email === null && (
-                    <span className="ml-2 rounded px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-[var(--warn)] ring-1 ring-[color-mix(in_oklab,var(--warn)_35%,transparent)]">
-                      {t('players.noEmailBadge')}
-                    </span>
-                  )}
-                  {p.reentriesUsed > 0 && (
-                    <span className="ml-2 text-xs text-[var(--text-faint)]">
-                      {p.reentriesUsed}× {t('players.reentriesShort')}
-                    </span>
-                  )}
-                  {p.bountiesWon > 0 && (
-                    <span className="ml-2 text-xs text-[var(--gold,var(--brand))]">
-                      {p.bountiesWon} {t('players.knockouts')}
+            <li key={p.id} className="px-3 py-2.5">
+              <div className="flex items-center gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    <span className="truncate font-medium">{p.name}</span>
+                    {/* Zonder mailadres kan je hem volgend seizoen niet
+                        terugvinden. Hier staan zodat je het na de avond
+                        alsnog kan aanvullen. */}
+                    {p.email === null && (
+                      <span className="rounded px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-[var(--warn)] ring-1 ring-[color-mix(in_oklab,var(--warn)_35%,transparent)]">
+                        {t('players.noEmailBadge')}
+                      </span>
+                    )}
+                    {p.reentriesUsed + p.rebuysUsed > 0 && (
+                      <span className="text-xs text-[var(--text-faint)]">
+                        {p.reentriesUsed + p.rebuysUsed}× {t('players.rebuy')}
+                      </span>
+                    )}
+                    {p.bountiesWon > 0 && (
+                      <span className="text-xs text-[var(--brand)]">
+                        {p.bountiesWon} {t('players.knockouts')}
+                      </span>
+                    )}
+                  </span>
+                  {p.email && (
+                    <span className="block truncate text-xs text-[var(--text-faint)]">
+                      {p.email}
                     </span>
                   )}
                 </span>
@@ -336,13 +392,8 @@ export function FloorPlayers({
                   onCommit={(v) => void setChips(p.id, v)}
                 />
 
-                {/* De geldknoppen zitten achter één knop, en niet naast
-                    "Uitschakelen". Ze stonden eerst wél naast elkaar, en dan
-                    kost één misser aan een volle tafel twintig euro in de
-                    pot die niemand betaald heeft. Nu moet je er bewust naar
-                    grijpen — en alles wat je hier boekt is terug te draaien. */}
                 {!finished && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <Small
                       onClick={() => setOpenMoney(openMoney === p.id ? null : p.id)}
                       disabled={busy}
@@ -377,7 +428,7 @@ export function FloorPlayers({
                     ↩ {t('players.undoBuyin')}
                   </Small>
                   <Small onClick={() => setOpenMoney(null)} disabled={busy}>
-                    {t('common.cancel')}
+                    {t('players.close')}
                   </Small>
                 </div>
               )}
@@ -412,23 +463,34 @@ export function FloorPlayers({
 
           {/* ------------------------------------------------- uitgeschakeld */}
           {visibleOut.length > 0 && (
-            <li className="bg-[var(--surface-2)] px-3 py-1.5 text-xs uppercase tracking-widest text-[var(--text-faint)] lg:col-span-2">
+            <li className="bg-[var(--surface-2)] px-3 py-1.5 text-xs uppercase tracking-widest text-[var(--text-faint)]">
               {t('players.eliminated')}
             </li>
           )}
           {visibleOut.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-[var(--bg)] px-3 py-2.5 text-[var(--text-muted)]">
+            <li key={p.id} className="flex items-center gap-3 px-3 py-2.5 text-[var(--text-muted)]">
               <span className="tnum w-8 shrink-0 text-right font-semibold text-[var(--text-faint)]">
                 {p.finishPosition ?? '—'}
               </span>
-              <span className="min-w-0 flex-1 truncate line-through decoration-[var(--line-strong)]">
-                {p.name}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate line-through decoration-[var(--line-strong)]">
+                  {p.name}
+                </span>
+                {p.email && (
+                  <span className="block truncate text-xs text-[var(--text-faint)]">
+                    {p.email}
+                  </span>
+                )}
               </span>
               {!finished && (
-                <div className="flex items-center gap-1.5">
-                  {p.reentriesUsed < maxReentries && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Ook hier staat er gewoon "Rebuy". Dat het intern een
+                      re-entry is — hij was uitgeschakeld en komt terug met
+                      een verse stack — hoeft de floor niet te weten; de
+                      situatie bepaalt dat al. */}
+                  {p.reentriesUsed + p.rebuysUsed < maxReentries && (
                     <Small onClick={() => void rebuy(p.id, 'reentry')} disabled={busy}>
-                      {t('players.reentry')}
+                      {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
                     </Small>
                   )}
                   <Small onClick={() => void undo(p.id)} disabled={busy}>
@@ -444,7 +506,7 @@ export function FloorPlayers({
       {hiddenCount > 0 && (
         <button
           type="button"
-          onClick={() => setQuery('')}
+          onClick={() => setFilter('')}
           className="w-full rounded-lg border border-dashed border-[var(--line-strong)] px-3 py-2 text-sm text-[var(--text-faint)] transition hover:text-[var(--text)]"
         >
           {hiddenCount} {t('players.filtered')} · {t('players.showAll')}

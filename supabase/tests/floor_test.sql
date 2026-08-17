@@ -333,4 +333,70 @@ begin
   raise notice 'terugdraaien OK: addon, rebuy en re-entry, geld en chips samen';
 end $$;
 
+
+-- ---------------------------------------------------------------------------
+-- Per soort inkoop een eigen verdeling pot/club
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_club uuid; v_tour uuid; v_tp uuid; v_pot int; v_club_geld int;
+begin
+  insert into clubs (slug, name, compliance)
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Verdeling',
+          jsonb_build_object('enforce','off'))
+  returning id into v_club;
+
+  insert into tournaments (club_id, name, scheduled_at, status,
+                           buyin_cents, fee_cents,
+                           rebuy_cents, rebuy_fee_cents,
+                           addon_cents, addon_fee_cents, addon_stack,
+                           starting_stack, max_reentries)
+  values (v_club, 'Verdeling', now(), 'running',
+          2000, 500, 1500, 300, 1000, 200, 30000, 20000, 3)
+  returning id into v_tour;
+
+  v_tp := public.floor_add_entry(v_tour, null, 'Betaler', null, 'test');
+  perform public.floor_rebuy(v_tp, 'rebuy');
+  perform public.floor_rebuy(v_tp, 'addon');
+
+  assert (select amount_cents from buyins where tournament_player_id = v_tp and kind = 'rebuy') = 1500,
+    'de rebuy legde niet het ingestelde bedrag in de pot';
+  assert (select fee_cents from buyins where tournament_player_id = v_tp and kind = 'rebuy') = 300,
+    'de clubbijdrage op de rebuy klopt niet';
+  assert (select amount_cents from buyins where tournament_player_id = v_tp and kind = 'addon') = 1000,
+    'de addon legde niet het ingestelde bedrag in de pot';
+  assert (select fee_cents from buyins where tournament_player_id = v_tp and kind = 'addon') = 200,
+    'de clubbijdrage op de addon klopt niet';
+
+  -- Pot en clubinkomsten staan los van elkaar.
+  select coalesce(sum(amount_cents),0), coalesce(sum(fee_cents),0)
+  into v_pot, v_club_geld
+  from buyins where tournament_id = v_tour and not is_void;
+  assert v_pot = 4500, format('pot verwacht 4500, kreeg %s', v_pot);
+  assert v_club_geld = 1000, format('club verwacht 1000, kreeg %s', v_club_geld);
+
+  -- Een re-entry volgt dezelfde afspraak als een rebuy.
+  perform public.floor_eliminate(v_tp, null);
+  perform public.floor_rebuy(v_tp, 'reentry');
+  assert (select amount_cents from buyins where tournament_player_id = v_tp and kind = 'reentry') = 1500,
+    'een re-entry hoort hetzelfde te kosten als een rebuy';
+
+  -- Niets ingevuld = alles volgt de buy-in, zoals vroeger.
+  insert into tournaments (club_id, name, scheduled_at, status, buyin_cents, fee_cents, starting_stack)
+  values (v_club, 'Standaard', now(), 'running', 2000, 500, 20000)
+  returning id into v_tour;
+  v_tp := public.floor_add_entry(v_tour, null, 'Standaard', null, 'test');
+  perform public.floor_rebuy(v_tp, 'rebuy');
+  perform public.floor_rebuy(v_tp, 'addon');
+  assert (select amount_cents from buyins where tournament_player_id = v_tp and kind = 'rebuy') = 2000,
+    'zonder eigen rebuyprijs hoort de buy-in te gelden';
+  assert (select fee_cents from buyins where tournament_player_id = v_tp and kind = 'rebuy') = 500,
+    'zonder eigen rebuybijdrage hoort de gewone bijdrage te gelden';
+  assert (select fee_cents from buyins where tournament_player_id = v_tp and kind = 'addon') = 0,
+    'zonder ingestelde addonbijdrage hoort die nul te zijn';
+
+  raise notice 'verdeling OK: pot en clubbijdrage per soort inkoop apart';
+end $$;
+
 rollback;

@@ -116,15 +116,15 @@ export function FullscreenButton() {
     }
   }
 
-  // Linksboven, in de hoek naast de tornooinaam. Rechts staat het level, en
-  // dát mag nooit half achter een knop verdwijnen.
+  // Rechtsonder. Boven staan links de tornooinaam en rechts het level, en
+  // die mogen geen van beide half achter een knop verdwijnen.
   return (
     <button
       type="button"
       onClick={() => void toggle()}
       title={on ? t('clock.exitFullscreenHint') : t('clock.fullscreen')}
       aria-label={on ? t('clock.exitFullscreenHint') : t('clock.fullscreen')}
-      className={`absolute left-[0.9vw] top-[1.4vh] z-30 rounded-full border border-white/10 bg-black/30 p-[1.1vh] text-[var(--text-faint)] backdrop-blur transition hover:border-white/25 hover:text-[var(--text)] ${
+      className={`absolute bottom-[1.2vh] right-[1vw] z-30 rounded-full border border-white/10 bg-black/30 p-[1.1vh] text-[var(--text-faint)] backdrop-blur transition hover:border-white/25 hover:text-[var(--text)] ${
         on && hidden ? 'pointer-events-none opacity-0' : 'opacity-70'
       }`}
     >
