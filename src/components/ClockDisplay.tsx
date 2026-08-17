@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { resolveClock, formatDuration, formatBlinds, averageStack } from '@/lib/tournament/clock'
+import { resolveClock, formatDuration, averageStack } from '@/lib/tournament/clock'
 import { formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
@@ -11,11 +11,16 @@ import { useTournament } from '@/lib/useTournament'
 const ANNOUNCE_MS = 8_000
 
 /**
- * Zaalweergave. Ontworpen om vanaf de andere kant van een zaal leesbaar te
- * zijn: donkere achtergrond, weinig elementen, en de tijd domineert alles.
+ * Zaalweergave.
  *
- * Deze pagina heeft geen bedieningsknoppen. Wat hier staat wordt bepaald door
- * het floor-scherm; dat scheelt paniek als iemand tegen de laptop stoot.
+ * Twee dingen sturen elke keuze hier. Ten eerste: dit hangt op een beamer aan
+ * de andere kant van een zaal, dus de tijd moet alles domineren en er mag
+ * niets staan dat je van dichtbij moet lezen. Ten tweede: het is het enige
+ * scherm dat spelers de hele avond zien, dus het draagt de huisstijl van de
+ * club — logo, kleur, en accenten die met die kleur meebewegen.
+ *
+ * Geen bedieningsknoppen. Wat hier staat komt van het floor-scherm; dat
+ * scheelt paniek als iemand tegen de laptop stoot.
  */
 export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const { tournament, club, levels, stats, loading, error, live } = useTournament(tournamentId)
@@ -31,8 +36,6 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const secondsLeft = resolved ? Math.ceil(resolved.remainingMs / 1000) : 0
   const levelIdx = resolved?.levelIdx ?? 0
 
-  // Randdetectie voor het geluid. Bewust met refs binnen een effect: hier
-  // hoort geen state bij, want er is niets te tekenen dat er niet al staat.
   const prevLevelRef = useRef<number | null>(null)
   const warnedLevelRef = useRef<number | null>(null)
   const armedLevelRef = useRef<number | null>(null)
@@ -40,17 +43,12 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   useEffect(() => {
     if (!running || !resolved?.level) return
 
-    // Levelwissel: pas melden nadat we minstens één keer een vorig level
-    // gezien hebben, anders piept het bij elke keer dat het scherm opent.
     if (prevLevelRef.current !== null && prevLevelRef.current !== levelIdx) {
       sound.playLevelUp()
       sound.announce(resolved.level)
     }
     prevLevelRef.current = levelIdx
 
-    // Waarschuwing op één minuut. "Armed" zorgt dat we alleen piepen als we
-    // dit level ook boven de minuut hebben gezien — anders piept een scherm
-    // dat halverwege wordt geopend meteen.
     if (secondsLeft > 65) armedLevelRef.current = levelIdx
 
     if (
@@ -69,12 +67,10 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
     return <Centered tone="error">{error ?? 'Onbekend tornooi'}</Centered>
   }
 
-  const isBreak = resolved.level?.isBreak ?? false
+  const brand = club?.primary_color ?? '#10b981'
+  const level = resolved.level
+  const isBreak = level?.isBreak ?? false
 
-  // De aankondiging is puur afgeleid van de klok: zitten we minder dan acht
-  // seconden in een level, dan tonen we de nieuwe blinds groot. Geen state,
-  // dus twee schermen tonen hem vanzelf tegelijk en een refresh verandert
-  // niets.
   const announcing =
     running && !resolved.finished && levelIdx > 0 &&
     resolved.elapsedInLevelMs < ANNOUNCE_MS
@@ -85,118 +81,183 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       : secondsLeft <= 60 ? 'soon'
       : 'idle'
 
-  const timeColor =
-    urgency === 'critical' ? 'text-[var(--danger)]'
-      : urgency === 'soon' ? 'text-[var(--warn)]'
-      : isBreak ? 'text-[#7dd3fc]'
-      : 'text-white'
+  // De clubkleur is de standaard. Alleen wanneer het dringend wordt neemt
+  // rood of amber het over, want dán moet de kleur iets betekenen.
+  const accent =
+    urgency === 'critical' ? '#f87171'
+      : urgency === 'soon' ? '#fbbf24'
+      : isBreak ? '#38bdf8'
+      : brand
+
+  const levelDurationMs = Math.max(1, (level?.durationS ?? 0) * 1000)
+  const progress = Math.min(1, resolved.elapsedInLevelMs / levelDurationMs)
+  const playLevels = levels.filter((l) => !l.isBreak).length
+  const playIdx = levels.slice(0, levelIdx + 1).filter((l) => !l.isBreak).length
+
+  const elapsedTotal = tournament.started_at
+    ? Math.max(0, nowMs() - Date.parse(tournament.started_at))
+    : 0
 
   return (
-    <main className="relative min-h-dvh select-none bg-[var(--bg)] text-white flex flex-col">
-      <header className="flex items-baseline justify-between px-[3vw] pt-[2.5vh]">
-        <div className="min-w-0">
-          <p className="truncate text-[2.2vh] uppercase tracking-[0.25em] text-[var(--text-faint)]">
-            {club?.name ?? ''}
-          </p>
-          <h1 className="truncate text-[3.4vh] font-semibold">{tournament.name}</h1>
+    <main
+      data-hall
+      className="relative flex min-h-dvh select-none flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]"
+    >
+      {/* Zachte gloed in de clubkleur, zodat het scherm niet als een zwart
+          gat aan de muur hangt. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `radial-gradient(75vw 60vh at 50% 40%, ${accent}26 0%, transparent 72%)`,
+          transition: 'background 700ms ease',
+        }}
+      />
+      <Suits />
+
+      {/* Voortgang binnen het level over de volle breedte. Van veraf zie je
+          zo in één oogopslag of het level bijna om is. */}
+      <div className="absolute inset-x-0 top-0 h-[0.9vh] bg-white/[0.06]">
+        <div
+          className="h-full rounded-r-full transition-[width] duration-500 ease-linear"
+          style={{ width: `${progress * 100}%`, background: accent, boxShadow: `0 0 2vh ${accent}` }}
+        />
+      </div>
+
+      <header className="relative flex items-center justify-between gap-[3vw] px-[3.5vw] pt-[3.5vh]">
+        <div className="flex min-w-0 items-center gap-[1.6vw]">
+          {club?.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={club.logo_url}
+              alt=""
+              className="h-[9vh] w-auto max-w-[18vw] object-contain"
+            />
+          ) : (
+            <div
+              className="grid size-[8vh] shrink-0 place-items-center rounded-[1.6vh] text-[3.6vh] font-bold"
+              style={{ background: accent, color: '#07090c' }}
+            >
+              {(club?.name ?? '?').slice(0, 1)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
+              {club?.name ?? ''}
+            </p>
+            <h1 className="truncate text-[3.6vh] font-semibold tracking-tight">{tournament.name}</h1>
+          </div>
         </div>
+
         <div className="shrink-0 text-right">
-          <p className="text-[2.2vh] uppercase tracking-[0.25em] text-[var(--text-faint)]">
-            {isBreak ? 'Pauze' : `Level ${levelIdx + 1}`}
+          <p className="text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
+            {isBreak ? 'Pauze' : running ? 'Level' : tournament.clock === 'paused' ? 'Gepauzeerd' : 'Nog niet gestart'}
           </p>
-          <p className="text-[3.4vh] font-semibold tabular-nums">
-            {tournament.clock === 'paused' && 'Gepauzeerd'}
-            {tournament.clock === 'stopped' && 'Nog niet gestart'}
-            {running && !resolved.finished && `van ${levels.length}`}
-            {running && resolved.finished && 'Structuur voorbij'}
+          <p className="tnum text-[5.2vh] font-bold leading-none" style={{ color: accent }}>
+            {isBreak ? '—' : playIdx}
+            {!isBreak && (
+              <span className="text-[2.6vh] font-medium text-[var(--text-faint)]">
+                {' '}/ {playLevels}
+              </span>
+            )}
           </p>
         </div>
       </header>
 
-      <section className="flex flex-1 flex-col items-center justify-center gap-[1vh] px-[3vw]">
+      <section className="relative flex flex-1 flex-col items-center justify-center px-[3vw]">
         {isBreak && (
-          <p className="text-[6vh] font-semibold uppercase tracking-[0.2em] text-[#7dd3fc]">
-            {resolved.level?.label ?? 'Pauze'}
+          <p
+            className="mb-[1vh] text-[6.5vh] font-bold uppercase tracking-[0.25em]"
+            style={{ color: accent }}
+          >
+            {level?.label ?? 'Pauze'}
           </p>
         )}
 
         <p
-          className={`font-bold tabular-nums leading-none ${timeColor} ${
+          className={`tnum font-bold leading-[0.85] tracking-tight ${
             urgency === 'critical' ? 'animate-pulse' : ''
           }`}
-          style={{ fontSize: 'min(34vh, 30vw)' }}
+          style={{
+            fontSize: 'min(36vh, 32vw)',
+            color: urgency === 'idle' && !isBreak ? '#ffffff' : accent,
+            textShadow: `0 0 9vh ${accent}55`,
+          }}
         >
           {formatDuration(resolved.remainingMs)}
         </p>
 
-        {!isBreak && (
-          <p className="text-[9vh] font-semibold leading-none tabular-nums text-[var(--text)]">
-            {formatBlinds(resolved.level)}
-          </p>
+        {!isBreak && level && (
+          <div className="mt-[2.5vh] flex items-end gap-[3vw]">
+            <BlindChip label="Small blind" value={level.smallBlind} />
+            <BlindChip label="Big blind" value={level.bigBlind} big accent={accent} />
+            {level.ante > 0 && <BlindChip label="Ante" value={level.ante} />}
+          </div>
         )}
 
-        <p className="mt-[1vh] text-[2.8vh] text-[var(--text-faint)]">
+        <p className="mt-[2.5vh] text-[2.5vh] text-[var(--text-faint)]">
           {resolved.nextLevel
-            ? `Hierna — ${formatBlinds(resolved.nextLevel)}`
+            ? resolved.nextLevel.isBreak
+              ? `Hierna — ${resolved.nextLevel.label ?? 'pauze'}`
+              : `Hierna — ${resolved.nextLevel.smallBlind.toLocaleString('nl-BE')} / ${resolved.nextLevel.bigBlind.toLocaleString('nl-BE')}`
             : 'Laatste level'}
         </p>
       </section>
 
-      <footer className="grid grid-cols-4 gap-[2vw] px-[3vw] pb-[3vh] text-center">
-        <Stat label="Spelers over" value={`${stats.playersLeft} / ${stats.entriesTotal}`} />
+      <LevelPips levels={levels} current={levelIdx} accent={accent} />
+
+      <footer className="relative grid grid-cols-4 gap-[1.6vw] px-[3.5vw] pb-[3.5vh] pt-[1.8vh]">
+        <Stat label="Spelers over" value={String(stats.playersLeft)} sub={`van ${stats.entriesTotal}`} />
         <Stat
           label="Gem. stack"
-          value={
-            stats.totalChips > 0
-              ? averageStack(stats.totalChips, stats.playersLeft).toLocaleString('nl-BE')
-              : (tournament.starting_stack ?? 0).toLocaleString('nl-BE')
-          }
+          value={(stats.totalChips > 0
+            ? averageStack(stats.totalChips, stats.playersLeft)
+            : tournament.starting_stack ?? 0
+          ).toLocaleString('nl-BE')}
         />
         <Stat
           label="Prijzenpot"
-          value={
-            stats.prizePoolCents > 0
-              ? formatMoney(stats.prizePoolCents, club?.currency ?? 'EUR')
-              : '—'
-          }
+          value={stats.prizePoolCents > 0
+            ? formatMoney(stats.prizePoolCents, club?.currency ?? 'EUR')
+            : '—'}
         />
-        <Stat
-          label="Inzet"
-          value={formatMoney(tournament.buyin_cents + tournament.fee_cents, club?.currency ?? 'EUR')}
-        />
+        <Stat label="Gespeeld" value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
       </footer>
 
-      {/* Aankondiging bij een nieuw level. */}
-      {announcing && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_92%,transparent)]">
-          <p className="text-[4vh] uppercase tracking-[0.3em] text-[var(--text-muted)]">
-            {isBreak ? 'Pauze' : `Level ${levelIdx + 1}`}
+      {announcing && level && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-sm">
+          <p className="text-[3.2vh] font-medium uppercase tracking-[0.35em] text-[var(--text-muted)]">
+            {isBreak ? 'Pauze' : `Level ${playIdx}`}
           </p>
-          <p className="mt-[2vh] text-center font-bold leading-none" style={{ fontSize: 'min(18vh, 14vw)' }}>
-            {isBreak ? (resolved.level?.label ?? 'Pauze') : formatBlinds(resolved.level)}
+          <p
+            className="tnum mt-[2vh] text-center font-bold leading-none"
+            style={{ fontSize: 'min(20vh, 15vw)', color: accent }}
+          >
+            {isBreak
+              ? (level.label ?? 'Pauze')
+              : `${level.smallBlind.toLocaleString('nl-BE')} / ${level.bigBlind.toLocaleString('nl-BE')}`}
           </p>
-          {!isBreak && resolved.level && resolved.level.ante > 0 && (
+          {!isBreak && level.ante > 0 && (
             <p className="mt-[2vh] text-[4vh] text-[var(--text-muted)]">
-              Ante {resolved.level.ante.toLocaleString('nl-BE')}
+              Ante {level.ante.toLocaleString('nl-BE')}
             </p>
           )}
         </div>
       )}
 
-      {/* Geluid moet één keer met een klik aangezet worden; browsers staan
-          audio anders niet toe. Bewust groot en in beeld tot het gebeurd is. */}
       {sound.supported && !sound.enabled && (
         <button
           type="button"
           onClick={() => void sound.enable()}
-          className="absolute bottom-[2vh] left-1/2 -translate-x-1/2 rounded-full bg-white px-6 py-3 text-[2vh] font-medium text-[var(--bg)] shadow-lg hover:brightness-95"
+          className="absolute bottom-[2.5vh] left-1/2 -translate-x-1/2 rounded-full px-[2.5vw] py-[1.4vh] text-[1.9vh] font-semibold shadow-2xl transition hover:brightness-110"
+          style={{ background: accent, color: '#07090c' }}
         >
           Geluid aanzetten
         </button>
       )}
 
       {!live && (
-        <p className="absolute bottom-2 right-3 text-[1.6vh] text-[var(--warn)]">
+        <p className="absolute bottom-2 right-3 text-[1.5vh] text-[#fbbf24]">
           Verbinding kwijt — scherm ververst trager
         </p>
       )}
@@ -204,11 +265,76 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/** Eén blindwaarde als los blok, zodat SB en BB niet in elkaar overlopen. */
+function BlindChip({
+  label, value, big, accent,
+}: { label: string; value: number; big?: boolean; accent?: string }) {
   return (
-    <div className="min-w-0">
-      <p className="truncate text-[1.9vh] uppercase tracking-[0.2em] text-[var(--text-faint)]">{label}</p>
-      <p className="truncate text-[4.4vh] font-semibold tabular-nums">{value}</p>
+    <div className="text-center">
+      <p className="text-[1.6vh] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]">
+        {label}
+      </p>
+      <p
+        className="tnum font-bold leading-none"
+        style={{
+          fontSize: big ? '10vh' : '7.5vh',
+          color: big ? (accent ?? '#ffffff') : '#ffffff',
+        }}
+      >
+        {value.toLocaleString('nl-BE')}
+      </p>
+    </div>
+  )
+}
+
+/** Streepjes die tonen hoe ver het tornooi in de structuur zit. */
+function LevelPips({
+  levels, current, accent,
+}: { levels: { idx: number; isBreak: boolean }[]; current: number; accent: string }) {
+  if (levels.length === 0) return null
+  return (
+    <div className="relative flex items-end justify-center gap-[0.35vw] px-[3.5vw]">
+      {levels.map((l) => {
+        const done = l.idx < current
+        const now = l.idx === current
+        return (
+          <span
+            key={l.idx}
+            className="rounded-full transition-all duration-300"
+            style={{
+              width: now ? '1.6vw' : '0.7vw',
+              height: l.isBreak ? '0.6vh' : now ? '1.4vh' : '0.9vh',
+              background: now ? accent : done ? `${accent}66` : '#ffffff1f',
+              boxShadow: now ? `0 0 1.4vh ${accent}` : undefined,
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="min-w-0 rounded-[1.4vh] border border-white/[0.07] bg-white/[0.035] px-[1.2vw] py-[1.4vh] text-center backdrop-blur-sm">
+      <p className="truncate text-[1.5vh] font-medium uppercase tracking-[0.2em] text-[var(--text-faint)]">
+        {label}
+      </p>
+      <p className="tnum truncate text-[4.2vh] font-bold leading-tight">{value}</p>
+      {sub && <p className="tnum text-[1.5vh] text-[var(--text-faint)]">{sub}</p>}
+    </div>
+  )
+}
+
+/** Kaartsymbolen als zacht behangmotief. Nauwelijks zichtbaar, maar het
+ *  scherm oogt er minder kaal door. */
+function Suits() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <span className="absolute -left-[3vw] top-[12vh] text-[38vh] leading-none text-white/[0.022]">♠</span>
+      <span className="absolute -right-[2vw] bottom-[6vh] text-[34vh] leading-none text-white/[0.022]">♦</span>
+      <span className="absolute right-[16vw] top-[4vh] text-[16vh] leading-none text-white/[0.018]">♥</span>
+      <span className="absolute left-[18vw] bottom-[2vh] text-[14vh] leading-none text-white/[0.018]">♣</span>
     </div>
   )
 }
@@ -217,8 +343,8 @@ function Centered({
   children, tone = 'normal',
 }: { children: React.ReactNode; tone?: 'normal' | 'error' }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[var(--bg)] p-8">
-      <p className={`text-2xl ${tone === 'error' ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]'}`}>
+    <main data-hall className="flex min-h-dvh items-center justify-center bg-[var(--bg)] p-8">
+      <p className={`text-2xl ${tone === 'error' ? 'text-[#f87171]' : 'text-[var(--text-muted)]'}`}>
         {children}
       </p>
     </main>

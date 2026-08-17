@@ -7,6 +7,27 @@ import { createClient } from '@/lib/supabase/server'
  * `cache` zorgt dat layout en pagina binnen hetzelfde verzoek dezelfde query
  * delen in plaats van hem twee keer te doen.
  */
+
+/**
+ * De huisstijl van een club is meer dan één accentkleur.
+ *
+ * Cutoff is goud op diepzwart; een andere club kan licht en blauw zijn. Wie
+ * alleen een accentkleur laat instellen, dwingt elke club in hetzelfde jasje.
+ * Vandaar dat een club ook zijn eigen vlakken mag meebrengen. Alles is
+ * optioneel: wat je niet invult, valt terug op het platformthema.
+ */
+export interface ClubTheme {
+  bg?: string
+  surface?: string
+  surface2?: string
+  surfaceHover?: string
+  line?: string
+  lineStrong?: string
+  text?: string
+  textMuted?: string
+  textFaint?: string
+}
+
 export interface Club {
   id: string
   slug: string
@@ -17,13 +38,14 @@ export interface Club {
   locale: string
   logo_url: string | null
   primary_color: string | null
+  settings: { theme?: ClubTheme } | null
 }
 
 export const getClub = cache(async (slug: string): Promise<Club | null> => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('clubs')
-    .select('id,slug,name,city,currency,timezone,locale,logo_url,primary_color')
+    .select('id,slug,name,city,currency,timezone,locale,logo_url,primary_color,settings')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle<Club>()
@@ -44,7 +66,7 @@ export const getClubRole = cache(async (clubId: string): Promise<string | null> 
 /**
  * Een leesbare tekstkleur bij de clubkleur. Donkere merkkleuren krijgen witte
  * tekst, lichte krijgen zwarte — anders is een knop in clubkleur onleesbaar
- * bij een club met een gele of lichtblauwe huisstijl.
+ * bij een club met een gouden of lichtblauwe huisstijl.
  */
 export function readableTextOn(hex: string | null): string {
   if (!hex) return '#ffffff'
@@ -59,4 +81,34 @@ export function readableTextOn(hex: string | null): string {
   }
   const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
   return luminance > 0.45 ? '#0a0a0a' : '#ffffff'
+}
+
+/** Zet de huisstijl van een club om naar CSS-variabelen. */
+export function themeVars(club: Club): React.CSSProperties {
+  const t = club.settings?.theme ?? {}
+  const brand = club.primary_color ?? '#10b981'
+
+  const vars: Record<string, string> = {
+    '--brand': brand,
+    '--on-brand': readableTextOn(brand),
+  }
+
+  const map: [keyof ClubTheme, string][] = [
+    ['bg', '--bg'],
+    ['surface', '--surface'],
+    ['surface2', '--surface-2'],
+    ['surfaceHover', '--surface-hover'],
+    ['line', '--line'],
+    ['lineStrong', '--line-strong'],
+    ['text', '--text'],
+    ['textMuted', '--text-muted'],
+    ['textFaint', '--text-faint'],
+  ]
+
+  for (const [key, cssVar] of map) {
+    const value = t[key]
+    if (typeof value === 'string' && value.trim() !== '') vars[cssVar] = value
+  }
+
+  return vars as React.CSSProperties
 }

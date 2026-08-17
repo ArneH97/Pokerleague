@@ -1,17 +1,18 @@
 import { notFound } from 'next/navigation'
-import { getClub, readableTextOn } from '@/lib/club'
+import { getClub, themeVars } from '@/lib/club'
 
 /**
  * Omhulsel van de clubomgeving.
  *
  * Bewust zonder zichtbare navigatie of koptekst: de zaalklok is een
  * schermvullend scherm zonder chroom, en die zit hier ook onder. Wat deze
- * layout wél doet is de club vaststellen en zijn huisstijl beschikbaar maken
- * als CSS-variabelen.
+ * layout wél doet is de club vaststellen en zijn volledige huisstijl als
+ * CSS-variabelen zetten — kleur én vlakken.
  *
  * Hier staat nergens een productnaam. Cutoff koopt geen software van
- * Pokerleague; Cutoff koopt zijn eigen klok en ledenbestand. Vanuit hun stoel
- * hoort het platform onzichtbaar te zijn.
+ * PokerLeague; Cutoff koopt zijn eigen klok en ledenbestand. Vanaf het moment
+ * dat hun floor aanlogt hoort alles naar hen te ruiken, niet naar het
+ * platform eronder.
  */
 export default async function ClubLayout({ children, params }: LayoutProps<'/c/[club]'>) {
   const { club: slug } = await params
@@ -19,20 +20,8 @@ export default async function ClubLayout({ children, params }: LayoutProps<'/c/[
 
   if (!club) notFound()
 
-  const brand = club.primary_color ?? '#059669'
-
   return (
-    <div
-      className="min-h-dvh"
-      style={
-        {
-          // Overschrijft de standaardkleur uit globals.css voor alles onder
-          // deze club. Elke knop en elk accent volgt vanzelf.
-          '--brand': brand,
-          '--on-brand': readableTextOn(brand),
-        } as React.CSSProperties
-      }
-    >
+    <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]" style={themeVars(club)}>
       {children}
     </div>
   )
@@ -41,5 +30,8 @@ export default async function ClubLayout({ children, params }: LayoutProps<'/c/[
 export async function generateMetadata({ params }: LayoutProps<'/c/[club]'>) {
   const { club: slug } = await params
   const club = await getClub(slug)
-  return { title: club?.name ?? 'Club' }
+  return {
+    title: club?.name ?? 'Club',
+    icons: club?.logo_url ? { icon: club.logo_url } : undefined,
+  }
 }

@@ -53,6 +53,8 @@ export interface ClubRow {
   name: string
   currency: string
   timezone: string
+  logo_url: string | null
+  primary_color: string | null
 }
 
 /** Wat de zaalweergave over de deelnemers moet weten. */

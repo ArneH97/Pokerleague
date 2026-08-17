@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
-import { StructureEditor, makeLevel, type EditorLevel } from '@/components/StructureEditor'
+import { StructureEditor } from '@/components/StructureEditor'
+import { makeLevel, type EditorLevel } from '@/lib/tournament/structure'
 import { Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { createClient } from '@/lib/supabase/server'

@@ -1,0 +1,9 @@
+Logo's van clubs horen hier.
+
+Zet het bestand hier neer als bijvoorbeeld cutoff.png, en verwijs er in de
+database naar met clubs.logo_url = '/clubs/cutoff.png'.
+
+Dit is een tussenoplossing die prima werkt zolang jij de clubs zelf opzet.
+Zodra clubs hun eigen logo moeten kunnen uploaden, verhuist dit naar een
+publieke bucket in Supabase Storage — dan hoeft er geen deploy meer aan te
+pas te komen om een logo te vervangen.

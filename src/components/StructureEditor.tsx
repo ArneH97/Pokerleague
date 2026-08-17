@@ -4,6 +4,9 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Card, Field, Notice, SectionTitle, inputClass } from '@/components/ui'
+import {
+  generateLadder, makeLevel, nextBlinds, type EditorLevel,
+} from '@/lib/tournament/structure'
 
 /**
  * Blindstructuur bewerken.
@@ -12,40 +15,6 @@ import { Button, Card, Field, Notice, SectionTitle, inputClass } from '@/compone
  * kan lopen. Bij opslaan krijgt elk level zijn index op basis van waar het
  * staat, wat betekent dat verslepen of verwijderen nooit gaten laat.
  */
-
-export interface EditorLevel {
-  key: string
-  isBreak: boolean
-  label: string
-  smallBlind: number
-  bigBlind: number
-  ante: number
-  minutes: number
-}
-
-let counter = 0
-const newKey = () => `l${counter++}`
-
-export function makeLevel(p: Partial<EditorLevel> = {}): EditorLevel {
-  return {
-    key: newKey(),
-    isBreak: false,
-    label: '',
-    smallBlind: 25,
-    bigBlind: 50,
-    ante: 0,
-    minutes: 20,
-    ...p,
-  }
-}
-
-/** Volgende blindniveau: ongeveer anderhalf keer, afgerond op iets leesbaars. */
-function nextBlinds(bb: number): { sb: number; bb: number } {
-  const target = bb * 1.5
-  const step = target < 200 ? 25 : target < 1000 ? 50 : target < 5000 ? 500 : 1000
-  const rounded = Math.max(bb + step, Math.round(target / step) * step)
-  return { sb: Math.round(rounded / 2), bb: rounded }
-}
 
 interface Props {
   structureId: string
@@ -110,27 +79,9 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
     setSaved(false)
   }
 
-  /** Vult de structuur aan tot een gewenste speelduur, met pauze per vier levels. */
+  /** Vervangt de structuur door een volledige ladder voor deze speelduur. */
   function generate(hours: number) {
-    const perLevel = 20
-    const wanted = Math.max(4, Math.round((hours * 60) / perLevel))
-    const out: EditorLevel[] = []
-    let sb = 25
-    let bb = 50
-    for (let i = 0; i < wanted; i++) {
-      out.push(makeLevel({
-        smallBlind: sb, bigBlind: bb,
-        ante: i >= 5 ? bb : 0,
-        minutes: perLevel,
-      }))
-      if ((i + 1) % 4 === 0 && i + 1 < wanted) {
-        out.push(makeLevel({ isBreak: true, label: 'Pauze', minutes: 10 }))
-      }
-      const n = nextBlinds(bb)
-      sb = n.sb
-      bb = n.bb
-    }
-    setLevels(out)
+    setLevels(generateLadder(hours))
     setSaved(false)
   }
 

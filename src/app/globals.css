@@ -13,26 +13,39 @@
  */
 
 :root {
-  --bg:            #0a0c10;
-  --surface:       #12151b;
-  --surface-2:     #181c24;
-  --surface-hover: #1e232c;
-  --line:          #252b36;
-  --line-strong:   #333b49;
+  --bg:            #1a1e26;
+  --surface:       #232833;
+  --surface-2:     #2c323f;
+  --surface-hover: #353c4b;
+  --line:          #3a4252;
+  --line-strong:   #4d5668;
 
-  --text:          #eceef2;
-  --text-muted:    #98a1b0;
-  --text-faint:    #646d7c;
+  --text:          #f2f4f8;
+  --text-muted:    #aab3c2;
+  --text-faint:    #7c8698;
 
   --brand:         #10b981;
   --on-brand:      #04120c;
 
-  --danger:        #f87171;
-  --warn:          #fbbf24;
-  --ok:            #34d399;
+  --danger:        #fca5a5;
+  --warn:          #fcd34d;
+  --ok:            #6ee7b7;
 
   --radius:        0.875rem;
   --radius-lg:     1.25rem;
+}
+
+/**
+ * De zaalklok is de uitzondering. Die hangt op een beamer of tv in een
+ * schemerige zaal, waar een grijze achtergrond grauw oogt en licht in de
+ * ogen van de spelers schijnt. Daar willen we juist wél bijna zwart.
+ */
+[data-hall] {
+  --bg:         #07090c;
+  --surface:    #0f1218;
+  --text:       #ffffff;
+  --text-muted: #9aa3b2;
+  --text-faint: #6b7484;
 }
 
 @theme inline {
