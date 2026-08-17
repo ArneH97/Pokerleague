@@ -101,9 +101,17 @@ begin
   raise notice 'OK  de blinds van de avond zijn zichtbaar, de structuren van de club niet';
 
   -- 4 ------------------------------------------------------ de namenregel --
+  -- Het pseudoniem is "Speler " plus de eerste vier tekens van de uuid, dus
+  -- vier hexadecimale tekens. De testspelers heten "Speler 1" tot "Speler 4".
+  --
+  -- Die twee vormen exact uit elkaar houden is hier niet muggenziften: een
+  -- eerdere versie sloot af op "begint niet met Speler 1..4", en die viel
+  -- ongeveer een op de vier keer om zodra een uuid toevallig met een cijfer
+  -- tussen 1 en 4 begon. Een test die soms faalt zonder dat er iets stuk is,
+  -- leert je af om naar de uitslag te kijken — en dan vangt hij de echte
+  -- regressie ook niet meer.
   select player_name into v_naam from public.club_public_seats(v_open) limit 1;
-  if v_naam like 'Speler %' and v_naam not like 'Speler 1%' and v_naam not like 'Speler 2%'
-     and v_naam not like 'Speler 3%' and v_naam not like 'Speler 4%' then
+  if v_naam ~ '^Speler [0-9a-f]{4}$' then
     raise notice 'OK  zonder toestemming toont de lijst een pseudoniem (%)', v_naam;
   else
     raise exception 'FOUT: er stond een echte naam op de publieke lijst: %', v_naam;

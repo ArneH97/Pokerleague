@@ -24,15 +24,29 @@ import { useT } from '@/lib/i18n/context'
  *
  * De gebruikersnaam is optioneel en niet weggestopt: zonder toestemming voor
  * je echte naam is dát wat er in een landelijke ranglijst komt te staan.
+ *
+ * Komt iemand binnen via een uitnodiging van zijn club, dan staat het
+ * mailadres vast. Niet uit koppigheid maar omdat dát adres de sleutel is naar
+ * de historie die al op zijn naam staat: tikt hij hier een ander adres in, dan
+ * maakt hij een leeg tweede profiel en blijven zijn punten achter bij het
+ * eerste. De uitleg staat er dus bij, en het veld is te openen voor wie echt
+ * een ander adres wil — dan is het een keuze en geen ongeluk.
  */
-export function RegisterForm() {
+export function RegisterForm({
+  invitedEmail,
+  clubName,
+}: {
+  invitedEmail?: string
+  clubName?: string
+} = {}) {
   const router = useRouter()
   const t = useT()
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(invitedEmail ?? '')
+  const [unlocked, setUnlocked] = useState(false)
   const [password, setPassword] = useState('')
   const [listing, setListing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -89,6 +103,8 @@ export function RegisterForm() {
     router.refresh()
   }
 
+  const locked = Boolean(invitedEmail) && !unlocked
+
   if (confirm) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-5 py-10">
@@ -113,9 +129,11 @@ export function RegisterForm() {
     <main className="flex min-h-dvh items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-7 text-center">
-          <h1 className="text-2xl font-semibold">{t('register.title')}</h1>
+          <h1 className="text-2xl font-semibold">
+            {clubName ? t('invite.formTitle') : t('register.title')}
+          </h1>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-            {t('register.body')}
+            {clubName ? t('invite.formBody').replace('{club}', clubName) : t('register.body')}
           </p>
         </div>
 
@@ -136,11 +154,24 @@ export function RegisterForm() {
               </Field>
             </div>
 
-            <Field label={t('common.email')} hint={t('register.emailHint')}>
+            <Field
+              label={t('common.email')}
+              hint={locked ? t('invite.emailLocked') : t('register.emailHint')}
+            >
               <input
                 type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email" required className={inputClass}
+                autoComplete="email" required readOnly={locked}
+                className={`${inputClass}${locked ? ' cursor-default text-[var(--text-muted)]' : ''}`}
               />
+              {locked && (
+                <button
+                  type="button"
+                  onClick={() => setUnlocked(true)}
+                  className="mt-1.5 text-xs text-[var(--text-faint)] underline underline-offset-4 hover:text-[var(--text-muted)]"
+                >
+                  {t('invite.emailChange')}
+                </button>
+              )}
             </Field>
 
             <Field label={t('register.password')} hint={t('register.passwordHint')}>

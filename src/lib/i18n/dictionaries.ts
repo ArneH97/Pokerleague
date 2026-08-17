@@ -640,6 +640,30 @@ const nl = {
   'register.haveAccount': 'Heb je al een account?',
   'register.checkMail': 'Kijk even in je mailbox',
   'register.checkMailBody': 'We stuurden een link om je adres te bevestigen naar',
+
+  // Uitnodiging van een club
+  'invite.title': 'Uitnodiging',
+  'invite.from': 'Uitnodiging van',
+  'invite.played':
+    'Je speelde bij {club}. Je resultaten staan genoteerd op je naam — punten, plaatsen en prijzengeld.',
+  'invite.explain':
+    '{club} houdt die bij op PokerLeague, het platform waar Belgische clubs hun tornooien draaien. Maak je account af en je ziet ze zelf, na elke avond. Speel je later bij een andere club op PokerLeague, dan komt dat er gewoon bij.',
+  'invite.formTitle': 'Maak je account af',
+  'invite.formBody': 'Nog vier velden, en je historie bij {club} hangt eraan.',
+  'invite.emailLocked':
+    'Dit is het adres waar je uitnodiging naartoe ging. Op dit adres staat je historie, dus laat het beter staan.',
+  'invite.emailChange': 'Toch een ander adres gebruiken',
+  'invite.unknownTitle': 'Deze link kennen we niet',
+  'invite.unknownBody':
+    'Misschien is er een stuk van de link weggevallen bij het kopiëren. Probeer hem opnieuw vanuit je mailbox, of maak gewoon zelf een account aan met hetzelfde mailadres — dan komt je historie evengoed mee.',
+  'invite.expiredTitle': 'Deze uitnodiging is verlopen',
+  'invite.expiredBody':
+    'Een uitnodiging blijft dertig dagen geldig. Je kan gewoon zelf een account aanmaken met hetzelfde mailadres — dan komt je historie evengoed mee. Lukt dat niet, vraag het dan aan {club}.',
+  'invite.doneTitle': 'Dit is al in orde',
+  'invite.doneBody':
+    'Er bestaat al een account op dit mailadres. Meld je aan, dan staan je resultaten er.',
+  'invite.registerAnyway': 'Zelf een account aanmaken',
+
   'me.title': 'Mijn resultaten',
   'me.club': 'club',
   'me.clubs': 'clubs',
@@ -1336,6 +1360,30 @@ const fr: Record<Key, string> = {
   'register.haveAccount': 'Vous avez déjà un compte ?',
   'register.checkMail': 'Regardez dans votre boîte mail',
   'register.checkMailBody': 'Nous avons envoyé un lien de confirmation à',
+
+  // Invitation d’un club
+  'invite.title': 'Invitation',
+  'invite.from': 'Invitation de',
+  'invite.played':
+    'Vous avez joué au {club}. Vos résultats sont enregistrés à votre nom : points, places et gains.',
+  'invite.explain':
+    '{club} les tient à jour sur PokerLeague, la plateforme où les clubs belges gèrent leurs tournois. Finalisez votre compte et vous les verrez vous-même, après chaque soirée. Si vous jouez plus tard dans un autre club sur PokerLeague, tout se retrouve au même endroit.',
+  'invite.formTitle': 'Finalisez votre compte',
+  'invite.formBody': 'Encore quatre champs, et votre historique au {club} y sera rattaché.',
+  'invite.emailLocked':
+    'C’est l’adresse à laquelle votre invitation a été envoyée. Votre historique y est rattaché : mieux vaut la garder.',
+  'invite.emailChange': 'Utiliser une autre adresse',
+  'invite.unknownTitle': 'Ce lien nous est inconnu',
+  'invite.unknownBody':
+    'Il manque peut-être un morceau du lien lors de la copie. Réessayez depuis votre boîte mail, ou créez simplement un compte avec la même adresse e-mail — votre historique suivra tout autant.',
+  'invite.expiredTitle': 'Cette invitation a expiré',
+  'invite.expiredBody':
+    'Une invitation reste valable trente jours. Vous pouvez créer un compte vous-même avec la même adresse e-mail — votre historique suivra tout autant. En cas de problème, contactez {club}.',
+  'invite.doneTitle': 'C’est déjà réglé',
+  'invite.doneBody':
+    'Un compte existe déjà avec cette adresse e-mail. Connectez-vous et vos résultats vous y attendent.',
+  'invite.registerAnyway': 'Créer un compte moi-même',
+
   'me.title': 'Mes résultats',
   'me.club': 'club',
   'me.clubs': 'clubs',
@@ -2030,6 +2078,30 @@ const en: Record<Key, string> = {
   'register.haveAccount': 'Already have an account?',
   'register.checkMail': 'Check your inbox',
   'register.checkMailBody': 'We sent a link to confirm your address to',
+
+  // Invitation from a club
+  'invite.title': 'Invitation',
+  'invite.from': 'Invitation from',
+  'invite.played':
+    'You played at {club}. Your results are recorded under your name — points, finishes and winnings.',
+  'invite.explain':
+    '{club} keeps them on PokerLeague, the platform Belgian clubs use to run their tournaments. Finish your account and you can see them yourself, after every night. Play at another club on PokerLeague later and it all lands in the same place.',
+  'invite.formTitle': 'Finish your account',
+  'invite.formBody': 'Four more fields, and your history at {club} is attached to it.',
+  'invite.emailLocked':
+    'This is the address your invitation went to. Your history hangs on it, so best leave it as it is.',
+  'invite.emailChange': 'Use a different address',
+  'invite.unknownTitle': 'We don’t know this link',
+  'invite.unknownBody':
+    'A piece of the link may have been lost when copying it. Try again from your mailbox, or simply create an account with the same email address — your history follows either way.',
+  'invite.expiredTitle': 'This invitation has expired',
+  'invite.expiredBody':
+    'An invitation stays valid for thirty days. You can create an account yourself with the same email address — your history follows either way. If that fails, ask {club}.',
+  'invite.doneTitle': 'This is already sorted',
+  'invite.doneBody':
+    'An account already exists for this email address. Sign in and your results are there.',
+  'invite.registerAnyway': 'Create an account myself',
+
   'me.title': 'My results',
   'me.club': 'club',
   'me.clubs': 'clubs',
