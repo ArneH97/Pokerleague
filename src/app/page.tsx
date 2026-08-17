@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ClockPreview } from '@/components/marketing/ClockPreview'
+import { LanguageGate } from '@/components/LanguageGate'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { translator } from '@/lib/i18n/dictionaries'
+import { publicLocale, visitorLocale } from '@/lib/i18n/server'
 
 /**
  * De publieke voorkant van PokerLeague.
@@ -12,11 +16,14 @@ import { ClockPreview } from '@/components/marketing/ClockPreview'
  *
  * Geen tornooilijst: wie hier voor het eerst komt weet nog niet wat dit is,
  * en een rij namen legt dat niet uit.
+ *
+ * Drietalig. Wie nog nooit koos krijgt eerst de taalkeuze te zien; daarna
+ * onthoudt een koekje het en staat er in de kop een schakelaar.
  */
-export const metadata = {
-  title: 'PokerLeague — pokertornooien in België',
-  description:
-    'Alle tornooien van je club op één plek. Live standen, inschrijven, en al je resultaten over clubs heen.',
+
+export async function generateMetadata() {
+  const t = translator(await publicLocale())
+  return { title: t('site.meta.title'), description: t('site.meta.description') }
 }
 
 export default async function Page() {
@@ -24,43 +31,50 @@ export default async function Page() {
   const { data: claims } = await supabase.auth.getClaims()
   const loggedIn = Boolean(claims?.claims)
 
+  const chosen = await visitorLocale()
+  const locale = chosen ?? 'nl'
+  const t = translator(locale)
+
   return (
-    <div data-site className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div data-site lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       {/* ----------------------------------------------------------- nav */}
       <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3.5 sm:px-8">
           <Wordmark />
           <nav className="flex items-center gap-1 text-sm">
             <a href="#spelers" className="hidden rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] sm:block">
-              Voor spelers
+              {t('site.nav.players')}
             </a>
             <a href="#clubs" className="hidden rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] sm:block">
-              Voor clubs
+              {t('site.nav.clubs')}
             </a>
             {loggedIn ? (
               <>
                 <Link href="/clubs" className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
-                  Mijn club
+                  {t('site.nav.myClub')}
                 </Link>
                 <form action="/auth/signout" method="post">
                   <button className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
-                    Afmelden
+                    {t('common.signOut')}
                   </button>
                 </form>
               </>
             ) : (
               <>
                 <Link href="/login" className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
-                  Spelers
+                  {t('site.nav.playerLogin')}
                 </Link>
                 <Link
                   href="/clubs"
                   className="rounded-full bg-[var(--brand)] px-4 py-2 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
-                  Clublogin
+                  {t('site.nav.clubLogin')}
                 </Link>
               </>
             )}
+            <span className="ml-1 hidden sm:block">
+              <LanguageSwitch current={locale} label={t('common.language')} />
+            </span>
           </nav>
         </div>
       </header>
@@ -73,12 +87,12 @@ export default async function Page() {
             <div>
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] bg-[var(--bg)] px-3 py-1 text-xs font-medium text-[var(--text-muted)]">
                 <span className="size-1.5 rounded-full bg-[var(--gold)]" />
-                In opbouw met de eerste Belgische clubs
+                {t('site.hero.badge')}
               </p>
               <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-                Elke hand die je speelt,{' '}
+                {t('site.hero.titleA')}{' '}
                 <span className="relative whitespace-nowrap text-[var(--brand)]">
-                  telt mee
+                  {t('site.hero.titleHighlight')}
                   <span
                     aria-hidden
                     className="absolute inset-x-0 -bottom-1 h-2 rounded-full"
@@ -88,27 +102,23 @@ export default async function Page() {
                 .
               </h1>
               <p className="mt-6 max-w-lg text-pretty text-lg leading-relaxed text-[var(--text-muted)]">
-                PokerLeague verzamelt de tornooien van Belgische pokerclubs op
-                één plek. Schrijf je in bij je club, volg de stand terwijl er
-                gespeeld wordt, en zie je resultaten van alle clubs samen.
+                {t('site.hero.body')}
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
                   href="/login"
                   className="rounded-full bg-[var(--brand)] px-6 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
-                  Aanmelden als speler
+                  {t('site.hero.ctaPlayer')}
                 </Link>
                 <a
                   href="#clubs"
                   className="rounded-full border border-[var(--line-strong)] bg-[var(--bg)] px-6 py-3.5 font-medium transition hover:bg-[var(--surface-hover)]"
                 >
-                  Ik ben een club
+                  {t('site.hero.ctaClub')}
                 </a>
               </div>
-              <p className="mt-4 text-sm text-[var(--text-faint)]">
-                Gratis voor spelers. Clubs betalen per maand.
-              </p>
+              <p className="mt-4 text-sm text-[var(--text-faint)]">{t('site.hero.note')}</p>
             </div>
 
             <ClockPreview />
@@ -117,24 +127,24 @@ export default async function Page() {
 
         {/* ----------------------------------------------------- voor wie */}
         <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
-          <Eyebrow>Voor wie</Eyebrow>
+          <Eyebrow>{t('site.who.eyebrow')}</Eyebrow>
           <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Twee kanten van dezelfde avond
+            {t('site.who.title')}
           </h2>
           <div className="mt-10 grid gap-5 md:grid-cols-2">
             <Audience
-              tag="Spelers"
-              title="Je pokerjaar op één plek"
-              body="Je club nodigt je uit. Vanaf dan zie je waar je speelde, waar je eindigde en hoe je ervoor staat in het klassement — ook als je bij meerdere clubs speelt."
+              tag={t('site.who.playersTag')}
+              title={t('site.who.playersTitle')}
+              body={t('site.who.playersBody')}
               href="/login"
-              cta="Aanmelden als speler"
+              cta={t('site.hero.ctaPlayer')}
             />
             <Audience
-              tag="Clubs"
-              title="Een avond draaien zonder Excel"
-              body="Tornooiklok, ledenbestand, inschrijvingen en klassement in één omgeving met je eigen logo en kleuren, op je eigen adres."
+              tag={t('site.who.clubsTag')}
+              title={t('site.who.clubsTitle')}
+              body={t('site.who.clubsBody')}
               href="#clubs"
-              cta="Bekijk wat clubs krijgen"
+              cta={t('site.who.clubsCta')}
               gold
             />
           </div>
@@ -143,106 +153,51 @@ export default async function Page() {
         {/* --------------------------------------------------- hoe het werkt */}
         <section data-band="dark" className="bg-[var(--bg)] text-[var(--text)]">
           <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
-            <Eyebrow>Hoe een avond verloopt</Eyebrow>
+            <Eyebrow>{t('site.how.eyebrow')}</Eyebrow>
             <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Van inschrijving tot klassement, zonder tussenstap
+              {t('site.how.title')}
             </h2>
             <ol className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              <Step n={1} title="Inschrijven">
-                Leden schrijven zich vooraf in via de app. De floor weet hoeveel
-                tafels er nodig zijn nog voor de eerste kaart valt.
-              </Step>
-              <Step n={2} title="Aan de deur">
-                De floor vinkt aan wie er is en boekt de inkoop. Wie voor het
-                eerst komt staat er in twee seconden bij, zonder account.
-              </Step>
-              <Step n={3} title="Spelen">
-                De klok draait op de beamer, de floor bedient vanaf zijn laptop.
-                Spelers volgen de stand op hun telefoon.
-              </Step>
-              <Step n={4} title="Afsluiten">
-                Eén klik. Prijzengeld, punten en het seizoensklassement worden
-                berekend en staan meteen bij de spelers.
-              </Step>
+              <Step n={1} title={t('site.how.s1t')}>{t('site.how.s1b')}</Step>
+              <Step n={2} title={t('site.how.s2t')}>{t('site.how.s2b')}</Step>
+              <Step n={3} title={t('site.how.s3t')}>{t('site.how.s3b')}</Step>
+              <Step n={4} title={t('site.how.s4t')}>{t('site.how.s4b')}</Step>
             </ol>
           </div>
         </section>
 
         {/* ------------------------------------------------------- spelers */}
         <section id="spelers" className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
-          <Eyebrow>Voor spelers</Eyebrow>
+          <Eyebrow>{t('site.players.eyebrow')}</Eyebrow>
           <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Gratis, en het onthoudt alles voor je
+            {t('site.players.title')}
           </h2>
           <div className="mt-10 grid gap-x-10 gap-y-10 sm:grid-cols-3">
-            <Feature title="Live meekijken">
-              Zie wie er aan de leiding staat, hoeveel spelers er over zijn en op
-              welk level ze spelen — ook als je er zelf niet bij bent.
-            </Feature>
-            <Feature title="Inschrijven vooraf">
-              Eén klik voor de tornooien van je club, en afmelden als het toch
-              niet lukt.
-            </Feature>
-            <Feature title="Al je resultaten">
-              Elke plaats, elke cash, elk seizoen. Speel je bij meerdere clubs,
-              dan staat alles bij elkaar in plaats van in losse bestanden.
-            </Feature>
-            <Feature title="Je eigen stack ingeven">
-              Tijdens het spel geef je je chipcount door. Daar rolt vanzelf een
-              live klassement uit voor de hele tafel.
-            </Feature>
-            <Feature title="Klassementen">
-              Het seizoen van je club, en op termijn een ranking over alle
-              aangesloten clubs heen.
-            </Feature>
-            <Feature title="Niets te installeren">
-              Werkt in je browser, op je telefoon. Geen app store, geen updates.
-            </Feature>
+            <Feature title={t('site.players.f1t')}>{t('site.players.f1b')}</Feature>
+            <Feature title={t('site.players.f2t')}>{t('site.players.f2b')}</Feature>
+            <Feature title={t('site.players.f3t')}>{t('site.players.f3b')}</Feature>
+            <Feature title={t('site.players.f4t')}>{t('site.players.f4b')}</Feature>
+            <Feature title={t('site.players.f5t')}>{t('site.players.f5b')}</Feature>
+            <Feature title={t('site.players.f6t')}>{t('site.players.f6b')}</Feature>
           </div>
         </section>
 
         {/* --------------------------------------------------------- clubs */}
         <section id="clubs" data-band="dark" className="bg-[var(--bg)] text-[var(--text)]">
           <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
-            <Eyebrow>Voor clubs</Eyebrow>
+            <Eyebrow>{t('site.clubs.eyebrow')}</Eyebrow>
             <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Meer dan een tornooiklok
+              {t('site.clubs.title')}
             </h2>
-            <p className="mt-4 max-w-xl text-[var(--text-muted)]">
-              Je eigen omgeving, met je eigen logo en kleuren, op je eigen adres.
-              Nergens staat de naam van het platform.
-            </p>
+            <p className="mt-4 max-w-xl text-[var(--text-muted)]">{t('site.clubs.body')}</p>
 
             <div className="mt-12 grid gap-5 md:grid-cols-3">
-              <DarkCard title="Klok en floor">
-                Een zaalscherm voor de beamer en een bedieningsscherm voor de
-                floor die realtime gelijklopen. Geluid bij de laatste minuut en
-                bij elke nieuwe blindronde, en de klok rolt vanzelf door als
-                niemand doorklikt.
-              </DarkCard>
-              <DarkCard title="Ledenbestand">
-                Wie speelde er, wat kocht hij in, waar eindigde hij. Nieuwe
-                spelers voeg je aan tafel toe op naam; een account is nooit een
-                voorwaarde om te spelen.
-              </DarkCard>
-              <DarkCard title="Klassement op maat">
-                Punten volgens jouw systeem — vaste tabel, lineair of naar
-                veldgrootte — met bonussen voor knock-outs en de mogelijkheid om
-                enkel je beste resultaten te laten tellen.
-              </DarkCard>
-              <DarkCard title="Blindstructuren">
-                Zelf samenstellen, of in één klik een ladder laten genereren voor
-                een avond van drie tot zes uur.
-              </DarkCard>
-              <DarkCard title="Deals aan de finaletafel">
-                ICM en chipchop naast elkaar op het zaalscherm, zodat de tafel
-                het verschil ziet en zelf kiest.
-              </DarkCard>
-              <DarkCard title="In orde met de regels">
-                Elke inzet wordt geregistreerd met tijdstip, zodat je kan
-                aantonen dat niemand boven de daglimiet van het gedoogbeleid
-                ging.
-              </DarkCard>
+              <DarkCard title={t('site.clubs.c1t')}>{t('site.clubs.c1b')}</DarkCard>
+              <DarkCard title={t('site.clubs.c2t')}>{t('site.clubs.c2b')}</DarkCard>
+              <DarkCard title={t('site.clubs.c3t')}>{t('site.clubs.c3b')}</DarkCard>
+              <DarkCard title={t('site.clubs.c4t')}>{t('site.clubs.c4b')}</DarkCard>
+              <DarkCard title={t('site.clubs.c5t')}>{t('site.clubs.c5b')}</DarkCard>
+              <DarkCard title={t('site.clubs.c6t')}>{t('site.clubs.c6b')}</DarkCard>
             </div>
           </div>
         </section>
@@ -252,36 +207,23 @@ export default async function Page() {
           <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
             <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-center">
               <div>
-                <Eyebrow>Zo starten we</Eyebrow>
+                <Eyebrow>{t('site.start.eyebrow')}</Eyebrow>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Je eerste tornooi draait binnen een week
+                  {t('site.start.title')}
                 </h2>
-                <p className="mt-4 text-[var(--text-muted)]">
-                  We zetten je omgeving op, nemen je bestaande resultaten over als
-                  je die hebt, en lopen samen één avond door voor je er echt mee
-                  begint.
-                </p>
+                <p className="mt-4 text-[var(--text-muted)]">{t('site.start.body')}</p>
                 <a
                   href="mailto:info@pokerleague.be?subject=Interesse%20PokerLeague"
                   className="mt-7 inline-block rounded-full bg-[var(--brand)] px-6 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
-                  Neem contact op
+                  {t('site.start.cta')}
                 </a>
               </div>
               <ol className="space-y-3">
-                <Numbered n="01" title="Kennismaken">
-                  Wat speelt je club, hoe houd je het nu bij, en wat mist er.
-                </Numbered>
-                <Numbered n="02" title="Opzetten">
-                  Logo, kleuren, blindstructuur, puntensysteem en je ledenlijst.
-                </Numbered>
-                <Numbered n="03" title="Droogloop">
-                  Eén avond samen doorlopen, zodat de floor het kent voor het
-                  echt telt.
-                </Numbered>
-                <Numbered n="04" title="Spelen">
-                  Vanaf dan draai je zelf, en groeit je historie vanzelf aan.
-                </Numbered>
+                <Numbered n="01" title={t('site.start.n1t')}>{t('site.start.n1b')}</Numbered>
+                <Numbered n="02" title={t('site.start.n2t')}>{t('site.start.n2b')}</Numbered>
+                <Numbered n="03" title={t('site.start.n3t')}>{t('site.start.n3b')}</Numbered>
+                <Numbered n="04" title={t('site.start.n4t')}>{t('site.start.n4b')}</Numbered>
               </ol>
             </div>
           </div>
@@ -292,12 +234,9 @@ export default async function Page() {
           <div className="relative mx-auto max-w-3xl px-5 py-20 text-center sm:px-8">
             <p className="text-5xl" aria-hidden>♠</p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Interesse voor je club?
+              {t('site.cta.title')}
             </h2>
-            <p className="mx-auto mt-4 max-w-lg text-[var(--text-muted)]">
-              We starten met de eerste Belgische clubs. Laat weten wie je bent,
-              dan zetten we je omgeving op.
-            </p>
+            <p className="mx-auto mt-4 max-w-lg text-[var(--text-muted)]">{t('site.cta.body')}</p>
             <a
               href="mailto:info@pokerleague.be?subject=Interesse%20PokerLeague"
               className="mt-8 inline-block rounded-full bg-[var(--brand)] px-7 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
@@ -314,32 +253,41 @@ export default async function Page() {
           <div>
             <Wordmark />
             <p className="mt-3 max-w-xs text-sm text-[var(--text-muted)]">
-              Tornooibeheer voor Belgische pokerclubs, en één plek waar spelers
-              hun resultaten terugvinden.
+              {t('site.footer.about')}
             </p>
+            {/* Ook onderaan, want op een telefoon staat de schakelaar in de
+                kop niet altijd binnen bereik. */}
+            <div className="mt-5 w-fit">
+              <LanguageSwitch current={locale} label={t('common.language')} />
+            </div>
           </div>
           <div className="text-sm">
-            <p className="font-medium">Spelers</p>
+            <p className="font-medium">{t('site.who.playersTag')}</p>
             <ul className="mt-3 space-y-2 text-[var(--text-muted)]">
-              <li><Link href="/login" className="hover:text-[var(--text)]">Aanmelden</Link></li>
-              <li><a href="#spelers" className="hover:text-[var(--text)]">Wat je krijgt</a></li>
+              <li><Link href="/login" className="hover:text-[var(--text)]">{t('common.signIn')}</Link></li>
+              <li><a href="#spelers" className="hover:text-[var(--text)]">{t('site.footer.whatYouGet')}</a></li>
             </ul>
           </div>
           <div className="text-sm">
-            <p className="font-medium">Clubs</p>
+            <p className="font-medium">{t('site.who.clubsTag')}</p>
             <ul className="mt-3 space-y-2 text-[var(--text-muted)]">
-              <li><Link href="/clubs" className="hover:text-[var(--text)]">Clublogin</Link></li>
-              <li><a href="#clubs" className="hover:text-[var(--text)]">Wat je krijgt</a></li>
+              <li><Link href="/clubs" className="hover:text-[var(--text)]">{t('site.nav.clubLogin')}</Link></li>
+              <li><a href="#clubs" className="hover:text-[var(--text)]">{t('site.footer.whatYouGet')}</a></li>
               <li><a href="mailto:info@pokerleague.be" className="hover:text-[var(--text)]">info@pokerleague.be</a></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-[var(--line)]">
           <p className="mx-auto max-w-6xl px-5 py-5 text-sm text-[var(--text-faint)] sm:px-8">
-            PokerLeague · België
+            {t('site.footer.tagline')}
           </p>
         </div>
       </footer>
+
+      {/* De taalkeuze ligt over de pagina heen, niet ervoor in de plaats: wie
+          hem wegscrollt heeft de pagina er al achter staan in het Nederlands,
+          en wie kiest krijgt hem meteen in zijn eigen taal terug. */}
+      {chosen === null && <LanguageGate />}
     </div>
   )
 }

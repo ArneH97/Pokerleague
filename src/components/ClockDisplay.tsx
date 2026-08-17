@@ -117,6 +117,37 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       />
       <Suits />
 
+      {/* Het beeldmerk van de club als watermerk achter de tijd.
+          Geen tegel met een eigen achtergrond: dat geeft een harde rechthoek
+          tegen het scherm. Dit is het vrijstaande merk, groot, zacht, en aan
+          de randen weggevaagd met een masker zodat er nergens een overgang
+          te zien is. Het staat achter de cijfers, niet ernaast — zo blijft
+          de tijd het grootste ding in de zaal. */}
+      {club?.mark_url ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          style={{
+            // Het masker vervaagt het merk naar de randen toe, zodat er geen
+            // zichtbare grens is tussen beeld en achtergrond.
+            maskImage: 'radial-gradient(closest-side, #000 42%, transparent 88%)',
+            WebkitMaskImage: 'radial-gradient(closest-side, #000 42%, transparent 88%)',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={club.mark_url}
+            alt=""
+            className="h-[84vh] w-auto max-w-[86vw] object-contain"
+            style={{
+              opacity: isBreak ? 0.14 : 0.1,
+              filter: 'saturate(1.1)',
+              transition: 'opacity 700ms ease',
+            }}
+          />
+        </div>
+      ) : null}
+
       {/* Voortgang binnen het level over de volle breedte. Van veraf zie je
           zo in één oogopslag of het level bijna om is. */}
       <div className="absolute inset-x-0 top-0 h-[0.9vh] bg-white/[0.06]">
@@ -127,10 +158,9 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       </div>
 
       <header className="relative flex items-start justify-between gap-[3vw] px-[3.5vw] pt-[3vh]">
+        {/* De clubnaam staat centraal boven de klok, dus hier alleen nog
+            waar we in zitten: welk tornooi. */}
         <div className="min-w-0">
-          <p className="truncate text-[1.8vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
-            {club?.name ?? ''}
-          </p>
           <h1 className="truncate text-[3.2vh] font-semibold tracking-tight">{tournament.name}</h1>
         </div>
 
@@ -150,15 +180,27 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       </header>
 
       <section className="relative flex flex-1 flex-col items-center justify-center px-[3vw]">
-        {/* Het logo hoort hier, boven de tijd: dat is waar iedereen in de zaal
-            toch al naar kijkt. */}
-        {club?.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={club.logo_url}
-            alt=""
-            className="mb-[1.5vh] h-[13vh] w-auto max-w-[34vw] object-contain"
-          />
+        {/* De naam van de club, centraal boven de tijd. Als tekst en niet als
+            beeld: dan schaalt hij mee met het scherm, blijft hij scherp op
+            een beamer, en botst hij niet met het watermerk erachter.
+            Valt er geen vrijstaand beeldmerk te tonen, dan is dít wat de
+            zaal ziet — vandaar dat het er ook alleen goed uit moet zien. */}
+        {club?.name ? (
+          <p
+            className="mb-[1vh] max-w-[80vw] truncate text-center font-semibold uppercase leading-none"
+            style={{
+              fontSize: 'min(4.6vh, 5vw)',
+              letterSpacing: '0.42em',
+              // Eén spatie te veel rechts door de letterafstand; die halen we
+              // er weg zodat de naam echt gecentreerd staat.
+              textIndent: '0.42em',
+              color: accent,
+              opacity: 0.92,
+              textShadow: `0 0 6vh ${accent}44`,
+            }}
+          >
+            {club.name}
+          </p>
         ) : null}
 
         {isBreak && (
@@ -175,7 +217,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             urgency === 'critical' ? 'animate-pulse' : ''
           }`}
           style={{
-            fontSize: club?.logo_url ? 'min(30vh, 28vw)' : 'min(36vh, 32vw)',
+            fontSize: 'min(33vh, 30vw)',
             color: urgency === 'idle' && !isBreak ? '#ffffff' : accent,
             textShadow: `0 0 9vh ${accent}55`,
           }}

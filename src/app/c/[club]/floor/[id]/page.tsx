@@ -23,6 +23,7 @@ export default async function Page({ params }: PageProps<'/c/[club]/floor/[id]'>
     <FloorControls
       tournamentId={id}
       clockHref={`/c/${slug}/klok/${id}`}
+      backHref={`/c/${slug}`}
     />
   )
 }

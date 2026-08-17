@@ -103,6 +103,7 @@ const nl = {
   'floor.rolledOver': 'level(s) automatisch doorgerold — de klok liep door zonder dat er geklikt werd.',
   'floor.noRights': 'Geen rechten om dit tornooi te bedienen.',
   'floor.min': 'min',
+  'floor.back': 'Terug naar tornooien',
 
   // Blindstructuren
   'struct.title': 'Blindstructuren',
@@ -172,6 +173,128 @@ const nl = {
   'struct.noRightsCreate': 'Geen rechten om structuren aan te maken.',
   'struct.needsOneLevel': 'Een structuur moet minstens één level bevatten.',
   'club.city': 'Gemeente',
+  // ---------------------------------------------------------------- Publieke
+  // kant: landingspagina, clubkiezer en de taalkeuze bij binnenkomst.
+  'site.meta.title': 'PokerLeague — pokertornooien in België',
+  'site.meta.description':
+    'Alle tornooien van je club op één plek. Live standen, inschrijven, en al je resultaten over clubs heen.',
+
+  'site.nav.players': 'Voor spelers',
+  'site.nav.clubs': 'Voor clubs',
+  'site.nav.myClub': 'Mijn club',
+  'site.nav.playerLogin': 'Spelers',
+  'site.nav.clubLogin': 'Clublogin',
+
+  'site.hero.badge': 'In opbouw met de eerste Belgische clubs',
+  'site.hero.titleA': 'Elke hand die je speelt,',
+  'site.hero.titleHighlight': 'telt mee',
+  'site.hero.body':
+    'PokerLeague verzamelt de tornooien van Belgische pokerclubs op één plek. Schrijf je in bij je club, volg de stand terwijl er gespeeld wordt, en zie je resultaten van alle clubs samen.',
+  'site.hero.ctaPlayer': 'Aanmelden als speler',
+  'site.hero.ctaClub': 'Ik ben een club',
+  'site.hero.note': 'Gratis voor spelers. Clubs betalen per maand.',
+
+  'site.who.eyebrow': 'Voor wie',
+  'site.who.title': 'Twee kanten van dezelfde avond',
+  'site.who.playersTag': 'Spelers',
+  'site.who.playersTitle': 'Je pokerjaar op één plek',
+  'site.who.playersBody':
+    'Je club nodigt je uit. Vanaf dan zie je waar je speelde, waar je eindigde en hoe je ervoor staat in het klassement — ook als je bij meerdere clubs speelt.',
+  'site.who.clubsTag': 'Clubs',
+  'site.who.clubsTitle': 'Een avond draaien zonder Excel',
+  'site.who.clubsBody':
+    'Tornooiklok, ledenbestand, inschrijvingen en klassement in één omgeving met je eigen logo en kleuren, op je eigen adres.',
+  'site.who.clubsCta': 'Bekijk wat clubs krijgen',
+
+  'site.how.eyebrow': 'Hoe een avond verloopt',
+  'site.how.title': 'Van inschrijving tot klassement, zonder tussenstap',
+  'site.how.s1t': 'Inschrijven',
+  'site.how.s1b':
+    'Leden schrijven zich vooraf in via de app. De floor weet hoeveel tafels er nodig zijn nog voor de eerste kaart valt.',
+  'site.how.s2t': 'Aan de deur',
+  'site.how.s2b':
+    'De floor vinkt aan wie er is en boekt de inkoop. Wie voor het eerst komt staat er in twee seconden bij, zonder account.',
+  'site.how.s3t': 'Spelen',
+  'site.how.s3b':
+    'De klok draait op de beamer, de floor bedient vanaf zijn laptop. Spelers volgen de stand op hun telefoon.',
+  'site.how.s4t': 'Afsluiten',
+  'site.how.s4b':
+    'Eén klik. Prijzengeld, punten en het seizoensklassement worden berekend en staan meteen bij de spelers.',
+
+  'site.players.eyebrow': 'Voor spelers',
+  'site.players.title': 'Gratis, en het onthoudt alles voor je',
+  'site.players.f1t': 'Live meekijken',
+  'site.players.f1b':
+    'Zie wie er aan de leiding staat, hoeveel spelers er over zijn en op welk level ze spelen — ook als je er zelf niet bij bent.',
+  'site.players.f2t': 'Inschrijven vooraf',
+  'site.players.f2b': 'Eén klik voor de tornooien van je club, en afmelden als het toch niet lukt.',
+  'site.players.f3t': 'Al je resultaten',
+  'site.players.f3b':
+    'Elke plaats, elke cash, elk seizoen. Speel je bij meerdere clubs, dan staat alles bij elkaar in plaats van in losse bestanden.',
+  'site.players.f4t': 'Je eigen stack ingeven',
+  'site.players.f4b':
+    'Tijdens het spel geef je je chipcount door. Daar rolt vanzelf een live klassement uit voor de hele tafel.',
+  'site.players.f5t': 'Klassementen',
+  'site.players.f5b':
+    'Het seizoen van je club, en op termijn een ranking over alle aangesloten clubs heen.',
+  'site.players.f6t': 'Niets te installeren',
+  'site.players.f6b': 'Werkt in je browser, op je telefoon. Geen app store, geen updates.',
+
+  'site.clubs.eyebrow': 'Voor clubs',
+  'site.clubs.title': 'Meer dan een tornooiklok',
+  'site.clubs.body':
+    'Je eigen omgeving, met je eigen logo en kleuren, op je eigen adres. Nergens staat de naam van het platform.',
+  'site.clubs.c1t': 'Klok en floor',
+  'site.clubs.c1b':
+    'Een zaalscherm voor de beamer en een bedieningsscherm voor de floor die realtime gelijklopen. Geluid bij de laatste minuut en bij elke nieuwe blindronde, en de klok rolt vanzelf door als niemand doorklikt.',
+  'site.clubs.c2t': 'Ledenbestand',
+  'site.clubs.c2b':
+    'Wie speelde er, wat kocht hij in, waar eindigde hij. Nieuwe spelers voeg je aan tafel toe op naam; een account is nooit een voorwaarde om te spelen.',
+  'site.clubs.c3t': 'Klassement op maat',
+  'site.clubs.c3b':
+    'Punten volgens jouw systeem — vaste tabel, lineair of naar veldgrootte — met bonussen voor knock-outs en de mogelijkheid om enkel je beste resultaten te laten tellen.',
+  'site.clubs.c4t': 'Blindstructuren',
+  'site.clubs.c4b':
+    'Zelf samenstellen, of in één klik een ladder laten genereren voor een avond van drie tot zes uur.',
+  'site.clubs.c5t': 'Deals aan de finaletafel',
+  'site.clubs.c5b':
+    'ICM en chipchop naast elkaar op het zaalscherm, zodat de tafel het verschil ziet en zelf kiest.',
+  'site.clubs.c6t': 'In orde met de regels',
+  'site.clubs.c6b':
+    'Elke inzet wordt geregistreerd met tijdstip, zodat je kan aantonen dat niemand boven de daglimiet van het gedoogbeleid ging.',
+
+  'site.start.eyebrow': 'Zo starten we',
+  'site.start.title': 'Je eerste tornooi draait binnen een week',
+  'site.start.body':
+    'We zetten je omgeving op, nemen je bestaande resultaten over als je die hebt, en lopen samen één avond door voor je er echt mee begint.',
+  'site.start.cta': 'Neem contact op',
+  'site.start.n1t': 'Kennismaken',
+  'site.start.n1b': 'Wat speelt je club, hoe houd je het nu bij, en wat mist er.',
+  'site.start.n2t': 'Opzetten',
+  'site.start.n2b': 'Logo, kleuren, blindstructuur, puntensysteem en je ledenlijst.',
+  'site.start.n3t': 'Droogloop',
+  'site.start.n3b': 'Eén avond samen doorlopen, zodat de floor het kent voor het echt telt.',
+  'site.start.n4t': 'Spelen',
+  'site.start.n4b': 'Vanaf dan draai je zelf, en groeit je historie vanzelf aan.',
+
+  'site.cta.title': 'Interesse voor je club?',
+  'site.cta.body':
+    'We starten met de eerste Belgische clubs. Laat weten wie je bent, dan zetten we je omgeving op.',
+
+  'site.footer.about':
+    'Tornooibeheer voor Belgische pokerclubs, en één plek waar spelers hun resultaten terugvinden.',
+  'site.footer.whatYouGet': 'Wat je krijgt',
+  'site.footer.tagline': 'PokerLeague · België',
+
+  'site.pick.metaTitle': 'Clubs — PokerLeague',
+  'site.pick.title': 'Aanmelden als club',
+  'site.pick.body':
+    'Kies je club om naar de beheeromgeving te gaan. Heeft je club een eigen adres, dan kan je daar rechtstreeks naartoe.',
+  'site.pick.none': 'Nog geen clubs aangesloten.',
+  'site.pick.beFirst': 'Wil je de eerste zijn?',
+  'site.pick.manageEnv': 'Beheeromgeving',
+
+  'site.lang.change': 'Taal wijzigen',
 } as const
 
 export type Key = keyof typeof nl
@@ -250,6 +373,7 @@ const fr: Record<Key, string> = {
   'floor.rolledOver': "niveau(x) passé(s) automatiquement — l'horloge a continué sans clic.",
   'floor.noRights': "Vous n'avez pas les droits pour piloter ce tournoi.",
   'floor.min': 'min',
+  'floor.back': 'Retour aux tournois',
 
   'struct.title': 'Structures de blinds',
   'struct.subtitle': "Déterminent ce que l'horloge décompte pendant un tournoi",
@@ -317,6 +441,126 @@ const fr: Record<Key, string> = {
   'struct.noRightsCreate': 'Pas les droits pour créer des structures.',
   'struct.needsOneLevel': 'Une structure doit contenir au moins un niveau.',
   'club.city': 'Commune',
+  'site.meta.title': 'PokerLeague — tournois de poker en Belgique',
+  'site.meta.description':
+    'Tous les tournois de votre club au même endroit. Classements en direct, inscriptions et tous vos résultats, tous clubs confondus.',
+
+  'site.nav.players': 'Pour les joueurs',
+  'site.nav.clubs': 'Pour les clubs',
+  'site.nav.myClub': 'Mon club',
+  'site.nav.playerLogin': 'Joueurs',
+  'site.nav.clubLogin': 'Espace club',
+
+  'site.hero.badge': 'En construction avec les premiers clubs belges',
+  'site.hero.titleA': 'Chaque main que vous jouez',
+  'site.hero.titleHighlight': 'compte',
+  'site.hero.body':
+    'PokerLeague rassemble les tournois des clubs de poker belges au même endroit. Inscrivez-vous auprès de votre club, suivez le classement pendant la partie et retrouvez vos résultats de tous les clubs réunis.',
+  'site.hero.ctaPlayer': 'Se connecter comme joueur',
+  'site.hero.ctaClub': 'Je représente un club',
+  'site.hero.note': 'Gratuit pour les joueurs. Les clubs paient au mois.',
+
+  'site.who.eyebrow': 'Pour qui',
+  'site.who.title': 'Deux facettes d’une même soirée',
+  'site.who.playersTag': 'Joueurs',
+  'site.who.playersTitle': 'Votre année de poker au même endroit',
+  'site.who.playersBody':
+    'Votre club vous invite. Dès lors, vous voyez où vous avez joué, où vous avez terminé et où vous en êtes au classement — même si vous jouez dans plusieurs clubs.',
+  'site.who.clubsTag': 'Clubs',
+  'site.who.clubsTitle': 'Gérer une soirée sans Excel',
+  'site.who.clubsBody':
+    'Horloge de tournoi, fichier des membres, inscriptions et classement dans un seul espace, avec votre logo, vos couleurs et votre propre adresse.',
+  'site.who.clubsCta': 'Voir ce que reçoivent les clubs',
+
+  'site.how.eyebrow': 'Le déroulé d’une soirée',
+  'site.how.title': 'De l’inscription au classement, sans étape intermédiaire',
+  'site.how.s1t': 'S’inscrire',
+  'site.how.s1b':
+    'Les membres s’inscrivent à l’avance via l’application. Le floor sait combien de tables prévoir avant même la première carte.',
+  'site.how.s2t': 'À l’entrée',
+  'site.how.s2b':
+    'Le floor pointe les présents et enregistre la cave. Un nouveau venu est ajouté en deux secondes, sans compte.',
+  'site.how.s3t': 'Jouer',
+  'site.how.s3b':
+    'L’horloge tourne sur le projecteur, le floor pilote depuis son portable. Les joueurs suivent le classement sur leur téléphone.',
+  'site.how.s4t': 'Clôturer',
+  'site.how.s4b':
+    'Un clic. Les gains, les points et le classement de la saison sont calculés et arrivent aussitôt chez les joueurs.',
+
+  'site.players.eyebrow': 'Pour les joueurs',
+  'site.players.title': 'Gratuit, et tout est retenu pour vous',
+  'site.players.f1t': 'Suivre en direct',
+  'site.players.f1b':
+    'Voyez qui mène, combien de joueurs restent et à quel niveau ils jouent — même quand vous n’êtes pas sur place.',
+  'site.players.f2t': 'Inscription à l’avance',
+  'site.players.f2b': 'Un clic pour les tournois de votre club, et une annulation si ça ne va finalement pas.',
+  'site.players.f3t': 'Tous vos résultats',
+  'site.players.f3b':
+    'Chaque place, chaque gain, chaque saison. Si vous jouez dans plusieurs clubs, tout est réuni au lieu d’être éparpillé.',
+  'site.players.f4t': 'Saisir votre tapis',
+  'site.players.f4b':
+    'Pendant la partie, vous encodez votre tapis. Il en sort automatiquement un classement en direct pour toute la table.',
+  'site.players.f5t': 'Classements',
+  'site.players.f5b':
+    'La saison de votre club, et à terme un classement sur l’ensemble des clubs affiliés.',
+  'site.players.f6t': 'Rien à installer',
+  'site.players.f6b': 'Ça fonctionne dans votre navigateur, sur votre téléphone. Pas d’app store, pas de mises à jour.',
+
+  'site.clubs.eyebrow': 'Pour les clubs',
+  'site.clubs.title': 'Plus qu’une horloge de tournoi',
+  'site.clubs.body':
+    'Votre propre espace, avec votre logo et vos couleurs, à votre propre adresse. Le nom de la plateforme n’apparaît nulle part.',
+  'site.clubs.c1t': 'Horloge et floor',
+  'site.clubs.c1b':
+    'Un écran de salle pour le projecteur et un écran de pilotage pour le floor, synchronisés en temps réel. Un signal sonore à la dernière minute et à chaque nouveau niveau, et l’horloge enchaîne d’elle-même si personne ne clique.',
+  'site.clubs.c2t': 'Fichier des membres',
+  'site.clubs.c2b':
+    'Qui a joué, ce qu’il a payé, où il a terminé. Les nouveaux joueurs s’ajoutent à table par leur nom ; un compte n’est jamais obligatoire pour jouer.',
+  'site.clubs.c3t': 'Classement sur mesure',
+  'site.clubs.c3b':
+    'Des points selon votre système — table fixe, linéaire ou selon la taille du champ — avec des bonus pour les knock-outs et la possibilité de ne compter que vos meilleurs résultats.',
+  'site.clubs.c4t': 'Structures de blinds',
+  'site.clubs.c4b':
+    'À composer vous-même, ou générées en un clic pour une soirée de trois à six heures.',
+  'site.clubs.c5t': 'Deals en table finale',
+  'site.clubs.c5b':
+    'ICM et chip chop côte à côte sur l’écran de salle, pour que la table voie la différence et choisisse elle-même.',
+  'site.clubs.c6t': 'En règle',
+  'site.clubs.c6b':
+    'Chaque mise est enregistrée avec son horodatage, pour pouvoir démontrer que personne n’a dépassé la limite journalière de la politique de tolérance.',
+
+  'site.start.eyebrow': 'Comment on démarre',
+  'site.start.title': 'Votre premier tournoi tourne en une semaine',
+  'site.start.body':
+    'Nous mettons votre espace en place, reprenons vos résultats existants si vous en avez, et parcourons une soirée ensemble avant que vous ne vous lanciez pour de bon.',
+  'site.start.cta': 'Nous contacter',
+  'site.start.n1t': 'Faire connaissance',
+  'site.start.n1b': 'Ce que joue votre club, comment vous gérez aujourd’hui, et ce qui manque.',
+  'site.start.n2t': 'Mise en place',
+  'site.start.n2b': 'Logo, couleurs, structure de blinds, système de points et liste des membres.',
+  'site.start.n3t': 'Répétition',
+  'site.start.n3b': 'Une soirée parcourue ensemble, pour que le floor la maîtrise avant que ça compte vraiment.',
+  'site.start.n4t': 'Jouer',
+  'site.start.n4b': 'Ensuite vous êtes autonome, et votre historique s’étoffe tout seul.',
+
+  'site.cta.title': 'Intéressé pour votre club ?',
+  'site.cta.body':
+    'Nous démarrons avec les premiers clubs belges. Dites-nous qui vous êtes et nous mettons votre espace en place.',
+
+  'site.footer.about':
+    'La gestion de tournois pour les clubs de poker belges, et un seul endroit où les joueurs retrouvent leurs résultats.',
+  'site.footer.whatYouGet': 'Ce que vous obtenez',
+  'site.footer.tagline': 'PokerLeague · Belgique',
+
+  'site.pick.metaTitle': 'Clubs — PokerLeague',
+  'site.pick.title': 'Connexion club',
+  'site.pick.body':
+    'Choisissez votre club pour accéder à son espace de gestion. Si votre club a sa propre adresse, vous pouvez y aller directement.',
+  'site.pick.none': 'Aucun club affilié pour l’instant.',
+  'site.pick.beFirst': 'Vous voulez être le premier ?',
+  'site.pick.manageEnv': 'Espace de gestion',
+
+  'site.lang.change': 'Changer de langue',
 }
 
 const en: Record<Key, string> = {
@@ -393,6 +637,7 @@ const en: Record<Key, string> = {
   'floor.rolledOver': 'level(s) rolled over automatically — the clock kept running without a click.',
   'floor.noRights': 'You do not have permission to run this tournament.',
   'floor.min': 'min',
+  'floor.back': 'Back to tournaments',
 
   'struct.title': 'Blind structures',
   'struct.subtitle': 'Decide what the clock counts down during a tournament',
@@ -460,6 +705,126 @@ const en: Record<Key, string> = {
   'struct.noRightsCreate': 'No permission to create structures.',
   'struct.needsOneLevel': 'A structure needs at least one level.',
   'club.city': 'Town',
+  'site.meta.title': 'PokerLeague — poker tournaments in Belgium',
+  'site.meta.description':
+    'Every tournament your club runs, in one place. Live standings, sign-ups, and all your results across clubs.',
+
+  'site.nav.players': 'For players',
+  'site.nav.clubs': 'For clubs',
+  'site.nav.myClub': 'My club',
+  'site.nav.playerLogin': 'Players',
+  'site.nav.clubLogin': 'Club login',
+
+  'site.hero.badge': 'Being built with the first Belgian clubs',
+  'site.hero.titleA': 'Every hand you play',
+  'site.hero.titleHighlight': 'counts',
+  'site.hero.body':
+    'PokerLeague brings the tournaments of Belgian poker clubs together in one place. Sign up at your club, follow the standings while the cards are in the air, and see your results across every club at once.',
+  'site.hero.ctaPlayer': 'Sign in as a player',
+  'site.hero.ctaClub': 'I run a club',
+  'site.hero.note': 'Free for players. Clubs pay monthly.',
+
+  'site.who.eyebrow': 'Who it’s for',
+  'site.who.title': 'Two sides of the same evening',
+  'site.who.playersTag': 'Players',
+  'site.who.playersTitle': 'Your poker year in one place',
+  'site.who.playersBody':
+    'Your club invites you. From then on you can see where you played, where you finished and how you stand in the rankings — even if you play at more than one club.',
+  'site.who.clubsTag': 'Clubs',
+  'site.who.clubsTitle': 'Run a night without Excel',
+  'site.who.clubsBody':
+    'Tournament clock, member database, sign-ups and standings in one place, with your own logo and colours, at your own address.',
+  'site.who.clubsCta': 'See what clubs get',
+
+  'site.how.eyebrow': 'How an evening runs',
+  'site.how.title': 'From sign-up to standings, with nothing in between',
+  'site.how.s1t': 'Sign up',
+  'site.how.s1b':
+    'Members register in advance through the app. The floor knows how many tables are needed before the first card is dealt.',
+  'site.how.s2t': 'At the door',
+  'site.how.s2b':
+    'The floor ticks off who showed up and books the buy-in. A first-timer is added in two seconds, no account needed.',
+  'site.how.s3t': 'Play',
+  'site.how.s3b':
+    'The clock runs on the projector, the floor controls it from a laptop. Players follow the standings on their phone.',
+  'site.how.s4t': 'Close out',
+  'site.how.s4b':
+    'One click. Prize money, points and the season standings are calculated and land with the players straight away.',
+
+  'site.players.eyebrow': 'For players',
+  'site.players.title': 'Free, and it remembers everything for you',
+  'site.players.f1t': 'Follow live',
+  'site.players.f1b':
+    'See who is in the lead, how many players are left and what level they are on — even when you are not there yourself.',
+  'site.players.f2t': 'Register in advance',
+  'site.players.f2b': 'One tap for your club’s tournaments, and an easy cancel if it turns out you can’t make it.',
+  'site.players.f3t': 'All your results',
+  'site.players.f3b':
+    'Every finish, every cash, every season. Play at several clubs and it all sits together instead of in separate files.',
+  'site.players.f4t': 'Enter your own stack',
+  'site.players.f4b':
+    'During play you enter your chip count. A live leaderboard for the whole field falls out of that by itself.',
+  'site.players.f5t': 'Standings',
+  'site.players.f5b':
+    'Your club’s season, and in time a ranking across every affiliated club.',
+  'site.players.f6t': 'Nothing to install',
+  'site.players.f6b': 'Runs in your browser, on your phone. No app store, no updates.',
+
+  'site.clubs.eyebrow': 'For clubs',
+  'site.clubs.title': 'More than a tournament clock',
+  'site.clubs.body':
+    'Your own environment, with your own logo and colours, at your own address. The platform’s name appears nowhere.',
+  'site.clubs.c1t': 'Clock and floor',
+  'site.clubs.c1b':
+    'A hall screen for the projector and a control screen for the floor, in step in real time. A sound at the last minute and at every new blind level, and the clock rolls on by itself if nobody clicks.',
+  'site.clubs.c2t': 'Member database',
+  'site.clubs.c2b':
+    'Who played, what they bought in for, where they finished. New players are added at the table by name; an account is never a condition for playing.',
+  'site.clubs.c3t': 'Standings your way',
+  'site.clubs.c3b':
+    'Points on your system — fixed table, linear or scaled to field size — with knock-out bonuses and the option to count only your best results.',
+  'site.clubs.c4t': 'Blind structures',
+  'site.clubs.c4b':
+    'Build your own, or generate a ladder in one click for a three to six hour evening.',
+  'site.clubs.c5t': 'Final-table deals',
+  'site.clubs.c5b':
+    'ICM and chip chop side by side on the hall screen, so the table sees the difference and decides for itself.',
+  'site.clubs.c6t': 'By the book',
+  'site.clubs.c6b':
+    'Every stake is recorded with a timestamp, so you can show that nobody went over the daily limit set by the tolerance policy.',
+
+  'site.start.eyebrow': 'How we start',
+  'site.start.title': 'Your first tournament runs within a week',
+  'site.start.body':
+    'We set up your environment, bring over your existing results if you have them, and walk through one evening together before it counts for real.',
+  'site.start.cta': 'Get in touch',
+  'site.start.n1t': 'Get acquainted',
+  'site.start.n1b': 'What your club plays, how you track it today, and what is missing.',
+  'site.start.n2t': 'Set up',
+  'site.start.n2b': 'Logo, colours, blind structure, points system and your member list.',
+  'site.start.n3t': 'Dry run',
+  'site.start.n3b': 'One evening walked through together, so the floor knows it before it counts.',
+  'site.start.n4t': 'Play',
+  'site.start.n4b': 'From then on you run it yourself, and your history grows on its own.',
+
+  'site.cta.title': 'Interested for your club?',
+  'site.cta.body':
+    'We are starting with the first Belgian clubs. Tell us who you are and we will set up your environment.',
+
+  'site.footer.about':
+    'Tournament management for Belgian poker clubs, and one place where players find their results.',
+  'site.footer.whatYouGet': 'What you get',
+  'site.footer.tagline': 'PokerLeague · Belgium',
+
+  'site.pick.metaTitle': 'Clubs — PokerLeague',
+  'site.pick.title': 'Club sign-in',
+  'site.pick.body':
+    'Pick your club to go to its management area. If your club has its own address, you can go there directly.',
+  'site.pick.none': 'No clubs on board yet.',
+  'site.pick.beFirst': 'Want to be the first?',
+  'site.pick.manageEnv': 'Management area',
+
+  'site.lang.change': 'Change language',
 }
 
 export const dictionaries: Record<Locale, Record<Key, string>> = { nl, fr, en }

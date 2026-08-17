@@ -25,6 +25,11 @@ set
   -- repo en push; dan staat hij op dit pad.
   logo_url = '/clubs/cutoff.png',
 
+  -- Alleen de C, vrijgemaakt van de zwarte achtergrond en van de woorden.
+  -- Die staat groot en zacht achter de klok in de zaal; de naam komt er als
+  -- tekst boven. Het volledige logo hierboven blijft voor de beheerschermen.
+  mark_url = '/clubs/cutoff-mark.png',
+
   -- Het volledige palet van de club. Alles wat je hier weglaat valt terug op
   -- het platformthema, dus een club met alleen een accentkleur werkt ook.
   settings = coalesce(settings, '{}'::jsonb) || jsonb_build_object(
@@ -50,7 +55,7 @@ set
 where slug = 'cutoff';
 
 -- Controle: zo ziet het er nu uit.
-select slug, name, custom_domain, primary_color, logo_url,
+select slug, name, custom_domain, primary_color, logo_url, mark_url,
        settings->'theme'->>'bg' as achtergrond
 from clubs
 where slug = 'cutoff';

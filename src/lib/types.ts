@@ -54,6 +54,8 @@ export interface ClubRow {
   currency: string
   timezone: string
   logo_url: string | null
+  /** Alleen het beeldmerk, vrijstaand. Zie migratie 0009. */
+  mark_url: string | null
   primary_color: string | null
 }
 

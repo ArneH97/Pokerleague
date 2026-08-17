@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -22,10 +23,13 @@ import { useT } from '@/lib/i18n/context'
 export function FloorControls({
   tournamentId,
   clockHref,
+  backHref,
 }: {
   tournamentId: string
   /** Waar het zaalscherm staat; komt van de clubroute zodat de URL klopt. */
   clockHref: string
+  /** Terug naar het clubdashboard. Zonder dit zit de floor vast op dit scherm. */
+  backHref: string
 }) {
   const supabase = useMemo(() => createClient(), [])
   const { tournament, club, levels, stats, loading, error, live } = useTournament(tournamentId)
@@ -61,9 +65,14 @@ export function FloorControls({
     setBusy(false)
   }
 
-  if (loading) return <Shell><p className="text-[var(--text-muted)]">{t('common.loading')}</p></Shell>
+  // De terugweg staat ook op het laad- en foutscherm. Juist dáár heb je hem
+  // nodig: een floor die op een leeg scherm belandt heeft anders alleen nog
+  // de terugknop van de browser, en die is op een tablet ver weg.
+  const back = <BackLink href={backHref} label={t('floor.back')} />
+
+  if (loading) return <Shell back={back}><p className="text-[var(--text-muted)]">{t('common.loading')}</p></Shell>
   if (error || !tournament) {
-    return <Shell><p className="text-[var(--danger)]">{error ?? t('clock.unknown')}</p></Shell>
+    return <Shell back={back}><p className="text-[var(--danger)]">{error ?? t('clock.unknown')}</p></Shell>
   }
 
   const state = toClockState(tournament)
@@ -72,7 +81,7 @@ export function FloorControls({
   const neverStarted = tournament.clock === 'stopped' && !tournament.started_at
 
   return (
-    <Shell>
+    <Shell back={back}>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
@@ -222,11 +231,24 @@ export function FloorControls({
   )
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, back }: { children: React.ReactNode; back?: React.ReactNode }) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 bg-[var(--bg)] p-6 text-white">
+      {back}
       {children}
     </main>
+  )
+}
+
+/** Terug naar het clubdashboard. Bewust bovenaan links: daar zoekt iedereen. */
+function BackLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="-mb-2 inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+    >
+      <span aria-hidden>←</span> {label}
+    </Link>
   )
 }
 

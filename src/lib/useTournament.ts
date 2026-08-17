@@ -70,7 +70,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
     }
 
     const [clubRes, levelRes, playerRes, potRes] = await Promise.all([
-      supabase.from('clubs').select('id,slug,name,currency,timezone,logo_url,primary_color')
+      supabase.from('clubs').select('id,slug,name,currency,timezone,logo_url,mark_url,primary_color')
         .eq('id', t.club_id).maybeSingle<ClubRow>(),
       t.structure_id
         ? supabase.from('blind_levels').select('*')
@@ -96,7 +96,11 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
       stats: {
         entriesTotal: players.length,
         playersLeft: players.filter((p) => p.status === 'active' || p.status === 'registered').length,
-        totalChips: players.reduce((sum, p) => sum + (p.chip_count ?? 0), 0),
+        // Alleen wie nog speelt telt mee, anders zakt de gemiddelde stack
+        // mee met elke afvaller in plaats van te stijgen.
+        totalChips: players
+          .filter((p) => p.status === 'active' || p.status === 'registered')
+          .reduce((sum, p) => sum + (p.chip_count ?? 0), 0),
         prizePoolCents: pot.reduce((sum, b) => sum + b.amount_cents, 0),
       },
       loading: false,

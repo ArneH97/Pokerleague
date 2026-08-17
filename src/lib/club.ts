@@ -37,6 +37,8 @@ export interface Club {
   timezone: string
   locale: string
   logo_url: string | null
+  /** Alleen het beeldmerk, vrijstaand op een doorzichtige achtergrond. */
+  mark_url: string | null
   primary_color: string | null
   settings: { theme?: ClubTheme } | null
 }
@@ -45,7 +47,7 @@ export const getClub = cache(async (slug: string): Promise<Club | null> => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('clubs')
-    .select('id,slug,name,city,currency,timezone,locale,logo_url,primary_color,settings')
+    .select('id,slug,name,city,currency,timezone,locale,logo_url,mark_url,primary_color,settings')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle<Club>()
