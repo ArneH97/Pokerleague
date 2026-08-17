@@ -11,7 +11,14 @@ export interface OpenDeal {
   id: string
   method: string
   poolCents: number
-  shares: { name: string; chips: number; agreed_cents: number }[]
+  shares: {
+    name: string
+    chips: number
+    agreed_cents: number
+    icm_cents?: number | null
+    chop_cents?: number | null
+    even_cents?: number | null
+  }[]
 }
 
 interface State {
@@ -26,6 +33,8 @@ interface State {
   live: boolean
   /** Het voorstel dat nu op het zaalscherm hoort te staan, of null. */
   deal: OpenDeal | null
+  /** De prijzenladder: plaats 1..N in cent. Voor het bord in de zaal. */
+  prizes: number[]
 }
 
 const EMPTY_STATS: TournamentStats = {
@@ -57,7 +66,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
   const supabase = useMemo(() => createClient(), [])
   const [state, setState] = useState<State>({
     tournament: null, club: null, levels: [], stats: EMPTY_STATS,
-    loading: true, error: null, live: false, deal: null,
+    loading: true, error: null, live: false, deal: null, prizes: [],
   })
 
   const load = useCallback(async () => {
@@ -79,7 +88,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
       return
     }
 
-    const [clubRes, levelRes, playerRes, potRes, dealRes] = await Promise.all([
+    const [clubRes, levelRes, playerRes, potRes, dealRes, prizeRes] = await Promise.all([
       supabase.from('clubs').select('id,slug,name,currency,timezone,logo_url,mark_url,primary_color')
         .eq('id', t.club_id).maybeSingle<ClubRow>(),
       t.structure_id
@@ -100,6 +109,9 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
         .eq('tournament_id', tournamentId)
         .eq('status', 'proposed')
         .maybeSingle<{ id: string; method: string; pool_cents: number; shares: OpenDeal['shares'] }>(),
+      // De prijzenladder hangt in de zaal op het bord; hier halen we hem op
+      // zodat het zaalscherm hem af en toe kan tonen.
+      supabase.rpc('tournament_prizes', { p_tournament_id: tournamentId }),
     ])
 
     const players = (playerRes.data ?? []) as { status: string; chip_count: number | null }[]
@@ -133,6 +145,9 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
             shares: dealRes.data.shares ?? [],
           }
         : null,
+      prizes: ((prizeRes.data ?? []) as unknown as { place: number; amount_cents: number }[])
+        .sort((a, b) => a.place - b.place)
+        .map((r) => r.amount_cents),
       loading: false,
       error: null,
       live: true,

@@ -1,139 +1,174 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { computeDeal, type DealSeat } from '@/lib/tournament/deal'
+import { computeDeal, evenSplitCents } from '@/lib/tournament/deal'
 import { formatMoney } from '@/lib/types'
 import { useT } from '@/lib/i18n/context'
 
 /**
- * De deal aan de finaletafel, bediend vanaf het floor-scherm.
+ * De deal aan de finaletafel.
  *
- * Waarom ICM en chipchop naast elkaar en niet één van de twee: dat verschil
- * ís de onderhandeling. Chipchop deelt naar rato van de chips; ICM houdt
- * rekening met de prijzenladder, want je kan maar één keer eerste worden en
- * een dubbel zo grote stapel is dus geen dubbel zo grote verwachting. De
- * chipleader wil chipchop, de kortste stapel wil ICM, en de waarheid ligt
- * ertussen. Beide tonen en de tafel laten kiezen is eerlijker dan zelf
- * beslissen welke methode "juist" is.
+ * Twee dingen die de vorm bepalen.
  *
- * De floor kan de bedragen ook met de hand zetten — een tafel spreekt vaak
- * iets af dat op geen van beide kolommen staat. Het enige dat de software
- * bewaakt is dat de som klopt met wat er te verdelen valt.
+ * Eerst tellen, dan rekenen. De chipcounts in het systeem zijn een schatting:
+ * spelers geven hun stapel door wanneer het hun uitkomt, en aan de
+ * finaletafel klopt dat allang niet meer. Zodra er over geld gepraat wordt
+ * moet de floor opnieuw tellen. De controle daarop is niet "exact gelijk"
+ * maar 95 tot 105 procent van wat er in spel hoort te zijn — chip-ups en
+ * verdwenen fiches zorgen altijd voor wat drift, en een systeem dat op één
+ * fiche na gelijk eist krijgt gegarandeerd verzonnen getallen.
+ *
+ * En drie voorstellen, niet één. ICM houdt rekening met de prijzenladder,
+ * chipchop deelt naar rato van de stapels, even split geeft iedereen
+ * evenveel. De chipleader wil chipchop, de kortste stapel wil even split, en
+ * ICM ligt ertussen. Alle drie tegelijk op het zaalscherm kunnen zetten is
+ * eerlijker dan zelf beslissen welke de juiste is.
+ *
+ * Even split is het enige voorstel dat geen telling nodig heeft — daar komen
+ * geen chips aan te pas. Dat is bewust apart bereikbaar: als de tafel dat
+ * meteen afspreekt hoeft niemand nog te tellen.
  */
 
-interface Seat extends DealSeat {
-  tpId: string
+interface Seat {
+  id: string
+  name: string
+  chips: number
 }
+
+type Col = 'icm' | 'chop' | 'even'
 
 export function DealPanel({
   tournamentId,
   currency,
   seats,
+  expectedChips,
   onClose,
 }: {
   tournamentId: string
   currency: string
-  /** Wie er nog zit, met hun chipcount. */
+  /** Wie er nog zit, met hun laatst bekende chipcount als vertrekpunt. */
   seats: Seat[]
+  /** Hoeveel chips er in spel horen te zijn: inkopen × startstack, plus addons. */
+  expectedChips: number
   onClose: () => void
 }) {
   const supabase = useMemo(() => createClient(), [])
   const t = useT()
 
   const [prizes, setPrizes] = useState<number[] | null>(null)
+  const [step, setStep] = useState<'count' | 'propose'>('count')
+  const [counts, setCounts] = useState<Record<string, number>>(
+    () => Object.fromEntries(seats.map((s) => [s.id, s.chips])),
+  )
+  const [counted, setCounted] = useState(false)
   const [amounts, setAmounts] = useState<Record<string, number>>({})
-  const [method, setMethod] = useState<'icm' | 'chipchop' | 'custom'>('icm')
-  const [openDealId, setOpenDealId] = useState<string | null>(null)
+  const [show, setShow] = useState<Record<Col, boolean>>({ icm: true, chop: true, even: true })
+  const [openDeal, setOpenDeal] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
 
-  // De prijzenladder van dit tornooi. Alleen de bovenste N plaatsen tellen,
-  // met N het aantal spelers dat nog zit: de rest is al uitbetaald.
-  useEffect(() => {
-    let dood = false
-    void (async () => {
-      const { data, error: err } = await supabase.rpc('tournament_prizes', {
-        p_tournament_id: tournamentId,
-      })
-      if (dood) return
-      if (err) { setError(err.message); return }
-      const rows = (data ?? []) as unknown as { place: number; amount_cents: number }[]
-      setPrizes(rows.sort((a, b) => a.place - b.place).map((r) => r.amount_cents))
-    })()
-    return () => { dood = true }
+  const load = useCallback(async () => {
+    const [ladder, open] = await Promise.all([
+      supabase.rpc('tournament_prizes', { p_tournament_id: tournamentId }),
+      supabase.from('tournament_deals').select('id')
+        .eq('tournament_id', tournamentId).eq('status', 'proposed')
+        .maybeSingle<{ id: string }>(),
+    ])
+    if (ladder.error) setError(ladder.error.message)
+    const rows = (ladder.data ?? []) as unknown as { place: number; amount_cents: number }[]
+    setPrizes(rows.sort((a, b) => a.place - b.place).map((r) => r.amount_cents))
+    setOpenDeal(open.data != null)
   }, [supabase, tournamentId])
 
-  // Staat er al een voorstel op het scherm?
   useEffect(() => {
-    let dood = false
-    void (async () => {
-      const { data } = await supabase
-        .from('tournament_deals')
-        .select('id')
-        .eq('tournament_id', tournamentId)
-        .eq('status', 'proposed')
-        .maybeSingle<{ id: string }>()
-      if (!dood) setOpenDealId(data?.id ?? null)
-    })()
-    return () => { dood = true }
-  }, [supabase, tournamentId])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+  }, [load])
+
+  const n = seats.length
+
+  // Wat er nog te verdelen valt zijn de bovenste N plaatsen. De plaatsen
+  // daaronder zijn al uitbetaald aan wie eerder afviel; die horen hier niet
+  // meer bij.
+  const remaining = prizes ? prizes.slice(0, Math.min(n, prizes.length)) : []
+  const poolCents = remaining.reduce((a, b) => a + b, 0)
+  const paidOutCents = prizes
+    ? prizes.slice(Math.min(n, prizes.length)).reduce((a, b) => a + b, 0)
+    : 0
+
+  const totalCounted = seats.reduce((sum, s) => sum + (counts[s.id] ?? 0), 0)
+  const ratio = expectedChips > 0 ? totalCounted / expectedChips : 0
+  const countOk = expectedChips > 0 ? ratio >= 0.95 && ratio <= 1.05 : totalCounted > 0
 
   const result = useMemo(
-    () => (prizes ? computeDeal(seats, prizes) : null),
-    [seats, prizes],
+    () => computeDeal(seats.map((s) => ({ ...s, chips: counts[s.id] ?? 0 })), remaining),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [seats, counts, prizes],
   )
 
-  // Bij het wisselen van methode nemen we die kolom over als voorstel.
-  useEffect(() => {
-    if (!result || method === 'custom') return
+  const even = useMemo(() => evenSplitCents(n, remaining),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [n, prizes])
+
+  function pick(col: Col) {
     const next: Record<string, number> = {}
-    for (const s of result.shares) {
-      next[s.id] = method === 'icm' ? (s.icmCents ?? s.chopCents) : s.chopCents
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    result.shares.forEach((s, i) => {
+      next[s.id] = col === 'icm' ? (s.icmCents ?? 0) : col === 'chop' ? s.chopCents : even[i] ?? 0
+    })
     setAmounts(next)
-  }, [result, method])
-
-  if (seats.length < 2) {
-    return (
-      <Panel onClose={onClose} title={t('deal.title')}>
-        <p className="text-sm text-[var(--text-muted)]">{t('deal.needTwo')}</p>
-      </Panel>
-    )
   }
 
-  if (!result) {
-    return (
-      <Panel onClose={onClose} title={t('deal.title')}>
-        <p className="text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
-      </Panel>
-    )
-  }
-
-  const total = Object.values(amounts).reduce((a, b) => a + b, 0)
-  const diff = total - result.poolCents
-  const ok = diff === 0
-
-  async function propose() {
+  async function saveStacks() {
     setBusy(true)
     setError(null)
-    const shares = result!.shares.map((s) => ({
-      tournament_player_id: s.id,
-      name: s.name,
-      chips: s.chips,
-      icm_cents: s.icmCents,
-      chop_cents: s.chopCents,
-      agreed_cents: amounts[s.id] ?? 0,
-    }))
-    const { data, error: err } = await supabase.rpc('deal_propose', {
+    for (const s of seats) {
+      const { error: err } = await supabase
+        .from('tournament_players')
+        .update({ chip_count: counts[s.id] ?? 0 })
+        .eq('id', s.id)
+      if (err) { setError(err.message); setBusy(false); return }
+    }
+    setCounted(true)
+    setStep('propose')
+    pick('icm')
+    setBusy(false)
+  }
+
+  function evenOnly() {
+    const next: Record<string, number> = {}
+    seats.forEach((s, i) => { next[s.id] = even[i] ?? 0 })
+    setAmounts(next)
+    setShow({ icm: false, chop: false, even: true })
+    setStep('propose')
+  }
+
+  async function project() {
+    setBusy(true)
+    setError(null)
+    const shares = seats.map((s, i) => {
+      const share = result.shares[i]
+      return {
+        tournament_player_id: s.id,
+        name: s.name,
+        chips: counted ? (counts[s.id] ?? 0) : 0,
+        icm_cents: show.icm && counted ? share.icmCents : null,
+        chop_cents: show.chop && counted ? share.chopCents : null,
+        even_cents: show.even ? (even[i] ?? 0) : null,
+        agreed_cents: amounts[s.id] ?? 0,
+      }
+    })
+    const method = show.icm && show.chop && show.even ? 'all'
+      : show.icm ? 'icm' : show.chop ? 'chipchop' : 'even'
+
+    const { error: err } = await supabase.rpc('deal_propose', {
       p_tournament_id: tournamentId,
       p_method: method,
       p_shares: shares,
     })
     if (err) setError(err.message)
-    else setOpenDealId(typeof data === 'string' ? data : 'open')
+    else setOpenDeal(true)
     setBusy(false)
   }
 
@@ -141,88 +176,197 @@ export function DealPanel({
     setBusy(true)
     const { error: err } = await supabase.rpc('deal_cancel', { p_tournament_id: tournamentId })
     if (err) setError(err.message)
-    else setOpenDealId(null)
+    else setOpenDeal(false)
     setBusy(false)
   }
 
   async function accept() {
     setBusy(true)
-    setError(null)
     const { error: err } = await supabase.rpc('deal_accept', { p_tournament_id: tournamentId })
     if (err) { setError(err.message); setBusy(false); return }
     setBusy(false)
     onClose()
   }
 
+  const total = Object.values(amounts).reduce((a, b) => a + b, 0)
+  const sumOk = total === poolCents
+
+  if (n < 2) {
+    return <Panel title={t('deal.title')} onClose={onClose}>
+      <p className="text-sm text-[var(--text-muted)]">{t('deal.needTwo')}</p>
+    </Panel>
+  }
+  if (prizes === null) {
+    return <Panel title={t('deal.title')} onClose={onClose}>
+      <p className="text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
+    </Panel>
+  }
+
+  // -------------------------------------------------------------- tellen ---
+  if (step === 'count') {
+    return (
+      <Panel title={`${t('deal.title')} · ${t('deal.step1')}`} onClose={onClose}>
+        <p className="text-sm leading-relaxed text-[var(--text-muted)]">{t('deal.countHint')}</p>
+
+        <ul className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-lg border border-[var(--line)]">
+          {seats.map((s) => (
+            <li key={s.id} className="flex items-center gap-3 px-3 py-2">
+              <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
+              <input
+                inputMode="numeric"
+                aria-label={s.name}
+                value={counts[s.id] ?? 0}
+                onChange={(e) => {
+                  const v = Math.max(0, Number.parseInt(e.target.value.replace(/\D/g, ''), 10) || 0)
+                  setCounts((c) => ({ ...c, [s.id]: v }))
+                }}
+                className="tnum w-32 rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2 text-right outline-none focus:border-[var(--brand)]"
+              />
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+          <p className="text-[var(--text-muted)]">
+            {t('deal.counted')}{' '}
+            <span className="tnum font-semibold text-[var(--text)]">
+              {totalCounted.toLocaleString('nl-BE')}
+            </span>
+            <span className="mx-2 text-[var(--text-faint)]">/</span>
+            {t('deal.expected')}{' '}
+            <span className="tnum">{expectedChips.toLocaleString('nl-BE')}</span>
+          </p>
+          <p
+            className="tnum font-medium"
+            style={{ color: countOk ? 'var(--ok)' : 'var(--warn)' }}
+          >
+            {(ratio * 100).toFixed(1)}% · {countOk ? t('deal.countOk') : t('deal.countOff')}
+          </p>
+        </div>
+        <p className="mt-1 text-xs text-[var(--text-faint)]">{t('deal.countTolerance')}</p>
+
+        {error && <p className="mt-2 text-sm text-[var(--danger)]">{error}</p>}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || !countOk}
+            onClick={() => void saveStacks()}
+            className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
+          >
+            {t('deal.toProposals')}
+          </button>
+          {/* Even split heeft geen telling nodig: daar komen geen chips aan
+              te pas. Als de tafel dat meteen afspreekt scheelt dat een hoop
+              gedoe met fiches. */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={evenOnly}
+            className="rounded-lg border border-[var(--line-strong)] px-4 py-2 text-sm transition hover:bg-[var(--surface-hover)]"
+          >
+            {t('deal.evenOnly')}
+          </button>
+        </div>
+      </Panel>
+    )
+  }
+
+  // --------------------------------------------------------- voorstellen ---
   return (
-    <Panel onClose={onClose} title={t('deal.title')}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm text-[var(--text-muted)]">
+    <Panel title={`${t('deal.title')} · ${t('deal.step2')}`} onClose={onClose}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+        <p className="text-[var(--text-muted)]">
           {t('deal.pool')}{' '}
           <span className="tnum font-semibold text-[var(--text)]">
-            {formatMoney(result.poolCents, currency)}
+            {formatMoney(poolCents, currency)}
           </span>
         </p>
-        <p className="text-xs text-[var(--text-faint)]">
-          {t('deal.remaining')}: {Math.min(seats.length, prizes?.length ?? 0)}
-        </p>
+        {paidOutCents > 0 && (
+          <p className="text-xs text-[var(--text-faint)]">
+            {t('deal.paidOut')}: <span className="tnum">{formatMoney(paidOutCents, currency)}</span>
+          </p>
+        )}
       </div>
 
-      {/* ------------------------------------------------------- methodekeuze */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {(['icm', 'chipchop', 'custom'] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            disabled={m === 'icm' && !result.icmAvailable}
-            onClick={() => setMethod(m)}
-            className={`rounded-lg border px-3 py-1.5 text-sm transition disabled:opacity-40 ${
-              method === m
-                ? 'border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_16%,transparent)]'
-                : 'border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
-            }`}
-          >
-            {m === 'icm' ? t('deal.icm') : m === 'chipchop' ? t('deal.chop') : t('deal.custom')}
-          </button>
+      {!counted && (
+        <p className="mt-2 rounded-lg border border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_8%,transparent)] px-3 py-2 text-xs text-[var(--warn)]">
+          {t('deal.needCount')}
+        </p>
+      )}
+
+      {/* -------------------------------------------------- welke tonen we */}
+      <p className="mt-3 text-xs uppercase tracking-widest text-[var(--text-faint)]">
+        {t('deal.project')}
+      </p>
+      <div className="mt-1.5 flex flex-wrap gap-3">
+        {(['icm', 'chop', 'even'] as const).map((c) => (
+          <label key={c} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={show[c]}
+              disabled={c !== 'even' && !counted}
+              onChange={(e) => setShow((v) => ({ ...v, [c]: e.target.checked }))}
+              className="size-4"
+            />
+            <span className={c !== 'even' && !counted ? 'text-[var(--text-faint)]' : undefined}>
+              {c === 'icm' ? t('deal.icm') : c === 'chop' ? t('deal.chop') : t('deal.even')}
+            </span>
+          </label>
         ))}
       </div>
-      <p className="mt-1.5 text-xs text-[var(--text-faint)]">
-        {method === 'icm' ? t('deal.icmWhat')
-          : method === 'chipchop' ? t('deal.chopWhat')
-          : ''}
-        {!result.icmAvailable && ` ${result.icmUnavailableReason ?? t('deal.icmUnavailable')}`}
-      </p>
+      <p className="mt-1 text-xs text-[var(--text-faint)]">{t('deal.projectHint')}</p>
 
-      {/* ------------------------------------------------------------ tabel */}
+      {/* -------------------------------------------------------- de tabel */}
       <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--line)]">
-        <table className="w-full min-w-[30rem] text-sm">
+        <table className="w-full min-w-[34rem] text-sm">
           <thead>
             <tr className="border-b border-[var(--line)] text-left text-xs uppercase tracking-widest text-[var(--text-faint)]">
               <th className="px-3 py-2 font-medium">{t('members.player')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('deal.chips')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('deal.icm')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('deal.chop')}</th>
-              <th className="w-32 px-3 py-2 text-right font-medium">{t('deal.total')}</th>
+              {counted && <th className="px-3 py-2 text-right font-medium">{t('deal.chips')}</th>}
+              {counted && (
+                <th className="px-3 py-2 text-right font-medium">
+                  <button type="button" onClick={() => pick('icm')} className="hover:underline">
+                    {t('deal.icm')}
+                  </button>
+                </th>
+              )}
+              {counted && (
+                <th className="px-3 py-2 text-right font-medium">
+                  <button type="button" onClick={() => pick('chop')} className="hover:underline">
+                    {t('deal.chop')}
+                  </button>
+                </th>
+              )}
+              <th className="px-3 py-2 text-right font-medium">
+                <button type="button" onClick={() => pick('even')} className="hover:underline">
+                  {t('deal.even')}
+                </button>
+              </th>
+              <th className="w-32 px-3 py-2 text-right font-medium">{t('deal.agreed')}</th>
             </tr>
           </thead>
           <tbody>
-            {result.shares.map((s) => (
+            {result.shares.map((s, i) => (
               <tr key={s.id} className="border-b border-[var(--line)] last:border-0">
                 <td className="px-3 py-2 font-medium">{s.name}</td>
-                <td className="tnum px-3 py-2 text-right text-[var(--text-muted)]">
-                  {s.chips.toLocaleString('nl-BE')}
-                </td>
-                <td
-                  className="tnum px-3 py-2 text-right"
-                  style={method === 'icm' ? { color: 'var(--brand)' } : { color: 'var(--text-faint)' }}
-                >
-                  {s.icmCents === null ? '—' : formatMoney(s.icmCents, currency)}
-                </td>
-                <td
-                  className="tnum px-3 py-2 text-right"
-                  style={method === 'chipchop' ? { color: 'var(--brand)' } : { color: 'var(--text-faint)' }}
-                >
-                  {formatMoney(s.chopCents, currency)}
+                {counted && (
+                  <td className="tnum px-3 py-2 text-right text-[var(--text-muted)]">
+                    {s.chips.toLocaleString('nl-BE')}
+                  </td>
+                )}
+                {counted && (
+                  <td className="tnum px-3 py-2 text-right text-[var(--text-faint)]">
+                    {s.icmCents === null ? '—' : formatMoney(s.icmCents, currency)}
+                  </td>
+                )}
+                {counted && (
+                  <td className="tnum px-3 py-2 text-right text-[var(--text-faint)]">
+                    {formatMoney(s.chopCents, currency)}
+                  </td>
+                )}
+                <td className="tnum px-3 py-2 text-right text-[var(--text-faint)]">
+                  {formatMoney(even[i] ?? 0, currency)}
                 </td>
                 <td className="px-3 py-2">
                   <input
@@ -230,9 +374,8 @@ export function DealPanel({
                     aria-label={s.name}
                     value={((amounts[s.id] ?? 0) / 100).toFixed(2)}
                     onChange={(e) => {
-                      const cents = Math.max(0, Math.round(Number(e.target.value.replace(',', '.')) * 100))
-                      setMethod('custom')
-                      setAmounts((a) => ({ ...a, [s.id]: Number.isFinite(cents) ? cents : 0 }))
+                      const cents = Math.max(0, Math.round(Number(e.target.value.replace(',', '.')) * 100) || 0)
+                      setAmounts((a) => ({ ...a, [s.id]: cents }))
                     }}
                     className="tnum w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-2.5 py-1.5 text-right text-sm outline-none focus:border-[var(--brand)]"
                   />
@@ -242,12 +385,15 @@ export function DealPanel({
           </tbody>
           <tfoot>
             <tr className="bg-[var(--surface-2)]">
-              <td className="px-3 py-2 text-[var(--text-muted)]" colSpan={4}>
+              <td className="px-3 py-2 text-[var(--text-muted)]" colSpan={counted ? 4 : 1}>
                 {t('deal.total')}
+              </td>
+              <td className="tnum px-3 py-2 text-right text-[var(--text-faint)]">
+                {formatMoney(even.reduce((a, b) => a + b, 0), currency)}
               </td>
               <td
                 className="tnum px-3 py-2 text-right font-semibold"
-                style={{ color: ok ? undefined : 'var(--warn)' }}
+                style={{ color: sumOk ? undefined : 'var(--warn)' }}
               >
                 {formatMoney(total, currency)}
               </td>
@@ -256,40 +402,38 @@ export function DealPanel({
         </table>
       </div>
 
-      {!ok && (
+      {!sumOk && (
         <p className="mt-2 text-sm text-[var(--warn)]">
           {t('deal.mismatch')} {t('deal.difference')}:{' '}
-          <span className="tnum">{formatMoney(diff, currency)}</span>
+          <span className="tnum">{formatMoney(total - poolCents, currency)}</span>
         </p>
       )}
-
       {error && <p className="mt-2 text-sm text-[var(--danger)]">{error}</p>}
 
-      {/* ---------------------------------------------------------- knoppen */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {openDealId === null ? (
-          <button
-            type="button"
-            disabled={busy || !ok}
-            onClick={() => void propose()}
-            className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
-          >
-            {t('deal.show')}
-          </button>
-        ) : (
+        <button
+          type="button"
+          onClick={() => setStep('count')}
+          className="rounded-lg border border-[var(--line-strong)] px-3 py-2 text-sm transition hover:bg-[var(--surface-hover)]"
+        >
+          {t('deal.backToCount')}
+        </button>
+
+        <button
+          type="button"
+          disabled={busy || (!show.icm && !show.chop && !show.even)}
+          onClick={() => void project()}
+          className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
+        >
+          {openDeal ? t('common.save') : t('deal.show')}
+        </button>
+
+        {openDeal && (
           <>
             <span className="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--ok)_14%,transparent)] px-3 py-1.5 text-xs text-[var(--ok)]">
               <span className="size-1.5 animate-pulse rounded-full bg-[var(--ok)]" />
               {t('deal.showing')}
             </span>
-            <button
-              type="button"
-              disabled={busy || !ok}
-              onClick={() => void propose()}
-              className="rounded-lg border border-[var(--line-strong)] px-3 py-2 text-sm transition hover:bg-[var(--surface-hover)] disabled:opacity-40"
-            >
-              {t('common.save')}
-            </button>
             <button
               type="button"
               disabled={busy}
@@ -303,9 +447,7 @@ export function DealPanel({
 
         <span className="flex-1" />
 
-        {/* Afsluiten met een deal is het einde van de avond en niet terug te
-            draaien; vandaar de tussenstap. */}
-        {openDealId !== null && (
+        {openDeal && (
           confirming ? (
             <>
               <button
@@ -327,7 +469,7 @@ export function DealPanel({
           ) : (
             <button
               type="button"
-              disabled={busy || !ok}
+              disabled={busy || !sumOk}
               onClick={() => setConfirming(true)}
               className="rounded-lg border border-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--brand)] transition hover:bg-[color-mix(in_oklab,var(--brand)_12%,transparent)] disabled:opacity-40"
             >

@@ -39,6 +39,7 @@ export function FloorPlayers({
   money,
   potCents,
   entriesClosed,
+  expectedChips,
 }: {
   tournamentId: string
   clubId: string
@@ -51,6 +52,8 @@ export function FloorPlayers({
   /** Prijzenpot en of de inkopen al gesloten zijn; voor het prijzengeldpaneel. */
   potCents: number
   entriesClosed: boolean
+  /** Hoeveel chips er in spel horen te zijn; ijkpunt bij het tellen. */
+  expectedChips: number
 }) {
   const supabase = useMemo(() => createClient(), [])
   const { players, members, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
@@ -307,10 +310,10 @@ export function FloorPlayers({
           currency={money.currency}
           seats={active.map((p) => ({
             id: p.id,
-            tpId: p.id,
             name: p.name,
             chips: p.chipCount ?? 0,
           }))}
+          expectedChips={expectedChips}
           onClose={() => { setDealOpen(false); void reload() }}
         />
       )}

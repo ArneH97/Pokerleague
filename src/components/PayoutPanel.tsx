@@ -77,13 +77,13 @@ export function PayoutPanel({
     void loadCurrent()
   }, [loadCurrent])
 
-  async function suggest() {
+  async function suggest(nPlaces = places, withBubble = bubble, cents = bubbleCents) {
     setBusy(true)
     setError(null)
     const { data, error: err } = await supabase.rpc('suggest_payouts', {
       p_tournament_id: tournamentId,
-      p_places: places,
-      p_bubble_cents: bubble ? bubbleCents : 0,
+      p_places: nPlaces,
+      p_bubble_cents: withBubble ? cents : 0,
     })
     if (err) setError(err.message)
     else setRows(((data ?? []) as unknown as Row[]).sort((a, b) => a.place - b.place))
@@ -152,23 +152,33 @@ export function PayoutPanel({
 
       {/* ------------------------------------------------------------ keuzes */}
       <div className="mt-3 flex flex-wrap items-end gap-4">
-        <label className="block">
+        {/* Plus en min in plaats van een tikveld: op een laptop aan de deur
+            is één klik sneller dan een getal selecteren en overtypen, en het
+            aantal kan nooit onder de één zakken. Elke aanpassing rekent
+            meteen door, zodat je het effect ziet in plaats van het te moeten
+            opvragen. */}
+        <div>
           <span className="mb-1 block text-xs text-[var(--text-muted)]">{t('payout.places')}</span>
-          <input
-            type="number"
-            min={1}
-            max={maxPlaces}
-            value={places}
-            onChange={(e) => setPlaces(Math.max(1, Math.min(maxPlaces, Number(e.target.value) || 1)))}
-            className="tnum w-24 rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2 text-right outline-none focus:border-[var(--brand)]"
-          />
-        </label>
+          <div className="flex items-center gap-1">
+            <Step
+              label="−"
+              disabled={busy || places <= 1}
+              onClick={() => { const v = Math.max(1, places - 1); setPlaces(v); void suggest(v) }}
+            />
+            <span className="tnum w-12 text-center text-lg font-semibold">{places}</span>
+            <Step
+              label="+"
+              disabled={busy || places >= maxPlaces}
+              onClick={() => { const v = Math.min(maxPlaces, places + 1); setPlaces(v); void suggest(v) }}
+            />
+          </div>
+        </div>
 
         <label className="flex items-center gap-2 pb-2">
           <input
             type="checkbox"
             checked={bubble}
-            onChange={(e) => setBubble(e.target.checked)}
+            onChange={(e) => { setBubble(e.target.checked); void suggest(places, e.target.checked) }}
             className="size-4"
           />
           <span className="text-sm">{t('payout.bubble')}</span>
@@ -292,6 +302,22 @@ export function PayoutPanel({
         )}
       </div>
     </Panel>
+  )
+}
+
+function Step({
+  label, onClick, disabled,
+}: { label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="size-10 rounded-lg border border-[var(--line-strong)] text-lg leading-none transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-35"
+    >
+      {label}
+    </button>
   )
 }
 

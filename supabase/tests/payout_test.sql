@@ -146,4 +146,51 @@ begin
   raise notice 'override OK: wissen werkt, buitenstaanders geweigerd';
 end $$;
 
+
+-- ---------------------------------------------------------------------------
+-- Alles in hele euro's
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_club uuid; v_pt uuid; v_tour uuid; v_n int; v_sum int; i int;
+begin
+  insert into clubs (slug, name, compliance)
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Rond',
+          jsonb_build_object('enforce','off'))
+  returning id into v_club;
+
+  -- Een sjabloon dat op de cent afrondt: dat hoort opgetrokken te worden.
+  insert into payout_templates (club_id, name, tiers, rounding)
+  values (v_club, 'P', '[{"min_entries":1,"max_entries":99,"percentages":[45,27,16,12]}]'::jsonb, 1)
+  returning id into v_pt;
+
+  update payout_templates set rounding = greatest(coalesce(rounding, 100), 100) where id = v_pt;
+  assert (select rounding from payout_templates where id = v_pt) = 100,
+    'de afronding hoort minstens een euro te zijn';
+
+  insert into tournaments (club_id, payout_template_id, name, scheduled_at, status,
+                           buyin_cents, starting_stack)
+  values (v_club, v_pt, 'Rond', now(), 'running', 1700, 20000) returning id into v_tour;
+
+  -- Zeven spelers aan 17 euro: pot 11900 cent, een lelijk getal.
+  for i in 1 .. 7 loop
+    perform public.floor_add_entry(v_tour, null, format('R%s', i), null, 't');
+  end loop;
+
+  -- Uit het sjabloon: hele euro's, en de som klopt.
+  select count(*) filter (where amount_cents % 100 <> 0), coalesce(sum(amount_cents),0)
+  into v_n, v_sum from public.tournament_prizes(v_tour);
+  assert v_n = 0, format('%s bedragen uit het sjabloon hebben centen', v_n);
+  assert v_sum = 11900, format('de ladder telt op tot %s in plaats van 11900', v_sum);
+
+  -- Uit het voorstel: idem, ook met een bubbel die geen rond bedrag is.
+  select count(*) filter (where amount_cents % 100 <> 0), coalesce(sum(amount_cents),0)
+  into v_n, v_sum from public.suggest_payouts(v_tour, 5, 1750);
+  assert v_n = 0, format('%s bedragen uit het voorstel hebben centen', v_n);
+  assert v_sum = 11900, format('het voorstel telt op tot %s in plaats van 11900', v_sum);
+
+  raise notice 'afronding OK: geen centen, som blijft exact de pot';
+end $$;
+
 rollback;

@@ -148,12 +148,14 @@ begin
   exception when insufficient_privilege then v_geweigerd := v_geweigerd + 1; end;
   begin perform public.deal_accept(v_tour);
   exception when insufficient_privilege then v_geweigerd := v_geweigerd + 1; end;
-  begin perform * from public.tournament_prizes(v_tour);
-  exception when insufficient_privilege then v_geweigerd := v_geweigerd + 1; end;
+
+  -- De prijzenladder is bewust níet afgeschermd: die hangt op het bord in de
+  -- zaal. Wie het tornooi mag zien mag weten wat er te winnen valt.
+  perform * from public.tournament_prizes(v_tour);
 
   perform set_config('request.jwt.claim.role', '', true);
   perform set_config('request.jwt.claim.sub', '', true);
-  assert v_geweigerd = 3, format('verwacht 3 weigeringen, kreeg %s', v_geweigerd);
+  assert v_geweigerd = 2, format('verwacht 2 weigeringen, kreeg %s', v_geweigerd);
 
   raise notice 'dealrechten OK: grenzen en buitenstaanders geweigerd';
 end $$;

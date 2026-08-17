@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  computeDeal, chipChopCents, icmEquityCents, distributeCents, ICM_MAX_PLAYERS,
+  computeDeal, chipChopCents, evenSplitCents, icmEquityCents, distributeCents, ICM_MAX_PLAYERS,
   type DealSeat,
 } from './deal'
 
@@ -186,4 +186,74 @@ test('computeDeal boven het ICM-maximum toont alleen chipchop', () => {
   assert.equal(result.icmAvailable, false)
   assert.ok(result.icmUnavailableReason)
   assert.equal(sum(result.shares.map((s) => s.chopCents)), 10000)
+})
+
+test('even split verdeelt de pot gelijk, in hele euro’s', () => {
+  // 10.000 cent over drie spelers gaat niet gelijk op. Omdat er in stappen
+  // van een euro verdeeld wordt krijgt één speler er één euro meer, en de
+  // som blijft exact kloppen. Op de cent verdelen zou € 33,33 opleveren, en
+  // dat is precies wat we niet willen aan de kassa.
+  const even = evenSplitCents(3, [5000, 3000, 2000])
+  assert.equal(even.reduce((a, b) => a + b, 0), 10000)
+  assert.ok(Math.max(...even) - Math.min(...even) <= 100)
+  assert.ok(even.every((x) => x % 100 === 0), 'even split hoort rond te zijn')
+
+  // Meer spelers dan betaalde plaatsen: alleen wat er te verdelen valt.
+  const four = evenSplitCents(4, [5000, 3000])
+  assert.equal(four.reduce((a, b) => a + b, 0), 8000)
+  assert.equal(four.length, 4)
+
+  assert.deepEqual(evenSplitCents(0, [1000]), [])
+})
+
+test('computeDeal geeft de drie methodes naast elkaar', () => {
+  const seats = [
+    { id: 'a', name: 'A', chips: 60000 },
+    { id: 'b', name: 'B', chips: 25000 },
+    { id: 'c', name: 'C', chips: 15000 },
+  ]
+  const r = computeDeal(seats, [5000, 3000, 2000])
+
+  for (const key of ['icmCents', 'chopCents', 'evenCents'] as const) {
+    const total = r.shares.reduce((n, s) => n + (s[key] ?? 0), 0)
+    assert.equal(total, r.poolCents, `${key} telt niet op tot de pot`)
+  }
+
+  // De chipleader vaart het best bij chipchop, het slechtst bij even split.
+  const a = r.shares[0]
+  assert.ok(a.chopCents > a.evenCents, 'chipchop hoort de grote stapel te bevoordelen')
+  assert.ok((a.icmCents ?? 0) < a.chopCents, 'ICM hoort onder chipchop te liggen')
+  assert.ok((a.icmCents ?? 0) > a.evenCents, 'ICM hoort boven de gelijke verdeling te liggen')
+})
+
+test('elke verdeling komt uit op hele euro’s', () => {
+  // Een pot die niet netjes deelbaar is: 3 spelers, 10.000 cent. Zonder
+  // afronding zou dat 3333,33 per persoon worden — precies het soort bedrag
+  // waar je aan de kassa niet mee thuiskomt.
+  const seats = [
+    { id: 'a', name: 'A', chips: 61234 },
+    { id: 'b', name: 'B', chips: 24567 },
+    { id: 'c', name: 'C', chips: 14199 },
+  ]
+  const prizes = [5000, 3000, 2000]
+  const r = computeDeal(seats, prizes)
+
+  for (const s of r.shares) {
+    assert.equal((s.icmCents ?? 0) % 100, 0, `ICM van ${s.name} heeft centen`)
+    assert.equal(s.chopCents % 100, 0, `chipchop van ${s.name} heeft centen`)
+    assert.equal(s.evenCents % 100, 0, `even split van ${s.name} heeft centen`)
+  }
+
+  // En de som blijft exact de pot, ondanks het afronden.
+  for (const key of ['icmCents', 'chopCents', 'evenCents'] as const) {
+    const total = r.shares.reduce((n, s) => n + (s[key] ?? 0), 0)
+    assert.equal(total, r.poolCents, `${key} telt niet meer op tot de pot`)
+  }
+})
+
+test('een pot met centen erin verliest die centen niet', () => {
+  // Buy-in van € 2,50: dan is de pot zelf geen rond bedrag. Het restje moet
+  // ergens heen, en dat is de grootste winnaar — nooit verdwijnen.
+  const out = distributeCents(1250, [3, 1], 100)
+  assert.equal(out.reduce((a, b) => a + b, 0), 1250)
 })

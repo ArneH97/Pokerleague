@@ -97,6 +97,13 @@ export function FloorControls({
   const entriesClosed =
     tournament.late_reg_level !== null && playIdx > tournament.late_reg_level
 
+  // Hoeveel chips er in spel horen te zijn. Elke inkoop en elke rebuy legt
+  // een startstack op tafel, een addon zijn eigen aantal. Dit is het ijkpunt
+  // waartegen de floor zijn telling aan de finaletafel afzet.
+  const expectedChips =
+    (stats.buyins + stats.rebuys + stats.reentries) * (tournament.starting_stack ?? 0) +
+    stats.addons * (tournament.addon_stack ?? tournament.starting_stack ?? 0)
+
   return (
     <Shell back={back}>
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -237,6 +244,7 @@ export function FloorControls({
         }}
         potCents={stats.prizePoolCents}
         entriesClosed={entriesClosed}
+        expectedChips={expectedChips}
       />
 
       {levels.length > 0 && (

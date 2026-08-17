@@ -31,6 +31,7 @@ export interface DealShare {
   chipShare: number
   icmCents: number | null
   chopCents: number
+  evenCents: number
 }
 
 export interface DealResult {
@@ -50,33 +51,61 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
  * beneden afgerond, daarna gaan de overgebleven centen naar wie het grootste
  * stuk is kwijtgeraakt. Eerlijker dan alles bij de chipleider gooien.
  */
-export function distributeCents(total: number, weights: number[]): number[] {
+export function distributeCents(total: number, weights: number[], step = 1): number[] {
   const n = weights.length
   if (n === 0) return []
   if (total <= 0) return new Array(n).fill(0)
 
+  // In stappen van `step` rekenen en pas op het eind vermenigvuldigen. Zo
+  // komen er nergens centen tevoorschijn: honderd eenheden van één euro
+  // verdelen kan niet anders dan hele euro's opleveren.
+  const unit = Math.max(1, Math.round(step))
+  const units = Math.floor(total / unit)
+  const rest = total - units * unit
+
   const weightSum = sum(weights)
-  if (weightSum <= 0) {
+  let out: number[]
+
+  if (weightSum <= 0 || units === 0) {
     // Geen zinnige verhouding: gelijk verdelen.
-    const base = Math.floor(total / n)
-    const out = new Array(n).fill(base)
-    for (let i = 0; i < total - base * n; i++) out[i] += 1
-    return out
+    const base = Math.floor(units / n)
+    out = new Array(n).fill(base)
+    for (let i = 0; i < units - base * n; i++) out[i] += 1
+  } else {
+    const exact = weights.map((w) => (units * w) / weightSum)
+    out = exact.map((x) => Math.floor(x))
+    let left = units - sum(out)
+
+    const order = exact
+      .map((x, i) => ({ i, frac: x - Math.floor(x) }))
+      .sort((a, b) => b.frac - a.frac)
+
+    for (let k = 0; left > 0; k++, left--) {
+      out[order[k % n].i] += 1
+    }
   }
 
-  const exact = weights.map((w) => (total * w) / weightSum)
-  const out = exact.map((x) => Math.floor(x))
-  let left = total - sum(out)
+  const cents = out.map((u) => u * unit)
 
-  const order = exact
-    .map((x, i) => ({ i, frac: x - Math.floor(x) }))
-    .sort((a, b) => b.frac - a.frac)
-
-  for (let k = 0; left > 0; k++, left--) {
-    out[order[k % n].i] += 1
+  // Een pot die zelf geen rond bedrag is laat een restje na. Dat kan nergens
+  // anders heen dan naar de grootste winnaar, anders klopt de som niet meer
+  // met wat er in kas zit.
+  if (rest > 0) {
+    let top = 0
+    for (let i = 1; i < n; i++) if (cents[i] > cents[top]) top = i
+    cents[top] += rest
   }
-  return out
+  return cents
 }
+
+/**
+ * Prijzengeld wordt afgerond op hele euro's.
+ *
+ * Niet uit netheid: aan de kassa liggen er geen centen, en een uitbetaling
+ * van € 43,33 kost meer discussie dan ze waard is. Alles wat hieronder
+ * verdeeld wordt gaat in stappen van één euro, en de som blijft exact de pot.
+ */
+export const PAYOUT_STEP_CENTS = 100
 
 /**
  * ICM volgens Malmuth-Harville.
@@ -169,15 +198,29 @@ export function chipChopCents(chips: number[], prizes: number[]): number[] {
   const remainder = pool - guaranteed
 
   if (remainder <= 0) {
-    return distributeCents(pool, chips)
+    return distributeCents(pool, chips, PAYOUT_STEP_CENTS)
   }
 
-  const extra = distributeCents(remainder, chips)
+  const extra = distributeCents(remainder, chips, PAYOUT_STEP_CENTS)
   return extra.map((x) => x + floorCents)
 }
 
 /**
- * Rekent beide methodes door voor de spelers die nog aan tafel zitten.
+ * Alles gelijk verdelen.
+ *
+ * Klinkt te simpel om een methode te zijn, maar het is wat een tafel met
+ * vergelijkbare stapels het vaakst afspreekt: even splitten en naar huis. De
+ * grootste stapel gaat er zelden mee akkoord als hij ver voorloopt, en dan
+ * dient dit als ondergrens in de discussie.
+ */
+export function evenSplitCents(n: number, prizes: number[]): number[] {
+  if (n <= 0) return []
+  const pool = sum(prizes.slice(0, Math.min(n, prizes.length)))
+  return distributeCents(pool, new Array(n).fill(1), PAYOUT_STEP_CENTS)
+}
+
+/**
+ * Rekent alle drie de methodes door voor de spelers die nog aan tafel zitten.
  *
  * `prizes` zijn de bedragen voor de plaatsen die nog te vergeven zijn, van
  * hoog naar laag — dus bij vier spelers over en een structuur die vijf
@@ -190,8 +233,9 @@ export function computeDeal(seats: DealSeat[], prizes: number[]): DealResult {
   const poolCents = sum(payable)
 
   const rawIcm = icmEquityCents(chips, prizes)
-  const icm = rawIcm ? distributeCents(poolCents, rawIcm) : null
+  const icm = rawIcm ? distributeCents(poolCents, rawIcm, PAYOUT_STEP_CENTS) : null
   const chop = chipChopCents(chips, prizes)
+  const even = evenSplitCents(seats.length, prizes)
 
   return {
     poolCents,
@@ -212,6 +256,7 @@ export function computeDeal(seats: DealSeat[], prizes: number[]): DealResult {
       chipShare: totalChips > 0 ? chips[i] / totalChips : 0,
       icmCents: icm ? icm[i] : null,
       chopCents: chop[i],
+      evenCents: even[i] ?? 0,
     })),
   }
 }

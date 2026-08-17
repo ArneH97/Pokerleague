@@ -25,7 +25,7 @@ const ANNOUNCE_MS = 8_000
  * scheelt paniek als iemand tegen de laptop stoot.
  */
 export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
-  const { tournament, club, levels, stats, loading, error, live, deal } = useTournament(tournamentId)
+  const { tournament, club, levels, stats, loading, error, live, deal, prizes } = useTournament(tournamentId)
   const { nowMs } = useServerTime()
   const sound = useClockSound()
   const t = useT()
@@ -133,6 +133,13 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const lastEntryOpen =
     lateReg !== null && !isBreak && playIdx === lateReg && secondsLeft <= 300 && secondsLeft > 0
   const entriesClosed = lateReg !== null && playIdx > lateReg
+
+  // Tien seconden per minuut, en alleen als er iets te tonen valt: de
+  // inkopen zijn dicht, er ligt geen dealvoorstel, en er is geen
+  // levelaankondiging bezig.
+  const inPrizeWindow = Math.floor(nowMs() / 1000) % 60 < 10
+  const showPrizes =
+    inPrizeWindow && entriesClosed && prizes.length > 0 && !deal && !announcing
 
   const elapsedTotal = tournament.started_at
     ? Math.max(0, nowMs() - Date.parse(tournament.started_at))
@@ -396,41 +403,107 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           op dat moment praat de hele zaal hierover, en de klok staat toch
           stil. Zodra de floor het intrekt of de tafel akkoord gaat verdwijnt
           het vanzelf — het scherm luistert mee via realtime. */}
-      {deal && deal.shares.length > 0 && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_94%,transparent)] px-[4vw] backdrop-blur-sm">
-          <p
-            className="text-[2.6vh] font-medium uppercase tracking-[0.32em]"
-            style={{ color: accent }}
-          >
-            {t('deal.hallTitle')}
-          </p>
+      {deal && deal.shares.length > 0 && (() => {
+        // Welke kolommen de floor meegaf. Zijn het er meerdere, dan staan ze
+        // naast elkaar: dát is de onderhandeling, en de tafel hoort het
+        // verschil te zien in plaats van één cijfer voorgeschoteld te krijgen.
+        const cols = ([
+          ['icm_cents', t('deal.icm')],
+          ['chop_cents', t('deal.chop')],
+          ['even_cents', t('deal.even')],
+        ] as const).filter(([k]) => deal.shares.some((sh) => sh[k] != null))
+        const showAgreed = cols.length === 0
+        const rows = [...deal.shares].sort((a, b) => b.agreed_cents - a.agreed_cents)
 
-          <table className="mt-[3vh] w-full max-w-[70vw] border-collapse">
-            <tbody>
-              {[...deal.shares]
-                .sort((a, b) => b.agreed_cents - a.agreed_cents)
-                .map((sh, i) => (
-                  <tr key={i} className="border-b border-white/10 last:border-0">
-                    <td className="py-[1.4vh] text-left text-[4.6vh] font-semibold">
-                      {sh.name}
-                    </td>
-                    <td className="tnum py-[1.4vh] text-right text-[2.4vh] text-[var(--text-faint)]">
+        return (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_94%,transparent)] px-[3vw] backdrop-blur-sm">
+            <p
+              className="text-[2.6vh] font-medium uppercase tracking-[0.32em]"
+              style={{ color: accent }}
+            >
+              {t('deal.hallTitle')}
+            </p>
+
+            <table className="mt-[3vh] w-full max-w-[86vw] border-collapse">
+              <thead>
+                <tr className="text-[1.9vh] uppercase tracking-[0.2em] text-[var(--text-faint)]">
+                  <th />
+                  <th className="pb-[1vh] text-right font-medium">{t('deal.chips')}</th>
+                  {cols.map(([k, label]) => (
+                    <th key={k} className="pb-[1vh] pl-[3vw] text-right font-medium">{label}</th>
+                  ))}
+                  {showAgreed && (
+                    <th className="pb-[1vh] pl-[3vw] text-right font-medium">{t('deal.agreed')}</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((sh, i) => (
+                  <tr key={i} className="border-t border-white/10">
+                    <td className="py-[1.2vh] text-left text-[4vh] font-semibold">{sh.name}</td>
+                    <td className="tnum py-[1.2vh] text-right text-[2.2vh] text-[var(--text-faint)]">
                       {sh.chips > 0 ? sh.chips.toLocaleString('nl-BE') : ''}
                     </td>
-                    <td
-                      className="tnum py-[1.4vh] pl-[4vw] text-right text-[5.6vh] font-bold"
-                      style={{ color: accent }}
-                    >
-                      {formatMoney(sh.agreed_cents, club?.currency ?? 'EUR')}
-                    </td>
+                    {cols.map(([k]) => (
+                      <td
+                        key={k}
+                        className="tnum py-[1.2vh] pl-[3vw] text-right font-bold"
+                        style={{ fontSize: 'min(4.6vh, 4vw)', color: accent }}
+                      >
+                        {sh[k] == null ? '' : formatMoney(sh[k] as number, club?.currency ?? 'EUR')}
+                      </td>
+                    ))}
+                    {showAgreed && (
+                      <td
+                        className="tnum py-[1.2vh] pl-[3vw] text-right font-bold"
+                        style={{ fontSize: 'min(5vh, 4.4vw)', color: accent }}
+                      >
+                        {formatMoney(sh.agreed_cents, club?.currency ?? 'EUR')}
+                      </td>
+                    )}
                   </tr>
                 ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
 
-          <p className="mt-[3vh] text-[2.2vh] text-[var(--text-faint)]">
-            {t('deal.hallFoot')}
-          </p>
+            <p className="mt-[3vh] text-[2.2vh] text-[var(--text-faint)]">
+              {t('deal.hallFoot')}
+            </p>
+          </div>
+        )
+      })()}
+
+      {/* De prijzenverdeling, om de minuut tien tellen in beeld. Zodra de
+          inkopen dicht zijn ligt de pot vast en wil de zaal weten wat er te
+          winnen valt — maar het permanent tonen kost de plaats van de klok.
+          Het venster volgt uit de servertijd, dus alle schermen in de zaal
+          flitsen op hetzelfde moment. */}
+      {showPrizes && (
+        <div className="absolute inset-x-0 bottom-[9vh] z-30 flex justify-center px-[3vw]">
+          <div
+            className="rounded-[1.6vh] border px-[2.5vw] py-[1.6vh] backdrop-blur"
+            style={{
+              borderColor: `${accent}55`,
+              background: 'color-mix(in oklab, var(--bg) 88%, transparent)',
+            }}
+          >
+            <p
+              className="mb-[1vh] text-center text-[1.7vh] font-medium uppercase tracking-[0.28em]"
+              style={{ color: accent }}
+            >
+              {t('payout.title')}
+            </p>
+            <div className="flex flex-wrap items-end justify-center gap-x-[2.5vw] gap-y-[1vh]">
+              {prizes.slice(0, 9).map((cents, i) => (
+                <span key={i} className="text-center">
+                  <span className="block text-[1.6vh] text-[var(--text-faint)]">{i + 1}</span>
+                  <span className="tnum block text-[3.4vh] font-bold">
+                    {formatMoney(cents, club?.currency ?? 'EUR')}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
