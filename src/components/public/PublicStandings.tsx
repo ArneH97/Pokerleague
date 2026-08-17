@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { PublicShell } from '@/components/public/PublicShell'
 import type { Club } from '@/lib/club'
-import type { T } from '@/lib/i18n/dictionaries'
+import { translator, type Locale } from '@/lib/i18n/dictionaries'
 import { getPublicStandings } from '@/lib/publicClub'
 
 /**
@@ -16,12 +16,13 @@ import { getPublicStandings } from '@/lib/publicClub'
  * kan afwijken van wat er publiek te zien was.
  */
 export async function PublicStandings({
-  club, t, mode,
+  club, locale, mode,
 }: {
   club: Club
-  t: T
+  locale: Locale
   mode: 'all' | 'year' | 'month'
 }) {
+  const t = translator(locale)
   const now = new Date()
   const year = now.getFullYear()
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -43,7 +44,7 @@ export async function PublicStandings({
   ]
 
   return (
-    <PublicShell club={club} active="standings" t={t}>
+    <PublicShell club={club} locale={locale} active="standings">
       <div className="mb-4 flex gap-1 overflow-x-auto">
         {tabs.map((x) => (
           <Link
@@ -61,7 +62,9 @@ export async function PublicStandings({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[var(--text-muted)]">{t('pub.noResult')}</p>
+        <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text-muted)]">
+          {club.opens_on ? t('pub.standingsSoon') : t('pub.noResult')}
+        </p>
       ) : (
         <ol className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
           {rows.map((r, i) => (

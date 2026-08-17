@@ -1,76 +1,96 @@
 # Adressen: hoe een club online komt
 
 Eén app, veel adressen. Wat een bezoeker intypt bepaalt in welke clubomgeving
-hij terechtkomt; de proxy schrijft dat intern door naar `/c/<slug>/…`. De club
-ziet dus `app.cutoff.be/floor/123` en niet `pokerleague.be/c/cutoff/floor/123`.
+hij terechtkomt; `src/proxy.ts` schrijft dat intern door naar `/c/<slug>/…`. De
+club ziet dus `cutoff.pokerleague.be/floor/123` en niet
+`pokerleague.be/c/cutoff/floor/123`.
 
-Er zijn twee soorten clubadressen. Ze sluiten elkaar niet uit — een club begint
-op het eerste en verhuist naar het tweede wanneer het hem uitkomt.
+## Hoe het vandaag staat
 
----
-
-## 1. `cutoff.pokerleague.be` — werkt meteen
-
-Dit is het pad waar niemand iets voor hoeft te doen. De naam vóór de punt ís
-de slug van de club, dus zodra een club in de database staat is hij bereikbaar.
-Geen opzoeking, geen instelling, geen wachten op DNS van iemand anders.
-
-**Eenmalig, door jou:**
-
-| Waar | Wat |
+| | |
 |---|---|
-| DNS van pokerleague.be | `*` CNAME → `cname.vercel-dns.com` |
-| Vercel → Domains | `*.pokerleague.be` toevoegen |
+| Hosting | Vercel, project **pokerleague** |
+| DNS van pokerleague.be | EasyHost (`ns1/ns2/ns3.easyhost.be`) |
+| Apex | A-record → `216.198.79.1`, en Vercel stuurt hem 308 door naar www |
+| Canoniek adres | `www.pokerleague.be` |
+| **CNAME-doel van dit project** | **`971b460f0e7a5f2a.vercel-dns-017.com`** |
+| Mail | MX naar Google Workspace; autoconfig/autodiscover/SRV nog naar mailprotect (EasyHost) |
 
-Daarna is elke volgende club gratis: `aalst.pokerleague.be`, `gent.pokerleague.be`,
-wat de slug ook is.
-
-Namen die nooit als club gelezen worden staan in `src/lib/hosts.ts`: `www`,
-`api`, `mail`, `admin`, `status` en een handvol andere. Wil je later een echte
-`status.pokerleague.be`, dan botst die dus niet met een club.
+Die CNAME-waarde is per project en per account. Ze staat op de domeinkaart in
+Vercel; neem hem daar over en gok hem niet.
 
 ---
 
-## 2. `app.cutoff.be` — het eigen domein van de club
+## Een club online zetten
 
-Mooier op een affiche, en een club die betaalt voor zijn eigen platform
-verwacht zijn eigen adres. Het kost aan beide kanten één handeling.
+Twee handelingen, samen twee minuten. Doe ze in deze volgorde: dan weet Vercel
+dat het domein eraan komt en vraagt het certificaat zichzelf aan zodra DNS
+meewerkt.
 
-**De club doet:**
+**1. Vercel** → project `pokerleague` → Settings → Domains → **Add Existing** →
+`cutoff.pokerleague.be`. Hij zegt eerst *Invalid Configuration*; dat hoort zo.
+
+**2. EasyHost** → pokerleague.be → Beheer DNS → CNAME-records beheren →
+toevoegen:
 
 | Type | Naam | Waarde |
 |---|---|---|
-| CNAME | `app` | `cname.vercel-dns.com` |
+| CNAME | `cutoff` | `971b460f0e7a5f2a.vercel-dns-017.com` |
 
-**Jij doet:**
+Terug in Vercel op **Refresh** klikken. Binnen een paar minuten staat er
+*Valid Configuration* en werkt `cutoff.pokerleague.be`.
 
-1. Vercel → Settings → Domains → `app.cutoff.be` toevoegen. Vercel regelt het
-   certificaat zodra de CNAME actief is; reken op minuten, niet op dagen.
-2. Het domein in de database zetten:
-
-   ```sql
-   update clubs set custom_domain = 'app.cutoff.be' where slug = 'cutoff';
-   ```
-
-Meer is er niet. Het subdomein op pokerleague.be blijft gewoon werken, dus een
-link die iemand vorig jaar bewaarde blijft geldig.
+Meer is er niet. In de database hoeft niets: de naam vóór de punt ís de slug,
+en `src/lib/hosts.ts` leidt die af zonder opzoeking.
 
 ---
 
-## Waarom niet alleen het eigen domein
+## Een club met een eigen domein
 
-Omdat je dan bij elke nieuwe club afhankelijk bent van iemand anders zijn DNS.
-Een club die vanavond wil beginnen kan dat niet als er eerst een CNAME moet
-propageren bij een provider waar de voorzitter het wachtwoord van kwijt is. Het
-subdomein neemt die afhankelijkheid weg; het eigen domein is dan een
-verbetering achteraf in plaats van een voorwaarde vooraf.
+`app.cutoff.be` in plaats van (of naast) het subdomein. Mooier op een affiche.
+Drie handelingen in plaats van twee.
+
+**1. Vercel** → Add Existing → `app.cutoff.be`.
+
+**2. DNS van cutoff.be** — bij de club of bij jou:
+
+| Type | Naam | Waarde |
+|---|---|---|
+| CNAME | `app` | `971b460f0e7a5f2a.vercel-dns-017.com` |
+
+**3. De database**, want `app.cutoff.be` zegt niets over wélke club het is:
+
+```sql
+update clubs set custom_domain = 'app.cutoff.be' where slug = 'cutoff';
+```
+
+Zie `supabase/clubdomein_zetten.sql`. Beide adressen blijven daarna werken, dus
+een link die iemand bewaarde blijft geldig.
+
+---
+
+## Waarom geen jokerteken
+
+`*.pokerleague.be` zou elke nieuwe club meteen bereikbaar maken zonder dat er
+iemand nog een record moet zetten. Verleidelijk, en het is wat ik eerst
+voorstelde — maar het kan niet zonder de nameservers van pokerleague.be naar
+Vercel te verhuizen. Vercel moet zelf DNS-uitdagingen kunnen beantwoorden om
+een wildcard-certificaat te krijgen; een `*` CNAME bij EasyHost is niet genoeg.
+
+Die verhuizing betekent dat alle records hierboven opnieuw aangemaakt moeten
+worden bij Vercel: de MX naar Google, SPF, DMARC, de autodiscover- en
+SRV-records. Eén vergeten regel en de mail van pokerleague.be ligt eruit.
+
+Voor die prijs koop je dat je per club één CNAME uitspaart. Bij één club is dat
+geen ruil. Bij tien clubs wordt het interessant, en dan is het een middag werk
+die je rustig plant — niet iets wat je drie weken voor een opening doet.
 
 ---
 
 ## Wat er per club nog meer ingesteld wordt
 
-Het adres is één ding; dit is de rest van wat een nieuwe club nodig heeft. Nu
-nog met SQL — een instellingenscherm bestaat nog niet.
+Het adres is één ding; dit is de rest. Nu nog met SQL — een instellingenscherm
+bestaat nog niet.
 
 | Instelling | Waar | Standaard |
 |---|---|---|
@@ -88,6 +108,19 @@ nog met SQL — een instellingenscherm bestaat nog niet.
 `supabase/seed_cutoff.sql` doet dit alles voor Cutoff en is het beste
 vertrekpunt voor een tweede club: kopiëren, de bovenste regels aanpassen,
 draaien.
+
+---
+
+## Namen die nooit een club worden
+
+`www`, `app`, `api`, `admin`, `auth`, `mail`, `smtp`, `ftp`, `status`, `docs`,
+`blog`, `cdn`, `static`, `assets`, `staging`, `test`. Staan in
+`src/lib/hosts.ts`. Wil je later een echte `status.pokerleague.be`, dan botst
+die dus niet met een club die toevallig zo heet.
+
+Let op: er staat al een `ftp.pokerleague.be` A-record bij EasyHost, nog van de
+webhosting. Dat mag weg als je geen FTP gebruikt — het staat op de lijst
+hierboven, dus kwaad kan het niet.
 
 ---
 

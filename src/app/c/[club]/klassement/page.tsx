@@ -5,6 +5,7 @@ import { PublicStandings } from '@/components/public/PublicStandings'
 import { Card, EmptyState, Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator, type T } from '@/lib/i18n/dictionaries'
+import { visitorLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -124,7 +125,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
     return (
       <PublicStandings
         club={club}
-        t={t}
+        locale={(await visitorLocale()) ?? locale}
         mode={p === 'year' ? 'year' : p === 'month' ? 'month' : 'all'}
       />
     )

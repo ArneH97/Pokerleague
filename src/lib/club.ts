@@ -41,13 +41,24 @@ export interface Club {
   mark_url: string | null
   primary_color: string | null
   settings: { theme?: ClubTheme } | null
+
+  /** Het visitekaartje. Allemaal optioneel; de pagina laat weg wat leeg is. */
+  intro: string | null
+  address_line: string | null
+  maps_url: string | null
+  play_rhythm: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  /** Openingsdag. Zolang die er is en er niets gespeeld is, telt de pagina af. */
+  opens_on: string | null
 }
 
 export const getClub = cache(async (slug: string): Promise<Club | null> => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('clubs')
-    .select('id,slug,name,city,currency,timezone,locale,logo_url,mark_url,primary_color,settings')
+    .select('id,slug,name,city,currency,timezone,locale,logo_url,mark_url,primary_color,settings,'
+      + 'intro,address_line,maps_url,play_rhythm,contact_email,contact_phone,opens_on')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle<Club>()

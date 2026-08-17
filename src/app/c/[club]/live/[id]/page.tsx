@@ -4,6 +4,7 @@ import { LiveBoard } from '@/components/public/LiveBoard'
 import { PublicShell } from '@/components/public/PublicShell'
 import { getClub } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { visitorLocale } from '@/lib/i18n/server'
 import {
   getPrizeLadder, getPublicClock, getPublicLevels, getPublicResult, getPublicSeats,
 } from '@/lib/publicClub'
@@ -28,7 +29,8 @@ export default async function Page_({ params }: PageProps<'/c/[club]/live/[id]'>
   const club = await getClub(slug)
   if (!club) notFound()
 
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  const locale = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+  const t = translator(locale)
   const clock = await getPublicClock(id)
 
   // Geen rij betekent: bestaat niet, of staat niet publiek. Dat verschil
@@ -36,7 +38,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/live/[id]'>
   if (!clock) notFound()
 
   const done = clock.status === 'finished' || clock.status === 'cancelled'
-  const fmt = new Intl.DateTimeFormat(`${club.locale}-BE`, {
+  const fmt = new Intl.DateTimeFormat(`${locale}-BE`, {
     weekday: 'long', day: 'numeric', month: 'long',
     hour: '2-digit', minute: '2-digit', timeZone: club.timezone,
   })
@@ -44,7 +46,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/live/[id]'>
   if (done) {
     const rows = await getPublicResult(id)
     return (
-      <PublicShell club={club} active="calendar" t={t}>
+      <PublicShell club={club} locale={locale} active="calendar">
         <h1 className="text-2xl font-semibold">{clock.name}</h1>
         <p className="mt-1 text-sm text-[var(--text-faint)]">
           {fmt.format(new Date(clock.scheduled_at))} · {clock.entries} {t('pub.entriesWord')}
@@ -81,7 +83,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/live/[id]'>
   ])
 
   return (
-    <PublicShell club={club} active="home" t={t}>
+    <PublicShell club={club} locale={locale} active="home">
       <h1 className="text-xl font-semibold">{clock.name}</h1>
       <p className="mb-4 mt-0.5 text-sm text-[var(--text-faint)]">
         {fmt.format(new Date(clock.scheduled_at))}

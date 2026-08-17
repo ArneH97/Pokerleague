@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { PublicShell } from '@/components/public/PublicShell'
 import { getClub } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { visitorLocale } from '@/lib/i18n/server'
 import { getPublicTournaments, type PublicTournament } from '@/lib/publicClub'
 import { formatMoney } from '@/lib/types'
 
@@ -26,7 +27,10 @@ export default async function Page_({ params }: PageProps<'/c/[club]/kalender'>)
   const club = await getClub(slug)
   if (!club) notFound()
 
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  // De taal van de bezoeker wint van die van de club; wie niets koos krijgt
+  // de taal waarin de club zijn zaal bedient.
+  const locale = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+  const t = translator(locale)
   const all = await getPublicTournaments(club.id)
 
   const live = all.filter((x) => x.status === 'running' || x.status === 'paused')
@@ -74,9 +78,11 @@ export default async function Page_({ params }: PageProps<'/c/[club]/kalender'>)
     )
 
   return (
-    <PublicShell club={club} active="calendar" t={t}>
+    <PublicShell club={club} locale={locale} active="calendar">
       {all.length === 0 && (
-        <p className="text-[var(--text-muted)]">{t('pub.noTournaments')}</p>
+        <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text-muted)]">
+          {club.opens_on ? t('pub.calendarSoon') : t('pub.noTournaments')}
+        </p>
       )}
       {block(t('pub.nowPlaying'), live, 'live')}
       {block(t('pub.upcoming'), upcoming, 'next')}
