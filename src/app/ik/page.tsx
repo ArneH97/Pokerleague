@@ -40,6 +40,20 @@ interface Me {
   results_count: number
 }
 
+interface ClubRow {
+  slug: string
+  name: string
+  city: string | null
+  logo_url: string | null
+}
+
+interface StaffRow {
+  slug: string
+  name: string
+  logo_url: string | null
+  role: string
+}
+
 interface ResultRow {
   tournament_id: string
   tournament: string
@@ -68,13 +82,17 @@ export default async function Page() {
   // Ophalen of aanmaken. Zie de uitleg hierboven.
   await supabase.rpc('claim_my_player', {})
 
-  const [meRes, resultsRes] = await Promise.all([
+  const [meRes, resultsRes, clubsRes, staffRes] = await Promise.all([
     supabase.rpc('my_player'),
     supabase.rpc('my_results'),
+    supabase.rpc('my_clubs'),
+    supabase.rpc('my_staff_clubs'),
   ])
 
   const me = ((meRes.data ?? []) as unknown as Me[])[0] ?? null
   const results = (resultsRes.data ?? []) as unknown as ResultRow[]
+  const clubs = (clubsRes.data ?? []) as unknown as ClubRow[]
+  const staff = (staffRes.data ?? []) as unknown as StaffRow[]
 
   if (!me) {
     return (
@@ -113,13 +131,64 @@ export default async function Page() {
         <main className="mx-auto max-w-3xl space-y-5 px-5 py-7">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">{me.display_name}</h1>
-            <p className="mt-1 text-sm text-[var(--text-faint)]">
-              {me.username ? `@${me.username} · ` : ''}
-              {me.clubs_count === 1
-                ? `1 ${t('me.club')}`
-                : `${me.clubs_count} ${t('me.clubs')}`}
-            </p>
+            {me.username && (
+              <p className="mt-1 text-sm text-[var(--text-faint)]">@{me.username}</p>
+            )}
           </div>
+
+          {/* --------------------------------------------------- waar hoor ik
+              De vraag die deze pagina eerst onbeantwoord liet. Speler zijn bij
+              een club en medewerker zijn van een club zijn twee losse dingen,
+              en wie net een account maakte is meestal geen van beide. Dan is
+              "0 clubs" geen informatie maar een raadsel. */}
+          <section className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-5">
+            <h2 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
+              {t('me.where')}
+            </h2>
+
+            {clubs.length === 0 ? (
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                {t('me.noClubs')}
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-1.5">
+                {clubs.map((c) => (
+                  <li key={c.slug}>
+                    <Link
+                      href={`/c/${c.slug}`}
+                      className="text-sm underline-offset-4 hover:underline"
+                    >
+                      {c.name}
+                      {c.city ? <span className="text-[var(--text-faint)]"> · {c.city}</span> : null}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {staff.length > 0 && (
+              <div className="mt-5 border-t border-[var(--line)] pt-4">
+                <h3 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                  {t('me.staffAt')}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
+                  {t('me.staffBody')}
+                </p>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {staff.map((c) => (
+                    <li key={c.slug}>
+                      <Link
+                        href={`/c/${c.slug}`}
+                        className="inline-flex items-center gap-2 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
+                      >
+                        {t('me.manage')} {c.name} →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
 
           {/* --------------------------------------------------- de cijfers */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

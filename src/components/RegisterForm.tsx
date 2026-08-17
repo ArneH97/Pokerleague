@@ -51,8 +51,12 @@ export function RegisterForm() {
       options: {
         // Deze gegevens reizen mee in het token en worden pas gebruikt zodra
         // het profiel opgeeist wordt. Zo hoeven ze nergens tussentijds in een
-        // tabel te blijven hangen.
+        // tabel te blijven hangen — en overleven ze de omweg langs de mailbox,
+        // want op dat moment is het formulier allang weg.
         data: { first_name: firstName, last_name: lastName, username, public_listing: listing },
+        // Zonder dit landt de bevestigingslink op de voorpagina en mag hij
+        // zelf zoeken waar zijn profiel staat.
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/ik`,
       },
     })
 
