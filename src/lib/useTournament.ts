@@ -21,6 +21,7 @@ interface State {
 
 const EMPTY_STATS: TournamentStats = {
   entriesTotal: 0, playersLeft: 0, totalChips: 0, prizePoolCents: 0,
+  buyins: 0, rebuys: 0, reentries: 0, addons: 0,
 }
 
 function toLevel(r: BlindLevelRow): BlindLevel {
@@ -80,14 +81,15 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
         .select('status,chip_count')
         .eq('tournament_id', tournamentId),
       supabase.from('buyins')
-        .select('amount_cents')
+        .select('amount_cents,kind')
         .eq('tournament_id', tournamentId)
         .eq('is_void', false),
     ])
 
     const players = (playerRes.data ?? []) as { status: string; chip_count: number | null }[]
     // buyins is alleen zichtbaar voor staf; spelers krijgen hier netjes null.
-    const pot = (potRes.data ?? []) as { amount_cents: number }[]
+    const pot = (potRes.data ?? []) as { amount_cents: number; kind: string }[]
+    const count = (k: string) => pot.filter((b) => b.kind === k).length
 
     setState({
       tournament: t,
@@ -102,6 +104,10 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
           .filter((p) => p.status === 'active' || p.status === 'registered')
           .reduce((sum, p) => sum + (p.chip_count ?? 0), 0),
         prizePoolCents: pot.reduce((sum, b) => sum + b.amount_cents, 0),
+        buyins: count('buyin'),
+        rebuys: count('rebuy'),
+        reentries: count('reentry'),
+        addons: count('addon'),
       },
       loading: false,
       error: null,

@@ -214,6 +214,11 @@ export function FloorControls({
         bountyMode={tournament.bounty_mode}
         maxReentries={tournament.max_reentries}
         finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
+        money={{
+          buyinCents: tournament.buyin_cents,
+          addonCents: tournament.addon_cents,
+          currency: club?.currency ?? 'EUR',
+        }}
       />
 
       {levels.length > 0 && (

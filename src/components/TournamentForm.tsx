@@ -65,6 +65,9 @@ export function TournamentForm({
   const [stack, setStack] = useState(String(defaults?.startingStack ?? 20000))
   const [reentries, setReentries] = useState('1')
   const [lateReg, setLateReg] = useState('6')
+  const [addonOn, setAddonOn] = useState(false)
+  const [addonPrice, setAddonPrice] = useState('10.00')
+  const [addonStack, setAddonStack] = useState('20000')
   const [bountyOn, setBountyOn] = useState(false)
   const [bounty, setBounty] = useState('5.00')
   const [structureId, setStructureId] = useState(structures[0]?.id ?? '')
@@ -108,6 +111,11 @@ export function TournamentForm({
         bounty_mode: bountyOn ? 'fixed' : 'none',
         bounty_cents: bountyCents,
         starting_stack: Number.parseInt(stack, 10) || 0,
+        // Leeg laten betekent: een addon kost de buy-in en geeft een
+        // startstack. Wie hem aanzet mag beide apart zetten, want een addon
+        // is bij de meeste clubs goedkoper én meer chips dan een buy-in.
+        addon_cents: addonOn ? euroToCents(addonPrice) : null,
+        addon_stack: addonOn ? (Number.parseInt(addonStack, 10) || null) : null,
         max_reentries: Number.parseInt(reentries, 10) || 0,
         late_reg_level: lateReg === '' ? null : Number.parseInt(lateReg, 10),
       })
@@ -158,6 +166,33 @@ export function TournamentForm({
           <input inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} className={inputClass} />
         </Field>
       </div>
+
+      <Card>
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={addonOn}
+            onChange={(e) => setAddonOn(e.target.checked)}
+            className="size-4"
+          />
+          <span>{t('tour.addon')}</span>
+        </label>
+        {addonOn && (
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Field label={`${t('tour.addonPrice')} (${currency})`}>
+              <input inputMode="decimal" value={addonPrice}
+                     onChange={(e) => setAddonPrice(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label={t('tour.addonStack')}>
+              <input inputMode="numeric" value={addonStack}
+                     onChange={(e) => setAddonStack(e.target.value)} className={inputClass} />
+            </Field>
+            <p className="text-xs text-[var(--text-faint)] sm:col-span-2">
+              {t('tour.addonHint')}
+            </p>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <label className="flex items-center gap-3">

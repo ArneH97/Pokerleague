@@ -244,4 +244,93 @@ begin
   raise notice 'mailadres OK: sleutel over clubs heen, uitweg met reden, aanvullen achteraf';
 end $$;
 
+
+-- ---------------------------------------------------------------------------
+-- Een verkeerd geboekte inkoop terugdraaien
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_club uuid; v_tour uuid; v_tp uuid; v_pot int; v_kind buyin_kind;
+  v_geweigerd int := 0;
+begin
+  insert into clubs (slug, name, compliance)
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Undo',
+          jsonb_build_object('enforce','off'))
+  returning id into v_club;
+
+  insert into tournaments (club_id, name, scheduled_at, status,
+                           buyin_cents, fee_cents, starting_stack,
+                           addon_cents, addon_stack, max_reentries)
+  values (v_club, 'Undo', now(), 'running', 2000, 500, 20000, 1000, 30000, 3)
+  returning id into v_tour;
+
+  v_tp := public.floor_add_entry(v_tour, null, 'Terugdraaier', null, 'test');
+
+  -- Een addon met een eigen prijs en een eigen stapel.
+  perform public.floor_rebuy(v_tp, 'addon');
+  assert (select chip_count from tournament_players where id = v_tp) = 50000,
+    'de addon hoorde 30000 chips bij te leggen';
+  assert (select amount_cents from buyins
+          where tournament_player_id = v_tp and kind = 'addon') = 1000,
+    'de addon hoorde 1000 cent te kosten, niet de buy-in';
+  assert (select fee_cents from buyins
+          where tournament_player_id = v_tp and kind = 'addon') = 0,
+    'op een addon hoort geen clubbijdrage te staan';
+
+  select coalesce(sum(amount_cents),0) into v_pot
+  from buyins where tournament_id = v_tour and not is_void;
+  assert v_pot = 3000, format('pot verwacht 3000, kreeg %s', v_pot);
+
+  -- Terugdraaien: chips weg, geld uit de pot, teller terug op nul.
+  v_kind := public.floor_undo_last_buyin(v_tp);
+  assert v_kind = 'addon', format('verwacht addon terug te draaien, kreeg %s', v_kind);
+  assert (select chip_count from tournament_players where id = v_tp) = 20000,
+    'de chips van de addon bleven staan';
+  assert (select addons_used from tournament_players where id = v_tp) = 0,
+    'de addonteller werd niet bijgewerkt';
+  select coalesce(sum(amount_cents),0) into v_pot
+  from buyins where tournament_id = v_tour and not is_void;
+  assert v_pot = 2000, format('na terugdraaien verwacht 2000 in de pot, kreeg %s', v_pot);
+  assert (select count(*) from buyins where tournament_id = v_tour) = 2,
+    'de geschrapte inkoop hoort te blijven staan als spoor';
+
+  -- Een rebuy legt de buy-in in de pot en een startstack op tafel.
+  perform public.floor_rebuy(v_tp, 'rebuy');
+  assert (select chip_count from tournament_players where id = v_tp) = 40000,
+    'de rebuy hoorde een startstack bij te leggen';
+  select coalesce(sum(amount_cents),0) into v_pot
+  from buyins where tournament_id = v_tour and not is_void;
+  assert v_pot = 4000, 'de rebuy kwam niet in de prijzenpot terecht';
+  perform public.floor_undo_last_buyin(v_tp);
+  assert (select chip_count from tournament_players where id = v_tp) = 20000,
+    'de rebuy werd niet netjes teruggedraaid';
+
+  -- Een re-entry terugdraaien geeft de speler zijn oude stapel terug.
+  update tournament_players set chip_count = 7777 where id = v_tp;
+  perform public.floor_eliminate(v_tp, null);
+  perform public.floor_rebuy(v_tp, 'reentry');
+  assert (select chip_count from tournament_players where id = v_tp) = 20000,
+    're-entry hoort een verse stack te geven';
+  assert (select status from tournament_players where id = v_tp) = 'active',
+    're-entry bracht hem niet terug aan tafel';
+
+  perform public.floor_undo_last_buyin(v_tp);
+  assert (select status from tournament_players where id = v_tp) = 'eliminated',
+    'na terugdraaien hoort hij weer uitgeschakeld te zijn';
+  assert (select chip_count from tournament_players where id = v_tp) = 7777,
+    'de stapel van voor de re-entry ging verloren';
+  assert (select reentries_used from tournament_players where id = v_tp) = 0,
+    'de re-entryteller werd niet bijgewerkt';
+
+  -- De eerste inkoop mag je niet losweg schrappen.
+  begin
+    perform public.floor_undo_last_buyin(v_tp);
+  exception when check_violation then v_geweigerd := 1;
+  end;
+  assert v_geweigerd = 1, 'de eerste inkoop hoort niet terugdraaibaar te zijn';
+
+  raise notice 'terugdraaien OK: addon, rebuy en re-entry, geld en chips samen';
+end $$;
+
 rollback;

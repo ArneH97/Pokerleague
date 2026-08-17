@@ -25,6 +25,8 @@ export interface TournamentRow {
   fee_cents: number
   bounty_cents: number
   bounty_mode: string
+  addon_cents: number | null
+  addon_stack: number | null
   starting_stack: number
   max_reentries: number
   late_reg_level: number | null
@@ -62,10 +64,16 @@ export interface ClubRow {
 
 /** Wat de zaalweergave over de deelnemers moet weten. */
 export interface TournamentStats {
+  /** Aantal spelers dat vanavond aan tafel kwam, ongeacht hoe vaak ze inkochten. */
   entriesTotal: number
   playersLeft: number
   totalChips: number
   prizePoolCents: number
+  /** Aparte tellingen per soort inkoop. Een zaal wil het verschil zien. */
+  buyins: number
+  rebuys: number
+  reentries: number
+  addons: number
 }
 
 /** Databaserij omzetten naar de klokstand die clock.ts verwacht. */

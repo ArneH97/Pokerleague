@@ -6,6 +6,7 @@ import { formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
+import { FullscreenButton } from '@/components/FullscreenButton'
 import { useT } from '@/lib/i18n/context'
 
 /** Hoe lang de aankondiging van een nieuw level blijft staan. */
@@ -96,6 +97,11 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const playLevels = levels.filter((l) => !l.isBreak).length
   const playIdx = levels.slice(0, levelIdx + 1).filter((l) => !l.isBreak).length
 
+  const avg = stats.totalChips > 0
+    ? averageStack(stats.totalChips, stats.playersLeft)
+    : tournament.starting_stack ?? 0
+  const bigBlind = level && !level.isBreak ? level.bigBlind : (resolved.nextLevel?.bigBlind ?? 0)
+
   const elapsedTotal = tournament.started_at
     ? Math.max(0, nowMs() - Date.parse(tournament.started_at))
     : 0
@@ -116,6 +122,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
         }}
       />
       <Suits />
+      <FullscreenButton />
 
       {/* Het beeldmerk van de club als watermerk achter de tijd.
           Geen tegel met een eigen achtergrond: dat geeft een harde rechthoek
@@ -259,20 +266,45 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
       <LevelPips levels={levels} current={levelIdx} accent={accent} />
 
-      <footer className="relative grid grid-cols-4 gap-[1.6vw] px-[3.5vw] pb-[3.5vh] pt-[1.8vh]">
-        <Stat label={t('clock.playersLeft')} value={String(stats.playersLeft)} sub={`${t('common.of')} ${stats.entriesTotal}`} />
+      {/* De onderste balk is wat de zaal het vaakst bekijkt. Spelers,
+          inkopen en rebuys staan daarom als aparte blokken naast elkaar en
+          niet samengeperst in één cijfer: "24 inkopen" bij 18 spelers zegt
+          iets heel anders dan 24 spelers. De rebuykolommen verschijnen alleen
+          als er ook echt rebuys of addons geboekt zijn, zodat een gewone
+          freezeout niet volstaat met lege nullen. */}
+      <footer className="relative flex items-stretch gap-[1.2vw] px-[3vw] pb-[3vh] pt-[1.6vh]">
+        <Stat
+          label={t('clock.playersLeft')}
+          value={String(stats.playersLeft)}
+          sub={`${t('common.of')} ${stats.entriesTotal}`}
+          wide
+          accent={accent}
+        />
+        <Stat label={t('clock.buyins')} value={String(stats.buyins)} />
+        {stats.reentries > 0 && (
+          <Stat label={t('clock.reentries')} value={String(stats.reentries)} />
+        )}
+        {stats.rebuys > 0 && (
+          <Stat label={t('clock.rebuys')} value={String(stats.rebuys)} />
+        )}
+        {stats.addons > 0 && (
+          <Stat label={t('clock.addons')} value={String(stats.addons)} />
+        )}
         <Stat
           label={t('clock.avgStack')}
-          value={(stats.totalChips > 0
-            ? averageStack(stats.totalChips, stats.playersLeft)
-            : tournament.starting_stack ?? 0
-          ).toLocaleString('nl-BE')}
+          value={avg.toLocaleString('nl-BE')}
+          // Het aantal big blinds zegt een speler meer dan het aantal chips:
+          // twintig bb is kort, honderd bb is diep. Bij een pauze staat de
+          // big blind op nul, dus dan tonen we niets.
+          sub={bigBlind > 0 ? `${formatBb(avg / bigBlind)} bb` : undefined}
         />
         <Stat
           label={t('clock.prizePool')}
           value={stats.prizePoolCents > 0
             ? formatMoney(stats.prizePoolCents, club?.currency ?? 'EUR')
             : '—'}
+          wide
+          accent={accent}
         />
         <Stat label={t('clock.elapsed')} value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
       </footer>
@@ -305,6 +337,12 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       )}
     </main>
   )
+}
+
+/** Onder de tien big blinds is één cijfer na de komma zinvol, daarboven niet. */
+function formatBb(v: number): string {
+  if (!Number.isFinite(v) || v <= 0) return '0'
+  return v < 10 ? v.toFixed(1).replace('.', ',') : String(Math.round(v))
 }
 
 /** Eén blindwaarde als los blok, zodat SB en BB niet in elkaar overlopen. */
@@ -356,14 +394,45 @@ function LevelPips({
   )
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/**
+ * Eén cijfer in de onderbalk.
+ *
+ * `wide` krijgt meer breedte en een gekleurde rand: dat zijn de twee dingen
+ * waar vanaf de andere kant van de zaal naar gekeken wordt — hoeveel spelers
+ * er nog zitten, en hoeveel er in de pot ligt.
+ */
+function Stat({
+  label, value, sub, wide, accent,
+}: {
+  label: string
+  value: string
+  sub?: string
+  wide?: boolean
+  accent?: string
+}) {
   return (
-    <div className="min-w-0 rounded-[1.4vh] border border-white/[0.07] bg-white/[0.035] px-[1.2vw] py-[1.4vh] text-center backdrop-blur-sm">
-      <p className="truncate text-[1.5vh] font-medium uppercase tracking-[0.2em] text-[var(--text-faint)]">
+    <div
+      className={`min-w-0 rounded-[1.4vh] border px-[1.1vw] py-[1.5vh] text-center backdrop-blur-sm ${
+        wide ? 'flex-[1.6]' : 'flex-1'
+      }`}
+      style={{
+        borderColor: wide && accent ? `${accent}55` : 'rgba(255,255,255,0.07)',
+        background: wide && accent ? `${accent}12` : 'rgba(255,255,255,0.035)',
+      }}
+    >
+      <p className="truncate text-[1.6vh] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
         {label}
       </p>
-      <p className="tnum truncate text-[4.2vh] font-bold leading-tight">{value}</p>
-      {sub && <p className="tnum text-[1.5vh] text-[var(--text-faint)]">{sub}</p>}
+      <p
+        className="tnum truncate font-bold leading-tight"
+        style={{
+          fontSize: wide ? '6.4vh' : '5.2vh',
+          color: wide && accent ? accent : undefined,
+        }}
+      >
+        {value}
+      </p>
+      {sub && <p className="tnum text-[1.7vh] text-[var(--text-faint)]">{sub}</p>}
     </div>
   )
 }

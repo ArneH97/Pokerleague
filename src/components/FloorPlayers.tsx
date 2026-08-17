@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { formatMoney } from '@/lib/types'
 import { useFloorPlayers } from '@/lib/useFloorPlayers'
 import { useT } from '@/lib/i18n/context'
 
@@ -23,6 +24,7 @@ export function FloorPlayers({
   bountyMode,
   maxReentries,
   finished,
+  money,
 }: {
   tournamentId: string
   clubId: string
@@ -30,6 +32,8 @@ export function FloorPlayers({
   bountyMode: string
   maxReentries: number
   finished: boolean
+  /** Bedragen op de knoppen zetten: je ziet wát je boekt voor je klikt. */
+  money: { buyinCents: number; addonCents: number | null; currency: string }
 }) {
   const supabase = useMemo(() => createClient(), [])
   const { players, members, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
@@ -42,10 +46,17 @@ export function FloorPlayers({
   const [confirmFinish, setConfirmFinish] = useState(false)
   /** Het tweede scherm bij een onbekende speler: naam plus mailadres. */
   const [draft, setDraft] = useState<{ name: string; email: string } | null>(null)
+  /** Welke rij zijn geldknoppen open heeft staan. */
+  const [openMoney, setOpenMoney] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
 
   const active = players
     .filter((p) => p.status === 'active' || p.status === 'registered')
-    .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
+    .sort((a, b) => sortBy === 'chips'
+      // Grootste stapel bovenaan: dat is de vraag die aan de finaletafel
+      // het vaakst gesteld wordt.
+      ? (b.chipCount ?? 0) - (a.chipCount ?? 0)
+      : a.name.localeCompare(b.name, 'nl'))
   const out = players
     .filter((p) => p.status === 'eliminated')
     .sort((a, b) => (a.finishPosition ?? 0) - (b.finishPosition ?? 0))
@@ -66,6 +77,15 @@ export function FloorPlayers({
   const exactMatch = members.some(
     (m) => m.name.toLowerCase() === needle || (m.email ?? '').toLowerCase() === needle,
   )
+
+  // Hetzelfde veld filtert ook de lijst eronder. Bij veertig spelers is
+  // scrollen naar de juiste naam het traagste wat er is; drie letters typen
+  // is sneller, en je hoeft er geen tweede zoekveld voor te leren kennen.
+  const shown = (list: typeof players) =>
+    needle === '' ? list : list.filter((p) => p.name.toLowerCase().includes(needle))
+  const visibleActive = shown(active)
+  const visibleOut = shown(out)
+  const hiddenCount = (active.length + out.length) - (visibleActive.length + visibleOut.length)
 
   // PromiseLike en niet Promise: de bouwers van supabase-js zijn "thenables"
   // die pas een echt verzoek doen zodra je erop wacht.
@@ -110,6 +130,7 @@ export function FloorPlayers({
   }
 
   async function rebuy(tpId: string, kind: 'reentry' | 'rebuy' | 'addon') {
+    setOpenMoney(null)
     await run(() => supabase.rpc('floor_rebuy', {
       p_tournament_player_id: tpId, p_kind: kind,
     }))
@@ -117,6 +138,11 @@ export function FloorPlayers({
 
   async function undo(tpId: string) {
     await run(() => supabase.rpc('floor_undo_elimination', { p_tournament_player_id: tpId }))
+  }
+
+  async function undoBuyin(tpId: string) {
+    setOpenMoney(null)
+    await run(() => supabase.rpc('floor_undo_last_buyin', { p_tournament_player_id: tpId }))
   }
 
   async function setChips(tpId: string, value: number) {
@@ -142,9 +168,31 @@ export function FloorPlayers({
         {/* Alleen wat hier op het scherm staat: aan tafel van het totaal.
             Het aantal inkopen staat al bij de tegels boven — daar komt het
             uit het geldregister en klopt het ook met rebuys en addons. */}
-        <p className="text-sm text-[var(--text-faint)]">
-          {active.length} / {players.length}
-        </p>
+        <div className="flex items-center gap-3">
+          {/* Op naam om iemand te vinden, op chips om te zien wie er kort
+              staat. Twee vragen, twee volgordes. */}
+          {players.length > 1 && (
+            <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] p-0.5">
+              {(['name', 'chips'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setSortBy(k)}
+                  className={`rounded-md px-2 py-1 text-xs transition ${
+                    sortBy === k
+                      ? 'bg-[var(--surface-2)] text-[var(--text)]'
+                      : 'text-[var(--text-faint)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  {k === 'name' ? t('players.sortName') : t('players.sortChips')}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="tnum text-sm text-[var(--text-faint)]">
+            {active.length} / {players.length}
+          </p>
+        </div>
       </div>
 
       {finished && (
@@ -255,9 +303,9 @@ export function FloorPlayers({
           <p className="mt-1 text-sm text-[var(--text-muted)]">{t('players.noneBody')}</p>
         </div>
       ) : (
-        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-          {active.map((p) => (
-            <li key={p.id} className="px-3 py-2.5">
+        <ul className="grid gap-px overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--line)] lg:grid-cols-2">
+          {visibleActive.map((p) => (
+            <li key={p.id} className="bg-[var(--bg)] px-3 py-2.5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="min-w-0 flex-1 truncate font-medium">
                   {p.name}
@@ -288,14 +336,21 @@ export function FloorPlayers({
                   onCommit={(v) => void setChips(p.id, v)}
                 />
 
+                {/* De geldknoppen zitten achter één knop, en niet naast
+                    "Uitschakelen". Ze stonden eerst wél naast elkaar, en dan
+                    kost één misser aan een volle tafel twintig euro in de
+                    pot die niemand betaald heeft. Nu moet je er bewust naar
+                    grijpen — en alles wat je hier boekt is terug te draaien. */}
                 {!finished && (
                   <div className="flex items-center gap-1.5">
-                    <Small onClick={() => void rebuy(p.id, 'rebuy')} disabled={busy}>
-                      {t('players.rebuy')}
+                    <Small
+                      onClick={() => setOpenMoney(openMoney === p.id ? null : p.id)}
+                      disabled={busy}
+                      active={openMoney === p.id}
+                    >
+                      {t('players.money')}
                     </Small>
-                    <Small onClick={() => void rebuy(p.id, 'addon')} disabled={busy}>
-                      {t('players.addon')}
-                    </Small>
+                    <span className="mx-0.5 h-6 w-px bg-[var(--line)]" aria-hidden />
                     <Small
                       danger
                       onClick={() => (bountyMode === 'none'
@@ -308,6 +363,24 @@ export function FloorPlayers({
                   </div>
                 )}
               </div>
+
+              {openMoney === p.id && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5 rounded-lg bg-[var(--surface-2)] p-2.5">
+                  <Small onClick={() => void rebuy(p.id, 'rebuy')} disabled={busy}>
+                    {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
+                  </Small>
+                  <Small onClick={() => void rebuy(p.id, 'addon')} disabled={busy}>
+                    {t('players.addon')}{' '}
+                    {formatMoney(money.addonCents ?? money.buyinCents, money.currency)}
+                  </Small>
+                  <Small onClick={() => void undoBuyin(p.id)} disabled={busy}>
+                    ↩ {t('players.undoBuyin')}
+                  </Small>
+                  <Small onClick={() => setOpenMoney(null)} disabled={busy}>
+                    {t('common.cancel')}
+                  </Small>
+                </div>
+              )}
 
               {/* Bij een bountytornooi is de vraag wie hem eruit speelde geen
                   detail: daar hangt geld aan vast. Vandaar deze rij, en niet
@@ -338,13 +411,13 @@ export function FloorPlayers({
           ))}
 
           {/* ------------------------------------------------- uitgeschakeld */}
-          {out.length > 0 && (
-            <li className="bg-[var(--surface-2)] px-3 py-1.5 text-xs uppercase tracking-widest text-[var(--text-faint)]">
+          {visibleOut.length > 0 && (
+            <li className="bg-[var(--surface-2)] px-3 py-1.5 text-xs uppercase tracking-widest text-[var(--text-faint)] lg:col-span-2">
               {t('players.eliminated')}
             </li>
           )}
-          {out.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 text-[var(--text-muted)]">
+          {visibleOut.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-[var(--bg)] px-3 py-2.5 text-[var(--text-muted)]">
               <span className="tnum w-8 shrink-0 text-right font-semibold text-[var(--text-faint)]">
                 {p.finishPosition ?? '—'}
               </span>
@@ -366,6 +439,16 @@ export function FloorPlayers({
             </li>
           ))}
         </ul>
+      )}
+
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setQuery('')}
+          className="w-full rounded-lg border border-dashed border-[var(--line-strong)] px-3 py-2 text-sm text-[var(--text-faint)] transition hover:text-[var(--text)]"
+        >
+          {hiddenCount} {t('players.filtered')} · {t('players.showAll')}
+        </button>
       )}
 
       {/* ---------------------------------------------------------- afsluiten */}
@@ -601,12 +684,13 @@ function Primary({
 }
 
 function Small({
-  children, onClick, disabled, danger,
+  children, onClick, disabled, danger, active,
 }: {
   children: React.ReactNode
   onClick?: () => void
   disabled?: boolean
   danger?: boolean
+  active?: boolean
 }) {
   return (
     <button
@@ -616,7 +700,9 @@ function Small({
       className={`rounded-lg px-2.5 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
           ? 'border border-[color-mix(in_oklab,var(--danger)_45%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_12%,transparent)]'
-          : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+          : active
+            ? 'border border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_16%,transparent)]'
+            : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
       }`}
     >
       {children}
