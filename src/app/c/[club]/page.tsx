@@ -1,5 +1,6 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { ClubHeader } from '@/components/ClubHeader'
+import { PublicClubHome } from '@/components/public/PublicClubHome'
 import { ClubNav } from '@/components/ClubNav'
 import {
   Badge, ButtonLink, Card, EmptyState, Notice, Page, SectionTitle,
@@ -34,10 +35,16 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
-  if (!claims?.claims) redirect(`/c/${slug}/login`)
-
-  const role = await getClubRole(club.id)
+  const role = claims?.claims ? await getClubRole(club.id) : null
   const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+
+  // Eén adres, twee gezichten. Wie hier binnenkomt zonder bij de club te
+  // horen is een speler of een bezoeker en krijgt de publieke pagina; staf
+  // krijgt het dashboard. Dat scheelt de club een tweede domein en de spelers
+  // een URL die ze moeten onthouden — app.cutoff.be is gewoon "de club".
+  if (role === null || !['owner', 'admin', 'floor'].includes(role)) {
+    return <PublicClubHome club={club} t={t} />
+  }
 
   const { data } = await supabase
     .from('tournaments')

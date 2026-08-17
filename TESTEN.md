@@ -27,9 +27,10 @@ de losse migraties die je nog niet had, in volgorde:
 0020_stop_clock_on_finish.sql  de klok stopt zodra het tornooi dicht is
 0021_payout_list.sql        de uitbetaallijst voor aan de kassa
 0022_whole_points.sql       punten zonder cijfers na de komma
+0023_public_club.sql        de publieke clubpagina's voor spelers
 ```
 
-Alle vijftien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
+Alle zestien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
 na elkaar over een gevulde database gehaald. Weet je niet meer waar je stond,
 draai ze dan gewoon allemaal.
 
@@ -41,6 +42,10 @@ demo_testavond.sql    één avond die nu middenin de finaletafel staat
 ```
 
 En `demo_cutoff_wissen.sql` haalt beide er weer uit. Doe dat vóór 6 september.
+
+Los daarvan staat `publieke_namen_aan.sql`. Draai je die, dan tonen de
+publieke pagina's van Cutoff de namen van je spelers in plaats van
+gebruikersnamen. Zie de uitleg onder *De publieke kant*.
 
 ---
 
@@ -154,6 +159,37 @@ klassement — daar bepaalt het wie er meedingt — terwijl je bij de cijfers
 kalendertijd wil vergelijken. De gekozen periode staat in de URL, dus je kan
 ze bewaren of doorsturen.
 
+### De publieke kant
+
+Nieuw: alles hierboven is voor jou en je floor. Daarnaast heeft de club nu
+pagina's voor de zaal, zonder login en mobiel eerst.
+
+`app.cutoff.be` (of `/c/cutoff`) is één adres met twee gezichten. Log je in
+als staf, dan krijg je het dashboard dat je kent. Iedereen anders krijgt de
+publieke voorpagina: wat er nu loopt, wanneer de volgende avond is, de laatste
+uitslag en de kop van het klassement.
+
+- **Nu** — loopt er een avond, dan staat daar een knop naar het live-bord.
+- **Kalender** — komende avonden en wat er gespeeld is.
+- **Klassement** — punten, aantal avonden en beste plaats. Alles, dit jaar of
+  deze maand.
+
+Het **live-bord** (`/c/cutoff/live/<id>`) is de avond op een telefoon: de klok
+telt lokaal af zodat hij vloeiend loopt, de stand wordt elke acht seconden
+opgehaald, en je ziet wie er nog zit en wie eruit is. Is het tornooi
+afgelopen, dan toont datzelfde adres de uitslag — zo blijft een link die
+tijdens de avond rondging daarna nog kloppen.
+
+**Namen.** Standaard tonen die pagina's gebruikersnamen en geen echte namen:
+een naam is een persoonsgegeven en de speler heeft er niets voor getekend.
+Voor de eigen pagina's van een club kan dat anders: `publieke_namen_aan.sql`
+zet het om, en dan verklaar je dat Cutoff die toestemming heeft via het
+clubreglement of het aanmeldformulier. Terugdraaien kan altijd.
+
+**Wat een bezoeker níét ziet**, en dat is met tests vastgelegd: het
+geldregister, de spelerstabel met mailadressen, de blindstructuren van de
+club, de uitbetaallijst, en tornooien die niet op publiek staan.
+
 ---
 
 ## 3. Wat je onthoudt over hoe het werkt
@@ -239,6 +275,14 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
       nieuw level bij te komen met hogere blinds, niet 00:00.
 - [ ] Cijfers: klik door dit jaar, deze maand en alles, en geef daarna zelf
       twee data in.
+- [ ] Open `/c/cutoff` in een privévenster (dus uitgelogd). Je hoort de
+      publieke voorpagina te zien en niet het inlogscherm.
+- [ ] Volg het live-bord op je telefoon terwijl je op de floor iemand
+      uitschakelt. Binnen acht seconden hoort hij bij "Eruit" te staan.
+- [ ] Draai `publieke_namen_aan.sql` en herlaad: waar eerst "Speler a3f2"
+      stond horen nu de namen te staan.
+- [ ] Zet een tornooi op besloten en probeer het live-adres in een
+      privévenster: dat hoort niet gevonden te worden.
 - [ ] Bekijk de uitslag en daarna het klassement, het ledenbestand en de cijfers.
 - [ ] Ledenbestand: vul het mailadres aan van Marcel Vandeputte.
 

@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { PublicStandings } from '@/components/public/PublicStandings'
 import { Card, EmptyState, Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator, type T } from '@/lib/i18n/dictionaries'
@@ -107,14 +108,27 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
-  if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/klassement`)
-
-  const role = await getClubRole(club.id)
+  const role = claims?.claims ? await getClubRole(club.id) : null
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
   const locale = isLocale(club.locale) ? club.locale : 'nl'
   const t = translator(locale)
 
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
+
+  // Het klassement is de reden dat spelers tussen twee avonden door
+  // terugkomen; dat achter een login zetten is het weggooien. Wie geen staf
+  // is krijgt de publieke versie: dezelfde telling, zonder prijzengeld, en
+  // met de naamregeling van de club erop.
+  if (!canManage) {
+    const p = one(q.p)
+    return (
+      <PublicStandings
+        club={club}
+        t={t}
+        mode={p === 'year' ? 'year' : p === 'month' ? 'month' : 'all'}
+      />
+    )
+  }
   const mode = one(q.p) === 'year' ? 'year' : one(q.p) === 'month' ? 'month' : 'season'
 
   const [seasonRes, yearRes] = await Promise.all([

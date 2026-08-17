@@ -47,9 +47,15 @@ declare
   v_lvl        jsonb;
 begin
   -- --------------------------------------------------------------- club ---
-  insert into clubs (slug, name, city, country, locale, timezone)
-  values ('cutoff', 'Cutoff Poker Club', 'Gent', 'BE', 'nl', 'Europe/Brussels')
-  on conflict (slug) do update set name = excluded.name
+  -- public_names: Cutoff toont de namen van zijn spelers op zijn eigen
+  -- publieke pagina's. Dat mag omdat de club die toestemming zelf regelt via
+  -- het clubreglement; zet het uit en de pagina's draaien door op
+  -- gebruikersnamen. Zie migratie 0023.
+  insert into clubs (slug, name, city, country, locale, timezone, public_names)
+  values ('cutoff', 'Cutoff Poker Club', 'Gent', 'BE', 'nl', 'Europe/Brussels', true)
+  on conflict (slug) do update
+    set name = excluded.name,
+        public_names = excluded.public_names
   returning id into v_club;
 
   -- ---------------------------------------------------------------- staf ---
