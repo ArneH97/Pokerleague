@@ -25,7 +25,7 @@ const ANNOUNCE_MS = 8_000
  * scheelt paniek als iemand tegen de laptop stoot.
  */
 export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
-  const { tournament, club, levels, stats, loading, error, live } = useTournament(tournamentId)
+  const { tournament, club, levels, stats, loading, error, live, deal } = useTournament(tournamentId)
   const { nowMs } = useServerTime()
   const sound = useClockSound()
   const t = useT()
@@ -389,6 +389,48 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
               {t('clock.ante')} {level.ante.toLocaleString('nl-BE')}
             </p>
           )}
+        </div>
+      )}
+
+      {/* Het dealvoorstel neemt het hele scherm over. Dat is geen detail:
+          op dat moment praat de hele zaal hierover, en de klok staat toch
+          stil. Zodra de floor het intrekt of de tafel akkoord gaat verdwijnt
+          het vanzelf — het scherm luistert mee via realtime. */}
+      {deal && deal.shares.length > 0 && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_94%,transparent)] px-[4vw] backdrop-blur-sm">
+          <p
+            className="text-[2.6vh] font-medium uppercase tracking-[0.32em]"
+            style={{ color: accent }}
+          >
+            {t('deal.hallTitle')}
+          </p>
+
+          <table className="mt-[3vh] w-full max-w-[70vw] border-collapse">
+            <tbody>
+              {[...deal.shares]
+                .sort((a, b) => b.agreed_cents - a.agreed_cents)
+                .map((sh, i) => (
+                  <tr key={i} className="border-b border-white/10 last:border-0">
+                    <td className="py-[1.4vh] text-left text-[4.6vh] font-semibold">
+                      {sh.name}
+                    </td>
+                    <td className="tnum py-[1.4vh] text-right text-[2.4vh] text-[var(--text-faint)]">
+                      {sh.chips > 0 ? sh.chips.toLocaleString('nl-BE') : ''}
+                    </td>
+                    <td
+                      className="tnum py-[1.4vh] pl-[4vw] text-right text-[5.6vh] font-bold"
+                      style={{ color: accent }}
+                    >
+                      {formatMoney(sh.agreed_cents, club?.currency ?? 'EUR')}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+
+          <p className="mt-[3vh] text-[2.2vh] text-[var(--text-faint)]">
+            {t('deal.hallFoot')}
+          </p>
         </div>
       )}
 

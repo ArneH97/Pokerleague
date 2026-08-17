@@ -7,6 +7,13 @@ import type {
   BlindLevelRow, ClubRow, TournamentRow, TournamentStats,
 } from '@/lib/types'
 
+export interface OpenDeal {
+  id: string
+  method: string
+  poolCents: number
+  shares: { name: string; chips: number; agreed_cents: number }[]
+}
+
 interface State {
   tournament: TournamentRow | null
   club: ClubRow | null
@@ -17,6 +24,8 @@ interface State {
   /** Verbinding met de realtime-stroom. Zichtbaar maken in de UI: als dit
    *  wegvalt tijdens een tornooi wil de floor dat weten. */
   live: boolean
+  /** Het voorstel dat nu op het zaalscherm hoort te staan, of null. */
+  deal: OpenDeal | null
 }
 
 const EMPTY_STATS: TournamentStats = {
@@ -48,7 +57,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
   const supabase = useMemo(() => createClient(), [])
   const [state, setState] = useState<State>({
     tournament: null, club: null, levels: [], stats: EMPTY_STATS,
-    loading: true, error: null, live: false,
+    loading: true, error: null, live: false, deal: null,
   })
 
   const load = useCallback(async () => {
@@ -70,7 +79,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
       return
     }
 
-    const [clubRes, levelRes, playerRes, potRes] = await Promise.all([
+    const [clubRes, levelRes, playerRes, potRes, dealRes] = await Promise.all([
       supabase.from('clubs').select('id,slug,name,currency,timezone,logo_url,mark_url,primary_color')
         .eq('id', t.club_id).maybeSingle<ClubRow>(),
       t.structure_id
@@ -84,6 +93,13 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
         .select('amount_cents,kind')
         .eq('tournament_id', tournamentId)
         .eq('is_void', false),
+      // Een openstaand dealvoorstel. Hoort op het zaalscherm zodra de floor
+      // het erop zet, en verdwijnt zodra het ingetrokken of aanvaard is.
+      supabase.from('tournament_deals')
+        .select('id,method,pool_cents,shares')
+        .eq('tournament_id', tournamentId)
+        .eq('status', 'proposed')
+        .maybeSingle<{ id: string; method: string; pool_cents: number; shares: OpenDeal['shares'] }>(),
     ])
 
     const players = (playerRes.data ?? []) as { status: string; chip_count: number | null }[]
@@ -109,6 +125,14 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
         reentries: count('reentry'),
         addons: count('addon'),
       },
+      deal: dealRes.data
+        ? {
+            id: dealRes.data.id,
+            method: dealRes.data.method,
+            poolCents: dealRes.data.pool_cents,
+            shares: dealRes.data.shares ?? [],
+          }
+        : null,
       loading: false,
       error: null,
       live: true,
@@ -133,6 +157,9 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
         () => void load())
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'buyins', filter: `tournament_id=eq.${tournamentId}` },
+        () => void load())
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tournament_deals', filter: `tournament_id=eq.${tournamentId}` },
         () => void load())
       .subscribe((status) => {
         setState((s) => ({ ...s, live: status === 'SUBSCRIBED' }))

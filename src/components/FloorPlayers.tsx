@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { DealPanel } from '@/components/DealPanel'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/types'
 import { useFloorPlayers } from '@/lib/useFloorPlayers'
@@ -64,6 +65,7 @@ export function FloorPlayers({
   const [killing, setKilling] = useState<string | null>(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
+  const [dealOpen, setDealOpen] = useState(false)
 
   const active = players
     .filter((p) => p.status === 'active' || p.status === 'registered')
@@ -247,7 +249,38 @@ export function FloorPlayers({
           >
             {adding ? t('common.cancel') : `＋ ${t('players.add')}`}
           </button>
+
+          {/* De deal komt pas in beeld als er nog maar een handvol spelers
+              zit. Eerder is het geen gesprek dat gevoerd wordt, en een knop
+              die je de hele avond ziet maar nooit gebruikt is ruis. */}
+          {active.length >= 2 && active.length <= 9 && (
+            <button
+              type="button"
+              onClick={() => setDealOpen((v) => !v)}
+              className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                dealOpen
+                  ? 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                  : 'border border-[var(--brand)] text-[var(--brand)] hover:bg-[color-mix(in_oklab,var(--brand)_12%,transparent)]'
+              }`}
+            >
+              {dealOpen ? t('deal.close') : t('deal.open')}
+            </button>
+          )}
         </div>
+      )}
+
+      {dealOpen && !finished && (
+        <DealPanel
+          tournamentId={tournamentId}
+          currency={money.currency}
+          seats={active.map((p) => ({
+            id: p.id,
+            tpId: p.id,
+            name: p.name,
+            chips: p.chipCount ?? 0,
+          }))}
+          onClose={() => { setDealOpen(false); void reload() }}
+        />
       )}
 
       {/* Het toevoegpaneel staat in de gewone stroom van de pagina en niet als
