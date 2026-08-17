@@ -144,13 +144,42 @@ export function start(nowIso: string): ClockState {
   return { status: 'running', levelIdx: 0, levelStartedAt: nowIso, levelElapsedMs: 0 }
 }
 
-export function pause(state: ClockState, nowMs: number): ClockState {
-  if (state.status !== 'running') return state
+/**
+ * De opgeslagen stand gelijkzetten met wat er op het scherm staat.
+ *
+ * Dit is de reparatie van een bug die je alleen merkt als je pauzeert. De
+ * klok telt door zonder dat er iets weggeschreven wordt, dus na een level dat
+ * afliep zonder klik staat er in de database nog altijd het oude level met
+ * een verstreken tijd die veel groter is dan dat level lang duurt. Zolang de
+ * klok loopt is dat onzichtbaar: resolveClock rolt er netjes doorheen.
+ *
+ * Pauzeren bevroor die ruwe tijd echter zoals ze was. Een gepauzeerde klok
+ * rolt niet door — met opzet, want anders zou een pauze van een uur je drie
+ * levels verder zetten — dus je zag ineens 00:00 op het oude level staan. En
+ * bij hervatten kwam al die opgespaarde tijd alsnog vrij: een niveau erbij en
+ * de melding "level automatisch doorgerold".
+ *
+ * Vandaar dat pauzeren, stoppen en het bijstellen van de tijd nu eerst
+ * gelijkzetten: het level waar de klok wérkelijk in zit, met de verstreken
+ * tijd afgetopt op de duur van dat level. Wat je ziet is dan ook wat er
+ * bewaard wordt.
+ */
+export function normalise(state: ClockState, levels: BlindLevel[], nowMs: number): ClockState {
+  const resolved = resolveClock(state, levels, nowMs)
   return {
     ...state,
+    levelIdx: resolved.levelIdx,
+    levelElapsedMs: Math.round(clamp(resolved.elapsedInLevelMs, 0)),
+  }
+}
+
+export function pause(state: ClockState, levels: BlindLevel[], nowMs: number): ClockState {
+  if (state.status !== 'running') return state
+  const here = normalise(state, levels, nowMs)
+  return {
+    ...here,
     status: 'paused',
     levelStartedAt: null,
-    levelElapsedMs: rawElapsedMs(state, nowMs),
   }
 }
 
@@ -159,12 +188,13 @@ export function resume(state: ClockState, nowIso: string): ClockState {
   return { ...state, status: 'running', levelStartedAt: nowIso }
 }
 
-export function stop(state: ClockState, nowMs: number): ClockState {
+export function stop(state: ClockState, levels: BlindLevel[], nowMs: number): ClockState {
+  const here = normalise(state, levels, nowMs)
   return {
     status: 'stopped',
-    levelIdx: state.levelIdx,
+    levelIdx: here.levelIdx,
     levelStartedAt: null,
-    levelElapsedMs: rawElapsedMs(state, nowMs),
+    levelElapsedMs: here.levelElapsedMs,
   }
 }
 
@@ -196,12 +226,16 @@ export function prevLevel(state: ClockState, levels: BlindLevel[], nowMs: number
  * Tijd bijtellen of aftrekken binnen het huidige level. Positief = meer tijd
  * op de klok. Kan niet voorbij het begin van het level.
  */
-export function adjustTime(state: ClockState, deltaMs: number, nowMs: number, nowIso: string): ClockState {
-  const elapsed = Math.round(clamp(rawElapsedMs(state, nowMs) - deltaMs, 0))
+export function adjustTime(
+  state: ClockState, levels: BlindLevel[], deltaMs: number, nowMs: number, nowIso: string,
+): ClockState {
+  // Eerst gelijkzetten, anders trek je een minuut af van een tijd die al
+  // voorbij het einde van het level ligt en gebeurt er zichtbaar niets.
+  const here = normalise(state, levels, nowMs)
   return {
-    ...state,
+    ...here,
     levelStartedAt: state.status === 'running' ? nowIso : null,
-    levelElapsedMs: elapsed,
+    levelElapsedMs: Math.round(clamp(here.levelElapsedMs - deltaMs, 0)),
   }
 }
 

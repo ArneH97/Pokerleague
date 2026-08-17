@@ -1,12 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FloorPlayers } from '@/components/FloorPlayers'
 import { createClient } from '@/lib/supabase/client'
 import {
   resolveClock, formatDuration, formatBlinds, breakLabel,
-  start, pause, resume, nextLevel, prevLevel, adjustTime,
+  start, pause, resume, nextLevel, prevLevel, adjustTime, normalise,
   type ClockState,
 } from '@/lib/tournament/clock'
 import { toClockState } from '@/lib/types'
@@ -38,6 +38,7 @@ export function FloorControls({
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const t = useT()
+  const rolledRef = useRef<number | null>(null)
   useTicker(250)
 
   async function apply(next: ClockState) {
@@ -75,6 +76,32 @@ export function FloorControls({
     }
     setBusy(false)
   }
+
+  // Rolde de klok door een levelgrens zonder dat er geklikt werd, dan loopt
+  // de opgeslagen stand achter op wat de zaal ziet. Eén keer wegschrijven en
+  // ze lopen weer gelijk. Zonder dit blijft de database op het oude level
+  // staan tot de floor iets aanraakt — en dat merk je pas bij het pauzeren,
+  // of wanneer iemand het scherm heropent.
+  useEffect(() => {
+    if (!tournament || levels.length === 0) return
+    if (tournament.clock !== 'running') return
+
+    const state = toClockState(tournament)
+    const here = resolveClock(state, levels, nowMs())
+    if (here.rolledOver === 0 || here.finished) return
+    if (rolledRef.current === here.levelIdx) return
+
+    rolledRef.current = here.levelIdx
+    const fixed = normalise(state, levels, nowMs())
+    void supabase
+      .from('tournaments')
+      .update({
+        level_idx: Math.round(fixed.levelIdx),
+        level_started_at: nowIso(),
+        level_elapsed_ms: Math.round(fixed.levelElapsedMs),
+      })
+      .eq('id', tournamentId)
+  }, [tournament, levels, nowMs, nowIso, supabase, tournamentId])
 
   // De terugweg staat ook op het laad- en foutscherm. Juist dáár heb je hem
   // nodig: een floor die op een leeg scherm belandt heeft anders alleen nog
@@ -146,7 +173,11 @@ export function FloorControls({
         <p className="mt-1 text-sm text-[var(--text-faint)]">
           {resolved.nextLevel ? `${t('clock.next')}: ${formatBlinds(resolved.nextLevel)}` : t('clock.lastLevel')}
         </p>
-        {resolved.rolledOver > 0 && running && (
+        {/* Eén gemiste levelgrens is geen incident: de klok hoort door te
+            lopen en het effect wordt hierboven meteen weggeschreven. Pas
+            vanaf twee levels is er echt iets aan de hand — dan stond het
+            scherm een tijd uit. */}
+        {resolved.rolledOver > 1 && running && (
           <p className="mt-3 text-sm text-[var(--warn)]">
             {resolved.rolledOver} {t('floor.rolledOver')}
           </p>
@@ -169,7 +200,7 @@ export function FloorControls({
             {t('floor.start')}
           </Button>
         ) : running ? (
-          <Button primary disabled={busy} onClick={() => apply(pause(state, nowMs()))}>
+          <Button primary disabled={busy} onClick={() => apply(pause(state, levels, nowMs()))}>
             {t('floor.pause')}
           </Button>
         ) : (
@@ -193,13 +224,13 @@ export function FloorControls({
         <div className="grid grid-cols-2 gap-3">
           <Button
             disabled={busy}
-            onClick={() => apply(adjustTime(state, -60_000, nowMs(), nowIso()))}
+            onClick={() => apply(adjustTime(state, levels, -60_000, nowMs(), nowIso()))}
           >
             {t('floor.minusMinute')}
           </Button>
           <Button
             disabled={busy}
-            onClick={() => apply(adjustTime(state, 60_000, nowMs(), nowIso()))}
+            onClick={() => apply(adjustTime(state, levels, 60_000, nowMs(), nowIso()))}
           >
             {t('floor.plusMinute')}
           </Button>

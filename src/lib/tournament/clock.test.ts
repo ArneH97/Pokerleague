@@ -36,7 +36,7 @@ test('lopende klok telt af tegen servertijd', () => {
 })
 
 test('pauzeren bevriest de resterende tijd', () => {
-  const paused = pause(running(), T0 + 500_000)
+  const paused = pause(running(), levels, T0 + 500_000)
   assert.equal(paused.status, 'paused')
   assert.equal(paused.levelElapsedMs, 500_000)
 
@@ -46,7 +46,7 @@ test('pauzeren bevriest de resterende tijd', () => {
 })
 
 test('hervatten pakt de opgebouwde tijd weer op', () => {
-  const paused = pause(running(), T0 + 500_000)
+  const paused = pause(running(), levels, T0 + 500_000)
   const resumed = resume(paused, iso(T0 + 900_000))
   const r = resolveClock(resumed, levels, T0 + 1_000_000)
   // 500s opgebouwd + 100s sinds hervatten = 600s verstreken van 1200s.
@@ -106,19 +106,19 @@ test('doorrollen respecteert het level waar de floor naartoe sprong', () => {
 })
 
 test('tijd bijtellen en aftrekken', () => {
-  const plus = adjustTime(running(), 60_000, T0 + 300_000, iso(T0 + 300_000))
+  const plus = adjustTime(running(), levels, 60_000, T0 + 300_000, iso(T0 + 300_000))
   assert.equal(resolveClock(plus, levels, T0 + 300_000).remainingMs, 960_000)
 
-  const minus = adjustTime(running(), -60_000, T0 + 300_000, iso(T0 + 300_000))
+  const minus = adjustTime(running(), levels, -60_000, T0 + 300_000, iso(T0 + 300_000))
   assert.equal(resolveClock(minus, levels, T0 + 300_000).remainingMs, 840_000)
 
   // Niet verder terug dan het begin van het level.
-  const capped = adjustTime(running(), 999_999_999, T0 + 300_000, iso(T0 + 300_000))
+  const capped = adjustTime(running(), levels, 999_999_999, T0 + 300_000, iso(T0 + 300_000))
   assert.equal(resolveClock(capped, levels, T0 + 300_000).remainingMs, 1_200_000)
 })
 
 test('stoppen bewaart de stand', () => {
-  const stopped = stop(running(), T0 + 400_000)
+  const stopped = stop(running(), levels, T0 + 400_000)
   assert.equal(stopped.status, 'stopped')
   assert.equal(stopped.levelElapsedMs, 400_000)
 })
@@ -160,12 +160,12 @@ test('elke overgang levert hele milliseconden op, ook bij een gebroken kloktijd'
   const iso2 = new Date(fractional).toISOString()
 
   const cases: Record<string, ClockState> = {
-    pause: pause(running(), fractional),
-    stop: stop(running(), fractional),
-    resume: resume(pause(running(), fractional), iso2),
-    plusMinuut: adjustTime(running(), 60_000, fractional, iso2),
-    minMinuut: adjustTime(running(), -60_000, fractional, iso2),
-    halveDelta: adjustTime(running(), 1234.5, fractional, iso2),
+    pause: pause(running(), levels, fractional),
+    stop: stop(running(), levels, fractional),
+    resume: resume(pause(running(), levels, fractional), iso2),
+    plusMinuut: adjustTime(running(), levels, 60_000, fractional, iso2),
+    minMinuut: adjustTime(running(), levels, -60_000, fractional, iso2),
+    halveDelta: adjustTime(running(), levels, 1234.5, fractional, iso2),
     volgend: nextLevel(running(), levels, fractional, iso2),
     vorig: prevLevel(running(1), levels, fractional, iso2),
     start: start(iso2),
@@ -216,4 +216,56 @@ test('weergave', () => {
 
   assert.equal(averageStack(210_000, 21), 10_000)
   assert.equal(averageStack(100, 0), 0)
+})
+
+test('pauzeren op een verlopen level springt niet alsnog bij het hervatten', () => {
+  // De bug: de klok liep door zonder dat er geklikt werd, dus in de database
+  // stond nog level 0 met een verstreken tijd van ver voorbij die twintig
+  // minuten. Pauzeren bevroor die ruwe tijd, het scherm toonde 00:00 op het
+  // oude level, en bij hervatten kwam alles alsnog vrij: een level erbij en
+  // de melding "automatisch doorgerold".
+  const laat = T0 + 25 * 60_000       // vijf minuten voorbij het einde van level 0
+  const paused = pause(running(), levels, laat)
+
+  // Pauzeren zet de stand gelijk met wat er op het scherm hoort te staan.
+  assert.equal(paused.levelIdx, 1, 'pauzeren hoort mee te schuiven naar het juiste level')
+  assert.equal(resolveClock(paused, levels, laat).remainingMs, 15 * 60_000)
+  assert.equal(resolveClock(paused, levels, laat).rolledOver, 0)
+
+  // En een uur later staat er nog precies hetzelfde.
+  const later = resolveClock(paused, levels, laat + 3600_000)
+  assert.equal(later.levelIdx, 1)
+  assert.equal(later.remainingMs, 15 * 60_000)
+
+  // Hervatten verandert niets aan het level en rolt niets door.
+  const resumed = resume(paused, iso(laat + 3600_000))
+  const na = resolveClock(resumed, levels, laat + 3600_000)
+  assert.equal(na.levelIdx, 1, 'hervatten hoort op hetzelfde level te blijven')
+  assert.equal(na.rolledOver, 0, 'hervatten mag geen doorrolmelding geven')
+  assert.equal(na.remainingMs, 15 * 60_000)
+})
+
+test('pauzeren bovenop een levelgrens blijft staan waar het scherm stond', () => {
+  // Precies op 00:00 van level 0 pauzeren: het scherm toont dan level 1 met
+  // volle tijd, en dat hoort ook bewaard te worden.
+  const grens = T0 + 20 * 60_000
+  const paused = pause(running(), levels, grens)
+  assert.equal(paused.levelIdx, 1)
+  assert.equal(paused.levelElapsedMs, 0)
+})
+
+test('tijd bijstellen werkt ook als de klok al doorgerold is', () => {
+  // Een minuut bijtellen op een klok die al voorbij het level staat hoorde
+  // zichtbaar niets te doen, want de tijd werd van een enorm getal afgetrokken.
+  const laat = T0 + 25 * 60_000
+  const plus = adjustTime(running(), levels, 60_000, laat, iso(laat))
+  assert.equal(plus.levelIdx, 1)
+  assert.equal(resolveClock(plus, levels, laat).remainingMs, 16 * 60_000)
+})
+
+test('stoppen zet de stand ook gelijk', () => {
+  const laat = T0 + 25 * 60_000
+  const stopped = stop(running(), levels, laat)
+  assert.equal(stopped.levelIdx, 1)
+  assert.equal(stopped.levelElapsedMs, 5 * 60_000)
 })
