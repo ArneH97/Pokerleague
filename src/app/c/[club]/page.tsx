@@ -138,6 +138,16 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
             {t('standings.view')}
           </Link>
           {canManage && (
+            <Link href={`/c/${slug}/leden`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
+              {t('members.view')}
+            </Link>
+          )}
+          {canManage && (
+            <Link href={`/c/${slug}/statistieken`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
+              {t('stats.view')}
+            </Link>
+          )}
+          {canManage && (
             <Link href={`/c/${slug}/structuren`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
               {t('club.manageStructures')}
             </Link>
