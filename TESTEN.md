@@ -25,9 +25,10 @@ de losse migraties die je nog niet had, in volgorde:
 0018_deal_even.sql          even split, en de ladder mag iedereen zien
 0019_round_euros.sql        alles in hele euro's
 0020_stop_clock_on_finish.sql  de klok stopt zodra het tornooi dicht is
+0021_payout_list.sql        de uitbetaallijst voor aan de kassa
 ```
 
-Alle dertien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
+Alle veertien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
 na elkaar over een gevulde database gehaald. Weet je niet meer waar je stond,
 draai ze dan gewoon allemaal.
 
@@ -95,6 +96,20 @@ in de taal van de club — voor Cutoff dus Engels.
 - **Prijzengeld**: het aantal betaalde plaatsen met plus en min, en een vinkje
   voor de bubbel. Werkt pas zinvol nadat de inkopen dicht zijn.
 - **Deal**: vanaf twee spelers.
+
+### Uitbetalen
+
+Valt er iemand af die in het geld eindigt, dan springt zijn bedrag meteen in
+beeld: naam, plaats, bedrag. Je streept hem daar af of je klikt het weg.
+
+Daaronder staat de **uitbetaallijst** — één regel per naam met plaats en
+bedrag, en per regel een knop om af te strepen. Bovenaan zie je wat er nog
+open staat. Dat afstrepen staat in de database, dus het overleeft een refresh
+en je kan het op een tweede toestel aan de kassa openen.
+
+Na een deal staan hier de **afgesproken** bedragen en niet de ladder — dat is
+dezelfde bron als de uitslagpagina, dus die twee kunnen niet uit elkaar lopen.
+Wie al eerder in het geld afviel houdt gewoon zijn ladderbedrag.
 
 ### De deal
 
@@ -187,10 +202,15 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
 - [ ] Schakel iemand uit en draai het terug; zijn stapel hoort er nog te zijn.
 - [ ] Prijzengeld: zet 6 plaatsen met plus en min, vink de bubbel aan, leg vast.
       Alle bedragen horen ronde euro's te zijn en op te tellen tot € 320.
+- [ ] Schakel iemand uit die net in het geld valt. Zijn bedrag hoort meteen in
+      beeld te springen, en hij hoort op de uitbetaallijst te komen.
+- [ ] Streep hem af, ververs de pagina: hij hoort afgestreept te blijven.
+      Draai het daarna terug.
 - [ ] Deal: tel de stapels (probeer eens een totaal ver naast de waarheid — hij
       hoort te weigeren), bekijk de drie voorstellen, zet ze alle drie op het
       zaalscherm, en sluit af. Hij hoort te vragen welk voorstel het geworden
-      is, en de klok hoort daarna stil te staan.
+      is, en de klok hoort daarna stil te staan. Daarna hoort de
+      uitbetaallijst de afgesproken bedragen per naam te tonen.
 - [ ] Bekijk de uitslag en daarna het klassement, het ledenbestand en de cijfers.
 - [ ] Ledenbestand: vul het mailadres aan van Marcel Vandeputte.
 

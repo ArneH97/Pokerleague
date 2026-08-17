@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import { DealPanel } from '@/components/DealPanel'
+import { PayoutList, InTheMoneyNotice } from '@/components/PayoutList'
 import { PayoutPanel } from '@/components/PayoutPanel'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/types'
 import { useFloorPlayers } from '@/lib/useFloorPlayers'
+import { usePayouts, type PayoutRow } from '@/lib/usePayouts'
 import { useT } from '@/lib/i18n/context'
 
 /**
@@ -76,6 +78,11 @@ export function FloorPlayers({
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
   const [dealOpen, setDealOpen] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
+
+  // Wie er geld krijgt, en wat er al uitbetaald is.
+  const payouts = usePayouts(tournamentId)
+  /** De melding die opkomt zodra iemand in het geld afvalt. */
+  const [inTheMoney, setInTheMoney] = useState<PayoutRow | null>(null)
 
   const active = players
     .filter((p) => p.status === 'active' || p.status === 'registered')
@@ -160,6 +167,20 @@ export function FloorPlayers({
     await run(() => supabase.rpc('floor_eliminate', {
       p_tournament_player_id: tpId, p_by_tournament_player_id: byId,
     }))
+    // Viel deze man in het geld, dan hoort de floor dat nú te weten en niet
+    // pas als de speler er zelf naar vraagt. De server bepaalt zowel de
+    // eindplaats als het bedrag, dus we vragen het gewoon opnieuw op en
+    // kijken of hij op de uitbetaallijst verschenen is.
+    const rows = await payouts.reload()
+    const hit = rows.find((r) => r.tournamentPlayerId === tpId && !r.paidAt)
+    if (hit) setInTheMoney(hit)
+  }
+
+  async function markPaid(tpId: string, paid: boolean) {
+    setBusy(true)
+    await payouts.markPaid(tpId, paid)
+    if (paid && inTheMoney?.tournamentPlayerId === tpId) setInTheMoney(null)
+    setBusy(false)
   }
 
   async function rebuy(tpId: string, kind: 'reentry' | 'rebuy' | 'addon') {
@@ -171,6 +192,8 @@ export function FloorPlayers({
 
   async function undo(tpId: string) {
     await run(() => supabase.rpc('floor_undo_elimination', { p_tournament_player_id: tpId }))
+    if (inTheMoney?.tournamentPlayerId === tpId) setInTheMoney(null)
+    await payouts.reload()
   }
 
   async function undoBuyin(tpId: string) {
@@ -186,6 +209,7 @@ export function FloorPlayers({
   async function finish() {
     setConfirmFinish(false)
     await run(() => supabase.rpc('floor_finish_tournament', { p_tournament_id: tournamentId }))
+    await payouts.reload()
   }
 
   if (loading) {
@@ -230,6 +254,28 @@ export function FloorPlayers({
           {t('players.isFinished')}
         </p>
       )}
+
+      {/* Bovenaan, want dit is het enige wat op dat moment telt. */}
+      {inTheMoney && (
+        <InTheMoneyNotice
+          row={inTheMoney}
+          currency={money.currency}
+          busy={busy}
+          onMarkPaid={() => void markPaid(inTheMoney.tournamentPlayerId, true)}
+          onDismiss={() => setInTheMoney(null)}
+        />
+      )}
+
+      {/* De kassalijst. Verschijnt zodra er iemand geld te goed heeft, en na
+          een deal staan hier de afgesproken bedragen per naam. */}
+      <PayoutList
+        rows={payouts.rows}
+        currency={money.currency}
+        totalCents={payouts.totalCents}
+        openCents={payouts.openCents}
+        busy={busy}
+        onMarkPaid={(id, paid) => void markPaid(id, paid)}
+      />
 
       {/* ------------------------------------------------- filter + toevoegen */}
       {/* Twee losse dingen naast elkaar, en dat is precies de bedoeling: links
@@ -314,7 +360,9 @@ export function FloorPlayers({
             chips: p.chipCount ?? 0,
           }))}
           expectedChips={expectedChips}
-          onClose={() => { setDealOpen(false); void reload() }}
+          // Na een aanvaarde deal staan de afgesproken bedragen per naam in
+          // de kassalijst; die moet dus mee ververst worden.
+          onClose={() => { setDealOpen(false); void reload(); void payouts.reload() }}
         />
       )}
 
