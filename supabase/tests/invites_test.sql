@@ -205,3 +205,85 @@ begin
 end $$;
 
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Een uitnodiging hoort bij het lidmaatschap, niet bij het profiel
+-- ---------------------------------------------------------------------------
+-- Dit is het gat uit 0032. Alle drie de gevallen hieronder gingen fout omdat
+-- de uitnodiging alleen bij een nieuw spelersprofiel werd aangemaakt.
+
+begin;
+do $$
+declare
+  v_a uuid; v_b uuid; v_struct uuid; v_pay uuid; v_tour uuid;
+  v_p uuid; v_tp uuid; v_uid uuid; v_n int; v_tok text;
+begin
+  insert into clubs (slug, name, city, country, locale, timezone)
+  values ('t33a', 'Club A', 'Gent', 'BE', 'nl', 'Europe/Brussels') returning id into v_a;
+  insert into clubs (slug, name, city, country, locale, timezone)
+  values ('t33b', 'Club B', 'Aalst', 'BE', 'nl', 'Europe/Brussels') returning id into v_b;
+
+  insert into blind_structures (club_id, name) values (v_b, 'S') returning id into v_struct;
+  insert into blind_levels (structure_id, idx, is_break, small_blind, big_blind, ante, duration_s)
+  values (v_struct, 0, false, 25, 50, 0, 1200);
+  insert into payout_templates (club_id, name, tiers, rounding)
+  values (v_b, 'P', '[{"min_entries":2,"max_entries":99,"percentages":[100]}]'::jsonb, 100)
+  returning id into v_pay;
+  insert into tournaments (club_id, payout_template_id, structure_id, name, scheduled_at,
+                           status, player_visibility, buyin_cents, fee_cents,
+                           starting_stack, max_reentries)
+  values (v_b, v_pay, v_struct, 'Avond bij B', now(), 'running'::tournament_status,
+          'public'::visibility, 2000, 0, 20000, 0)
+  returning id into v_tour;
+
+  -- 1 --- Hij bestaat al bij club A en komt voor het eerst bij club B.
+  insert into players (display_name, email, link_state)
+  values ('Reiziger', 'reiziger@t33.be', 'invited') returning id into v_p;
+  insert into club_players (club_id, player_id) values (v_a, v_p);
+
+  perform public.floor_add_entry(v_tour, null, 'Reiziger', 'reiziger@t33.be');
+
+  select count(*) into v_n from player_invites where club_id = v_b and player_id = v_p;
+  if v_n <> 1 then
+    raise exception 'FOUT: club B zette % uitnodigingen klaar voor een bestaand profiel', v_n;
+  end if;
+  raise notice 'OK  een bestaand profiel dat hier voor het eerst komt krijgt wel een uitnodiging';
+
+  -- 2 --- Nog eens toevoegen mag er geen tweede opleveren. Twee keer dezelfde
+  --       mail is erger dan geen mail.
+  select token into v_tok from player_invites where club_id = v_b and player_id = v_p;
+  update player_invites set sent_at = now() where token = v_tok;
+  perform public.floor_add_entry(v_tour, v_p);
+
+  select count(*) into v_n from player_invites where club_id = v_b and player_id = v_p;
+  if v_n <> 1 then raise exception 'FOUT: er staan nu % uitnodigingen; hij krijgt dubbel post', v_n; end if;
+  raise notice 'OK  opnieuw toevoegen levert geen tweede uitnodiging op';
+
+  -- 3 --- Maar een verlopen uitnodiging bij iemand die nog altijd geen account
+  --       heeft, mag wél vernieuwd worden. Anders komt er nooit meer iets.
+  update player_invites set expires_at = now() - interval '1 day' where token = v_tok;
+  perform public.floor_add_entry(v_tour, v_p);
+
+  select count(*) into v_n from player_invites
+  where club_id = v_b and player_id = v_p and expires_at > now() and accepted_at is null;
+  if v_n <> 1 then raise exception 'FOUT: na het verlopen kwam er geen nieuwe (% open)', v_n; end if;
+  raise notice 'OK  een verlopen uitnodiging wordt vernieuwd bij wie nog geen account heeft';
+
+  -- 4 --- En wie zijn account intussen heeft, krijgt niets meer.
+  delete from player_invites where club_id = v_b and player_id = v_p;
+  insert into auth.users (email) values ('reiziger@t33.be') returning id into v_uid;
+  update players set auth_user_id = v_uid, link_state = 'claimed' where id = v_p;
+
+  perform public.floor_add_entry(v_tour, v_p);
+  select count(*) into v_n from player_invites where club_id = v_b and player_id = v_p;
+  if v_n <> 0 then raise exception 'FOUT: iemand met een account kreeg toch een uitnodiging'; end if;
+  raise notice 'OK  wie zijn account al heeft krijgt geen uitnodiging meer';
+
+  -- 5 --- Zonder mailadres is er niets om naartoe te sturen.
+  v_tp := public.floor_add_entry(v_tour, null, 'Geen Adres', null, 'wilde niet');
+  select tp.player_id into v_p from tournament_players tp where tp.id = v_tp;
+  select count(*) into v_n from player_invites where player_id = v_p;
+  if v_n <> 0 then raise exception 'FOUT: uitnodiging aangemaakt zonder mailadres'; end if;
+  raise notice 'OK  zonder mailadres komt er geen uitnodiging';
+end $$;
+rollback;

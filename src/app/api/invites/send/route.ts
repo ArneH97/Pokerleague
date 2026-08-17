@@ -186,7 +186,86 @@ async function drain(req: NextRequest) {
     skipped,
     // Er stonden er meer klaar dan er in één ronde passen.
     more: rows.length === BATCH,
+    // Niets gevonden is geen antwoord. Zie de uitleg bij diagnose().
+    ...(rows.length === 0 && !asCron ? { diagnose: await diagnose(supabase) } : {}),
   })
+}
+
+/**
+ * Waarom stond er niets klaar?
+ *
+ * `found: 0` is een slecht antwoord. Het kan drie totaal verschillende dingen
+ * betekenen — er bestaat geen uitnodiging, ze bestaat wel maar is al verstuurd
+ * of afgevinkt, of jouw account mag ze niet zien — en die drie los je elk
+ * anders op. Dit heeft me drie rondes kosten om uit te zoeken met de gebruiker
+ * ertussen; dat hoort de route zelf te vertellen.
+ *
+ * Loopt bewust via `club_invites`, niet via de tabel: die functie is
+ * security definer en laat staf van een club álles zien, ook wat al verstuurd
+ * of afgevinkt is. Precies wat je wil weten als er niets vertrok.
+ */
+interface StaffClub { slug: string; name: string; role: string }
+interface InviteRow {
+  email: string
+  player_name: string
+  sent_at: string | null
+  accepted_at: string | null
+  attempts: number
+  last_error: string | null
+}
+
+async function diagnose(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<Record<string, unknown>> {
+  const { data: staffData } = await supabase.rpc('my_staff_clubs')
+  const staff = (staffData ?? []) as unknown as StaffClub[]
+
+  if (staff.length === 0) {
+    return {
+      reden: 'Dit account is bij geen enkele club owner of admin, dus het ziet geen enkele wachtrij.',
+      staf_bij: [],
+    }
+  }
+
+  const perClub: Record<string, unknown> = {}
+
+  for (const c of staff) {
+    const { data: clubRow } = await supabase
+      .from('clubs').select('id').eq('slug', c.slug).maybeSingle<{ id: string }>()
+    if (!clubRow) continue
+
+    const { data: invData, error } = await supabase.rpc('club_invites', { p_club_id: clubRow.id })
+    if (error) { perClub[c.slug] = { fout: error.message }; continue }
+
+    const rows = (invData ?? []) as unknown as InviteRow[]
+    perClub[c.slug] = {
+      totaal: rows.length,
+      al_verstuurd: rows.filter((r) => r.sent_at).length,
+      afgevinkt: rows.filter((r) => !r.sent_at && r.accepted_at).length,
+      opgegeven: rows.filter((r) => !r.sent_at && !r.accepted_at && r.attempts >= 3).length,
+      laatste: rows.slice(0, 5).map((r) => ({
+        email: r.email,
+        naam: r.player_name,
+        verstuurd: r.sent_at,
+        afgevinkt: r.accepted_at,
+        pogingen: r.attempts,
+        fout: r.last_error,
+      })),
+    }
+  }
+
+  const totaal = Object.values(perClub).reduce<number>(
+    (n, v) => n + (typeof v === 'object' && v !== null && 'totaal' in v ? Number(v.totaal) : 0),
+    0,
+  )
+
+  return {
+    reden: totaal === 0
+      ? 'Er bestaat geen enkele uitnodiging bij je clubs. Ze wordt dus niet aangemaakt — draai migratie 0032.'
+      : 'Er bestaan wel uitnodigingen, maar geen enkele staat nog open. Zie per_club waarom.',
+    staf_bij: staff.map((c) => `${c.slug} (${c.role})`),
+    per_club: perClub,
+  }
 }
 
 /** Vercel Cron roept met GET aan. */
