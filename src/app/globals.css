@@ -183,7 +183,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .pl-ticker {
   display: inline-flex;
   white-space: nowrap;
-  animation: pl-ticker 45s linear infinite;
+  /* De duur wordt in de component gezet, naar de breedte van de rij, zodat
+     een lange ladder niet sneller voorbijkomt dan een korte. */
+  animation: pl-ticker 30s linear infinite;
   will-change: transform;
 }
 

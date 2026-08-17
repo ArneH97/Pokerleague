@@ -112,13 +112,33 @@ export function DealPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [n, prizes])
 
+  /** Wat een bepaald voorstel voor deze zitplaats uitkeert. */
+  function valueOf(col: Col, i: number): number {
+    const s = result.shares[i]
+    if (!s) return 0
+    return col === 'icm' ? (s.icmCents ?? 0) : col === 'chop' ? s.chopCents : even[i] ?? 0
+  }
+
   function pick(col: Col) {
     const next: Record<string, number> = {}
-    result.shares.forEach((s, i) => {
-      next[s.id] = col === 'icm' ? (s.icmCents ?? 0) : col === 'chop' ? s.chopCents : even[i] ?? 0
-    })
+    result.shares.forEach((s, i) => { next[s.id] = valueOf(col, i) })
     setAmounts(next)
   }
+
+  /**
+   * Welk voorstel staat er nu in de akkoord-kolom?
+   *
+   * De floor kan een kolom overnemen of zelf bedragen typen, en bij het
+   * afsluiten moet vastliggen wélke afspraak de tafel gemaakt heeft. Daarom
+   * leiden we dat af uit de bedragen zelf in plaats van te onthouden waar
+   * ooit op geklikt is — dan klopt het ook nog als er achteraf iets is
+   * bijgesteld.
+   */
+  const agreedCol: Col | 'custom' =
+    (['icm', 'chop', 'even'] as Col[]).find((col) =>
+      result.shares.length > 0 &&
+      result.shares.every((s, i) => (amounts[s.id] ?? 0) === valueOf(col, i)),
+    ) ?? 'custom'
 
   async function saveStacks() {
     setBusy(true)
@@ -144,8 +164,12 @@ export function DealPanel({
     setStep('propose')
   }
 
-  async function project() {
-    setBusy(true)
+  /**
+   * Het voorstel wegschrijven. Geeft terug of het gelukt is, zodat afsluiten
+   * eerst de akkoord-bedragen kan vastzetten en pas daarna de deal bevestigt
+   * — anders sluit de database af op wat er stond vóór de laatste keuze.
+   */
+  async function saveDeal(): Promise<boolean> {
     setError(null)
     const shares = seats.map((s, i) => {
       const share = result.shares[i]
@@ -167,8 +191,14 @@ export function DealPanel({
       p_method: method,
       p_shares: shares,
     })
-    if (err) setError(err.message)
-    else setOpenDeal(true)
+    if (err) { setError(err.message); return false }
+    setOpenDeal(true)
+    return true
+  }
+
+  async function project() {
+    setBusy(true)
+    await saveDeal()
     setBusy(false)
   }
 
@@ -182,6 +212,8 @@ export function DealPanel({
 
   async function accept() {
     setBusy(true)
+    // Eerst de gekozen bedragen vastleggen, dan pas afsluiten.
+    if (!(await saveDeal())) { setBusy(false); return }
     const { error: err } = await supabase.rpc('deal_accept', { p_tournament_id: tournamentId })
     if (err) { setError(err.message); setBusy(false); return }
     setBusy(false)
@@ -447,37 +479,87 @@ export function DealPanel({
 
         <span className="flex-1" />
 
-        {openDeal && (
-          confirming ? (
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void accept()}
-                className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
-              >
-                {t('players.finishYes')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="rounded-lg border border-[var(--line-strong)] px-3 py-2 text-sm"
-              >
-                {t('common.cancel')}
-              </button>
-            </>
-          ) : (
+        {openDeal && !confirming && (
+          <button
+            type="button"
+            disabled={busy || !sumOk}
+            onClick={() => setConfirming(true)}
+            className="rounded-lg border border-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--brand)] transition hover:bg-[color-mix(in_oklab,var(--brand)_12%,transparent)] disabled:opacity-40"
+          >
+            {t('deal.accept')}
+          </button>
+        )}
+      </div>
+
+      {/* Afsluiten legt geld vast, dus hier hoort geen kale ja/nee-vraag.
+          Er staan drie voorstellen op het zaalscherm; welk daarvan de tafel
+          heeft afgesproken weet alleen de floor. Dat wordt hier gekozen, en
+          pas daarna gaat het tornooi dicht. */}
+      {openDeal && confirming && (
+        <div className="mt-4 rounded-xl border border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_7%,transparent)] p-4">
+          <p className="text-sm font-medium">{t('deal.whichAgreed')}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">{t('deal.whichHint')}</p>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {(['icm', 'chop', 'even'] as Col[]).map((col) => {
+              const available = col === 'even' ? true : counted && (col !== 'icm' || result.icmAvailable)
+              const active = agreedCol === col
+              return (
+                <button
+                  key={col}
+                  type="button"
+                  disabled={busy || !available}
+                  onClick={() => pick(col)}
+                  className={`rounded-lg border px-3 py-2 text-left transition disabled:opacity-30 ${
+                    active
+                      ? 'border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_16%,transparent)]'
+                      : 'border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                  }`}
+                >
+                  <span className="block text-sm font-medium">
+                    {active ? '● ' : '○ '}
+                    {col === 'icm' ? t('deal.icm') : col === 'chop' ? t('deal.chop') : t('deal.even')}
+                  </span>
+                  <span className="mt-0.5 block tabular-nums text-xs text-[var(--text-muted)]">
+                    {seats.map((_, i) => formatMoney(valueOf(col, i), currency)).join(' · ')}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {agreedCol === 'custom' && (
+            <p className="mt-3 rounded-lg border border-[var(--line-strong)] px-3 py-2 text-xs text-[var(--text-muted)]">
+              ● {t('deal.custom')} — {seats.map((s) => formatMoney(amounts[s.id] ?? 0, currency)).join(' · ')}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={busy || !sumOk}
-              onClick={() => setConfirming(true)}
-              className="rounded-lg border border-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--brand)] transition hover:bg-[color-mix(in_oklab,var(--brand)_12%,transparent)] disabled:opacity-40"
+              onClick={() => void accept()}
+              className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
             >
-              {t('deal.accept')}
+              {t('deal.confirmAgreed')}
+              {' — '}
+              {agreedCol === 'icm' ? t('deal.icm')
+                : agreedCol === 'chop' ? t('deal.chop')
+                : agreedCol === 'even' ? t('deal.even')
+                : t('deal.custom')}
             </button>
-          )
-        )}
-      </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setConfirming(false)}
+              className="rounded-lg border border-[var(--line-strong)] px-3 py-2 text-sm"
+            >
+              {t('common.cancel')}
+            </button>
+            {!sumOk && <span className="text-xs text-[var(--danger)]">{t('deal.mismatch')}</span>}
+          </div>
+        </div>
+      )}
     </Panel>
   )
 }

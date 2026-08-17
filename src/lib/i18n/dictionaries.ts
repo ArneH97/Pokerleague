@@ -477,6 +477,10 @@ const nl = {
   'deal.showing': 'Staat op het zaalscherm',
   'deal.take': 'Van het scherm halen',
   'deal.accept': 'Iedereen akkoord — tornooi afsluiten',
+  'deal.whichAgreed': 'Welk voorstel heeft de tafel afgesproken?',
+  'deal.whichHint':
+    'Er staan meerdere voorstellen op het zaalscherm. Kies welke er uitbetaald wordt; dat bedrag komt in de uitslag.',
+  'deal.confirmAgreed': 'Afsluiten op',
   'deal.total': 'Totaal',
   'deal.mismatch': 'De bedragen tellen niet op tot wat er te verdelen valt.',
   'deal.difference': 'Verschil',
@@ -978,6 +982,10 @@ const fr: Record<Key, string> = {
   'deal.showing': 'Affiché sur l’écran de salle',
   'deal.take': 'Retirer de l’écran',
   'deal.accept': 'Tout le monde d’accord — clôturer',
+  'deal.whichAgreed': 'Quelle proposition la table a-t-elle acceptée ?',
+  'deal.whichHint':
+    'Plusieurs propositions sont à l’écran. Choisissez celle qui sera payée ; ce montant figurera dans le classement.',
+  'deal.confirmAgreed': 'Clôturer sur',
   'deal.total': 'Total',
   'deal.mismatch': 'Les montants ne correspondent pas à ce qu’il y a à partager.',
   'deal.difference': 'Écart',
@@ -1476,6 +1484,10 @@ const en: Record<Key, string> = {
   'deal.showing': 'On the hall screen',
   'deal.take': 'Take off the screen',
   'deal.accept': 'Everyone agrees — finish the tournament',
+  'deal.whichAgreed': 'Which proposal did the table agree on?',
+  'deal.whichHint':
+    'More than one proposal is on the hall screen. Pick the one being paid out; that is the amount that goes into the result.',
+  'deal.confirmAgreed': 'Finish on',
   'deal.total': 'Total',
   'deal.mismatch': 'The amounts do not add up to what there is to share.',
   'deal.difference': 'Difference',

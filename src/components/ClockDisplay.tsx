@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { resolveClock, formatDuration, averageStack, breakLabel } from '@/lib/tournament/clock'
 import { expectedChipsInPlay, formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
@@ -391,28 +391,12 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             background: `linear-gradient(90deg, transparent, ${accent}0f 20%, ${accent}0f 80%, transparent)`,
           }}
         >
-          {/* Twee identieke reeksen achter elkaar: als de eerste eruit loopt
-              staat de tweede precies op zijn plaats. */}
-          <div className="pl-ticker">
-            {[0, 1].map((copy) => (
-              <span key={copy} className="inline-flex shrink-0 items-baseline">
-                <span
-                  className="px-[2vw] text-[1.7vh] font-semibold uppercase tracking-[0.3em]"
-                  style={{ color: accent }}
-                >
-                  {t('payout.title')}
-                </span>
-                {prizes.map((cents, i) => (
-                  <span key={i} className="inline-flex items-baseline gap-[0.6vw] px-[1.6vw]">
-                    <span className="text-[1.9vh] text-[var(--text-faint)]">{i + 1}</span>
-                    <span className="tnum text-[2.8vh] font-bold">
-                      {formatMoney(cents, club?.currency ?? 'EUR')}
-                    </span>
-                  </span>
-                ))}
-              </span>
-            ))}
-          </div>
+          <PrizeTicker
+            accent={accent}
+            label={t('payout.title')}
+            prizes={prizes}
+            currency={club?.currency ?? 'EUR'}
+          />
         </div>
       )}
 
@@ -545,6 +529,84 @@ function BlindChip({
       >
         {value.toLocaleString('nl-BE')}
       </p>
+    </div>
+  )
+}
+
+/**
+ * De prijzenladder onderaan het zaalscherm.
+ *
+ * Schuiven doet hij alleen als het moet. Een ladder van drie plaatsen past
+ * ruim op een beamer, en dan is bewegende tekst puur storend — bovendien
+ * stonden de twee kopieën die het naadloos rondlopen mogelijk maken dan
+ * allebei tegelijk in beeld, en las de zaal alles dubbel.
+ *
+ * Vandaar dat we meten. Past de rij, dan staat ze stil en gecentreerd, één
+ * keer. Past ze niet, dan komt de tweede kopie erbij en begint het schuiven,
+ * met een snelheid van ongeveer 90 pixels per seconde zodat een lange ladder
+ * niet sneller voorbijkomt dan een korte — leesbaar blijft leesbaar.
+ */
+function PrizeTicker({
+  accent, label, prizes, currency,
+}: { accent: string; label: string; prizes: number[]; currency: string }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const runRef = useRef<HTMLSpanElement>(null)
+  const [scroll, setScroll] = useState(false)
+  const [seconds, setSeconds] = useState(30)
+
+  useEffect(() => {
+    const box = boxRef.current
+    const run = runRef.current
+    if (!box || !run) return
+
+    const measure = () => {
+      const need = run.scrollWidth
+      const have = box.clientWidth
+      const over = need > have + 8
+      setScroll(over)
+      if (over) setSeconds(Math.max(12, Math.round(need / 90)))
+    }
+
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(box)
+    ro.observe(run)
+    return () => ro.disconnect()
+    // Opnieuw meten als de ladder of de taal verandert: dan wordt de rij
+    // langer of korter en kan het antwoord omslaan.
+  }, [prizes, label, currency])
+
+  const run = (key: number, ref?: React.Ref<HTMLSpanElement>) => (
+    <span key={key} ref={ref} className="inline-flex shrink-0 items-baseline">
+      <span
+        className="px-[2vw] text-[1.7vh] font-semibold uppercase tracking-[0.3em]"
+        style={{ color: accent }}
+      >
+        {label}
+      </span>
+      {prizes.map((cents, i) => (
+        <span key={i} className="inline-flex items-baseline gap-[0.6vw] px-[1.6vw]">
+          <span className="text-[1.9vh] text-[var(--text-faint)]">{i + 1}</span>
+          <span className="tnum text-[2.8vh] font-bold">{formatMoney(cents, currency)}</span>
+        </span>
+      ))}
+    </span>
+  )
+
+  return (
+    <div
+      ref={boxRef}
+      className={scroll ? 'overflow-hidden' : 'flex justify-center overflow-hidden'}
+    >
+      <div
+        className={scroll ? 'pl-ticker' : 'inline-flex whitespace-nowrap'}
+        style={scroll ? { animationDuration: `${seconds}s` } : undefined}
+      >
+        {run(0, runRef)}
+        {/* Tweede kopie alleen bij het schuiven: als de eerste eruit loopt
+            staat deze precies op zijn plaats, en is er geen sprong te zien. */}
+        {scroll && run(1)}
+      </div>
     </div>
   )
 }

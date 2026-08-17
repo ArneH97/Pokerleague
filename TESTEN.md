@@ -24,9 +24,10 @@ de losse migraties die je nog niet had, in volgorde:
 0017_payouts.sql            prijzenverdeling door de floor + bubbel
 0018_deal_even.sql          even split, en de ladder mag iedereen zien
 0019_round_euros.sql        alles in hele euro's
+0020_stop_clock_on_finish.sql  de klok stopt zodra het tornooi dicht is
 ```
 
-Alle twaalf zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
+Alle dertien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
 na elkaar over een gevulde database gehaald. Weet je niet meer waar je stond,
 draai ze dan gewoon allemaal.
 
@@ -106,8 +107,13 @@ Onderaan zie je het getelde totaal naast wat er in spel hoort te zijn. Tussen
 
 **Voorstellen.** ICM, chipchop en even split naast elkaar. Klik op een kolomkop
 om die over te nemen, of typ zelf iets. Met de vinkjes kies je wat de zaal te
-zien krijgt — alle drie tegelijk mag. Bij akkoord sluit het tornooi af met die
-bedragen; de punten blijven van de eindstand.
+zien krijgt — alle drie tegelijk mag.
+
+Bij **Iedereen akkoord** vraagt hij eerst wélk voorstel de tafel afgesproken
+heeft, met de bedragen erbij. Staan er drie op het scherm, dan is dat de enige
+plek waar dat vastgelegd wordt. Pas na die keuze sluit het tornooi af — met die
+bedragen in de uitslag; de punten blijven van de eindstand. En de klok stopt:
+een afgesloten tornooi kan geen lopende klok meer hebben.
 
 Even split heeft geen telling nodig: dat is de resterende pot gedeeld door het
 aantal spelers. Daar staat een aparte knop voor op het telscherm.
@@ -130,6 +136,9 @@ laatste twaalf maanden).
 hoeveel tijd er al opgebouwd was. De resterende tijd is een berekening tegen
 servertijd. Daarom overleeft hij een refresh, een tweede scherm en een laptop
 die in slaap valt — en loopt hij gewoon door als niemand doorklikt.
+
+Een afgelopen tornooi heeft een stilstaande klok — dat is een regel op de
+tabel zelf, niet iets waar elke afsluitroute apart aan moet denken.
 
 Doorrollen gebeurt op die opgebouwde tijd, niet op de wandklok. Een pauze van
 een uur schuift dus nooit een level op — de opgebouwde tijd staat stil. Maar
@@ -166,8 +175,8 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
 - [ ] Geluid aanzetten en één level laten aflopen — piep, drieklank, gesproken
       blinds.
 - [ ] Volledig scherm aan en met Escape er weer uit.
-- [ ] Onderaan het zaalscherm hoort de prijzenladder als lopende balk te blijven
-      schuiven, zonder weg te gaan.
+- [ ] Onderaan het zaalscherm staat de prijzenladder. Past hij op het scherm,
+      dan staat hij stil en gecentreerd; is hij te lang, dan schuift hij door.
 - [ ] Voeg een speler toe die al lid is, en daarna één met een nieuw mailadres.
 - [ ] Probeer iemand toe te voegen zonder mailadres — hij hoort een reden te
       vragen.
@@ -180,7 +189,8 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
       Alle bedragen horen ronde euro's te zijn en op te tellen tot € 320.
 - [ ] Deal: tel de stapels (probeer eens een totaal ver naast de waarheid — hij
       hoort te weigeren), bekijk de drie voorstellen, zet ze alle drie op het
-      zaalscherm, en sluit af.
+      zaalscherm, en sluit af. Hij hoort te vragen welk voorstel het geworden
+      is, en de klok hoort daarna stil te staan.
 - [ ] Bekijk de uitslag en daarna het klassement, het ledenbestand en de cijfers.
 - [ ] Ledenbestand: vul het mailadres aan van Marcel Vandeputte.
 
