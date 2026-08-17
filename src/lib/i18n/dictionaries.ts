@@ -303,7 +303,7 @@ const nl = {
   // Spelersbeheer aan de floor
   'players.title': 'Spelers',
   'players.add': 'Speler toevoegen',
-  'players.searchPlaceholder': 'Naam zoeken of nieuwe speler typen',
+  'players.searchPlaceholder': 'Naam of mailadres zoeken, of een nieuwe naam typen',
   'players.addNew': 'toevoegen als nieuwe speler',
   'players.noMatches': 'Geen lid met die naam',
   'players.alreadyIn': 'zit al aan tafel',
@@ -327,6 +327,19 @@ const nl = {
   'players.isFinished': 'Dit tornooi is afgelopen.',
   'players.reentriesShort': 're',
   'players.entriesTotal': 'inkopen',
+  'players.newTitle': 'Nieuwe speler',
+  'players.name': 'Naam',
+  'players.emailHint':
+    'Dit is de sleutel: dezelfde speler bij een andere club is dan dezelfde speler. Hij krijgt een uitnodiging om zijn profiel aan te vullen.',
+  'players.noEmail': 'Geen mailadres?',
+  'players.reasonLabel': 'Waarom niet?',
+  'players.reasonRefused': 'Wil het niet geven',
+  'players.reasonUnknown': 'Kent het niet uit het hoofd',
+  'players.reasonNone': 'Heeft geen mailadres',
+  'players.reasonOther': 'Andere reden',
+  'players.addAnyway': 'Toch toevoegen zonder',
+  'players.addConfirm': 'Toevoegen',
+  'players.noEmailBadge': 'geen mail',
 } as const
 
 export type Key = keyof typeof nl
@@ -600,7 +613,7 @@ const fr: Record<Key, string> = {
 
   'players.title': 'Joueurs',
   'players.add': 'Ajouter un joueur',
-  'players.searchPlaceholder': 'Chercher un nom ou en saisir un nouveau',
+  'players.searchPlaceholder': 'Chercher un nom ou un e-mail, ou saisir un nouveau nom',
   'players.addNew': 'ajouter comme nouveau joueur',
   'players.noMatches': 'Aucun membre à ce nom',
   'players.alreadyIn': 'est déjà à table',
@@ -624,6 +637,19 @@ const fr: Record<Key, string> = {
   'players.isFinished': 'Ce tournoi est terminé.',
   'players.reentriesShort': 're',
   'players.entriesTotal': 'entrées',
+  'players.newTitle': 'Nouveau joueur',
+  'players.name': 'Nom',
+  'players.emailHint':
+    'C’est la clé : le même joueur dans un autre club reste le même joueur. Il recevra une invitation pour compléter son profil.',
+  'players.noEmail': 'Pas d’e-mail ?',
+  'players.reasonLabel': 'Pourquoi pas ?',
+  'players.reasonRefused': 'Ne veut pas le donner',
+  'players.reasonUnknown': 'Ne le connaît pas par cœur',
+  'players.reasonNone': 'N’a pas d’e-mail',
+  'players.reasonOther': 'Autre raison',
+  'players.addAnyway': 'Ajouter quand même',
+  'players.addConfirm': 'Ajouter',
+  'players.noEmailBadge': 'sans e-mail',
 }
 
 const en: Record<Key, string> = {
@@ -895,7 +921,7 @@ const en: Record<Key, string> = {
 
   'players.title': 'Players',
   'players.add': 'Add player',
-  'players.searchPlaceholder': 'Search a name or type a new one',
+  'players.searchPlaceholder': 'Search a name or e-mail, or type a new name',
   'players.addNew': 'add as a new player',
   'players.noMatches': 'No member by that name',
   'players.alreadyIn': 'is already at the table',
@@ -919,6 +945,19 @@ const en: Record<Key, string> = {
   'players.isFinished': 'This tournament has finished.',
   'players.reentriesShort': 're',
   'players.entriesTotal': 'entries',
+  'players.newTitle': 'New player',
+  'players.name': 'Name',
+  'players.emailHint':
+    'This is the key: the same player at another club stays the same player. They get an invitation to complete their profile.',
+  'players.noEmail': 'No e-mail address?',
+  'players.reasonLabel': 'Why not?',
+  'players.reasonRefused': 'Does not want to give it',
+  'players.reasonUnknown': 'Does not know it by heart',
+  'players.reasonNone': 'Has no e-mail',
+  'players.reasonOther': 'Other reason',
+  'players.addAnyway': 'Add without it anyway',
+  'players.addConfirm': 'Add',
+  'players.noEmailBadge': 'no e-mail',
 }
 
 export const dictionaries: Record<Locale, Record<Key, string>> = { nl, fr, en }

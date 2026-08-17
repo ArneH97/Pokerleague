@@ -40,6 +40,8 @@ export function FloorPlayers({
   const [actionError, setActionError] = useState<string | null>(null)
   const [killing, setKilling] = useState<string | null>(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
+  /** Het tweede scherm bij een onbekende speler: naam plus mailadres. */
+  const [draft, setDraft] = useState<{ name: string; email: string } | null>(null)
 
   const active = players
     .filter((p) => p.status === 'active' || p.status === 'registered')
@@ -50,13 +52,20 @@ export function FloorPlayers({
 
   const inTournament = new Set(players.map((p) => p.playerId))
   const needle = query.trim().toLowerCase()
+  // Zoeken op naam én op mailadres. Aan de deur zegt iemand zijn naam, dus
+  // dat is het gewone geval — maar met twee keer een Jan Peeters in het
+  // bestand is het mailadres het enige waarmee je ze uit elkaar houdt.
   const matches = needle
     ? members
-        .filter((m) => m.name.toLowerCase().includes(needle))
+        .filter((m) =>
+          m.name.toLowerCase().includes(needle) ||
+          (m.email ?? '').toLowerCase().includes(needle))
         .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
         .slice(0, 6)
     : []
-  const exactMatch = members.some((m) => m.name.toLowerCase() === needle)
+  const exactMatch = members.some(
+    (m) => m.name.toLowerCase() === needle || (m.email ?? '').toLowerCase() === needle,
+  )
 
   // PromiseLike en niet Promise: de bouwers van supabase-js zijn "thenables"
   // die pas een echt verzoek doen zodra je erop wacht.
@@ -82,10 +91,14 @@ export function FloorPlayers({
     }))
   }
 
-  async function addNew(name: string) {
+  async function addNew(name: string, email: string | null, reason: string | null) {
+    setDraft(null)
     setQuery('')
     await run(() => supabase.rpc('floor_add_entry', {
-      p_tournament_id: tournamentId, p_new_name: name,
+      p_tournament_id: tournamentId,
+      p_new_name: name,
+      p_email: email,
+      p_no_email_reason: reason,
     }))
   }
 
@@ -178,14 +191,19 @@ export function FloorPlayers({
                 </li>
               )}
 
-              {/* Iemand die er voor het eerst is, staat nergens in. Eén klik
-                  en hij zit aan tafel — een account komt later maar wel. */}
+              {/* Iemand die er voor het eerst is, staat nergens in. Dan komt
+                  er één scherm bij, want zonder mailadres kunnen we hem
+                  volgend seizoen niet terugvinden. */}
               {!exactMatch && (
                 <li className="border-t border-[var(--line)]">
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => void addNew(query.trim())}
+                    onClick={() => setDraft(
+                      looksLikeEmail(query)
+                        ? { name: '', email: query.trim() }
+                        : { name: query.trim(), email: '' },
+                    )}
                     className="w-full px-4 py-3 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
                   >
                     <span className="font-medium text-[var(--brand)]">＋ {query.trim()}</span>{' '}
@@ -196,6 +214,15 @@ export function FloorPlayers({
             </ul>
           )}
         </div>
+      )}
+
+      {draft && (
+        <NewPlayerForm
+          draft={draft}
+          busy={busy}
+          onCancel={() => setDraft(null)}
+          onSubmit={(name, email, reason) => void addNew(name, email, reason)}
+        />
       )}
 
       {actionError && (
@@ -220,6 +247,14 @@ export function FloorPlayers({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="min-w-0 flex-1 truncate font-medium">
                   {p.name}
+                  {/* Zonder mailadres kan je hem volgend seizoen niet
+                      terugvinden. Hier staan zodat je het na de avond
+                      alsnog kan aanvullen. */}
+                  {p.email === null && (
+                    <span className="ml-2 rounded px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-[var(--warn)] ring-1 ring-[color-mix(in_oklab,var(--warn)_35%,transparent)]">
+                      {t('players.noEmailBadge')}
+                    </span>
+                  )}
                   {p.reentriesUsed > 0 && (
                     <span className="ml-2 text-xs text-[var(--text-faint)]">
                       {p.reentriesUsed}× {t('players.reentriesShort')}
@@ -356,6 +391,145 @@ export function FloorPlayers({
   )
 }
 
+/** Ruwe controle, alleen om te raden of iemand een adres of een naam typte. */
+function looksLikeEmail(v: string): boolean {
+  return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v.trim())
+}
+
+/**
+ * Het tweede scherm bij een speler die er voor het eerst is.
+ *
+ * Het mailadres staat hier niet voor de vorm: het is de enige sleutel die
+ * over clubs heen werkt. Zonder adres is dezelfde man bij Cutoff en bij een
+ * tweede club twee spelers met elk een halve historie, en dat krijg je later
+ * alleen nog met de hand recht.
+ *
+ * Toch is het niet hard verplicht. Wie iemand niet ingeschreven krijgt omdat
+ * die zijn adres niet uit het hoofd kent, typt binnen de kortste keren
+ * jan@jan.be — en een vervuilde sleutel is erger dan een ontbrekende. Wie
+ * overslaat moet wel zeggen waarom, zodat je die spelers achteraf terugvindt.
+ */
+function NewPlayerForm({
+  draft, busy, onCancel, onSubmit,
+}: {
+  draft: { name: string; email: string }
+  busy: boolean
+  onCancel: () => void
+  onSubmit: (name: string, email: string | null, reason: string | null) => void
+}) {
+  const t = useT()
+  const [name, setName] = useState(draft.name)
+  const [email, setEmail] = useState(draft.email)
+  const [reason, setReason] = useState<string | null>(null)
+  const [askingReason, setAskingReason] = useState(false)
+
+  const reasons = [
+    t('players.reasonUnknown'),
+    t('players.reasonRefused'),
+    t('players.reasonNone'),
+  ]
+
+  const nameOk = name.trim() !== ''
+  const emailOk = looksLikeEmail(email)
+
+  return (
+    <div className="rounded-xl border border-[var(--brand)] bg-[var(--surface)] p-4">
+      <p className="mb-3 text-xs uppercase tracking-widest text-[var(--text-faint)]">
+        {t('players.newTitle')}
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs text-[var(--text-muted)]">{t('players.name')}</span>
+          <input
+            autoFocus={draft.name === ''}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 outline-none focus:border-[var(--brand)]"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-[var(--text-muted)]">{t('common.email')}</span>
+          <input
+            autoFocus={draft.name !== ''}
+            type="email"
+            inputMode="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && nameOk && emailOk && !busy) {
+                onSubmit(name.trim(), email.trim(), null)
+              }
+            }}
+            className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 outline-none focus:border-[var(--brand)]"
+          />
+        </label>
+      </div>
+
+      <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
+        {t('players.emailHint')}
+      </p>
+
+      {askingReason ? (
+        <div className="mt-3 rounded-lg bg-[var(--surface-2)] p-3">
+          <p className="mb-2 text-xs uppercase tracking-widest text-[var(--text-faint)]">
+            {t('players.reasonLabel')}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {reasons.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setReason(r)}
+                className={`rounded-lg border px-2.5 py-1.5 text-sm transition ${
+                  reason === r
+                    ? 'border-[var(--brand)] bg-[var(--brand)] text-[var(--on-brand)]'
+                    : 'border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <input
+            placeholder={t('players.reasonOther')}
+            value={reasons.includes(reason ?? '') ? '' : (reason ?? '')}
+            onChange={(e) => setReason(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Primary
+              disabled={busy || !nameOk || (reason ?? '').trim() === ''}
+              onClick={() => onSubmit(name.trim(), null, (reason ?? '').trim())}
+            >
+              {t('players.addAnyway')}
+            </Primary>
+            <Small onClick={() => { setAskingReason(false); setReason(null) }}>
+              {t('common.cancel')}
+            </Small>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Primary
+            disabled={busy || !nameOk || !emailOk}
+            onClick={() => onSubmit(name.trim(), email.trim(), null)}
+          >
+            {t('players.addConfirm')}
+          </Primary>
+          <Small onClick={() => setAskingReason(true)} disabled={busy}>
+            {t('players.noEmail')}
+          </Small>
+          <Small onClick={onCancel} disabled={busy}>{t('common.cancel')}</Small>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /**
  * Chipcount die pas wegschrijft als je klaar bent met typen.
  *
@@ -390,6 +564,21 @@ function ChipInput({
       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
       className="tnum w-24 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-right text-sm outline-none focus:border-[var(--brand)] disabled:opacity-45"
     />
+  )
+}
+
+function Primary({
+  children, onClick, disabled,
+}: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </button>
   )
 }
 

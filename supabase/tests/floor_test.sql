@@ -30,7 +30,9 @@ begin
 
   -- ---------------------------------------------------------------- toevoegen
   for i in 1 .. 6 loop
-    v_tp := public.floor_add_entry(v_tour, null, format('Speler %s', i));
+    v_tp := public.floor_add_entry(
+      v_tour, null, format('Speler %s', i),
+      format('speler%s-%s@test.be', i, substr(gen_random_uuid()::text, 1, 8)));
     v_tps := v_tps || v_tp;
   end loop;
 
@@ -129,12 +131,12 @@ begin
   values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Afgeschermd') returning id into v_club;
   insert into tournaments (club_id, name, scheduled_at, status)
   values (v_club, 'X', now(), 'running') returning id into v_tour;
-  v_tp := public.floor_add_entry(v_tour, null, 'Iemand');
+  v_tp := public.floor_add_entry(v_tour, null, 'Iemand', null, 'test');
 
   perform set_config('request.jwt.claim.role', 'authenticated', true);
   perform set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
 
-  begin perform public.floor_add_entry(v_tour, null, 'Indringer');
+  begin perform public.floor_add_entry(v_tour, null, 'Indringer', null, 'test');
   exception when insufficient_privilege then v_geweigerd := v_geweigerd + 1; end;
 
   begin perform public.floor_eliminate(v_tp, null);
@@ -151,6 +153,95 @@ begin
 
   assert v_geweigerd = 4, format('verwacht 4 weigeringen, kreeg %s', v_geweigerd);
   raise notice 'rechten OK: 4 van 4 handelingen geweigerd voor een buitenstaander';
+end $$;
+
+
+-- ---------------------------------------------------------------------------
+-- Het mailadres als sleutel bij een nieuwe speler
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_club1 uuid; v_club2 uuid; v_t1 uuid; v_t2 uuid;
+  v_tp uuid; v_tp2 uuid; v_p1 uuid; v_p2 uuid;
+  v_mail text := 'jan-' || substr(gen_random_uuid()::text, 1, 8) || '@voorbeeld.be';
+  v_geweigerd int := 0; v_n int;
+begin
+  insert into clubs (slug, name, compliance)
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Mailclub A',
+          jsonb_build_object('enforce','off'))
+  returning id into v_club1;
+  insert into clubs (slug, name, compliance)
+  values ('t-' || substr(gen_random_uuid()::text, 1, 12), 'Mailclub B',
+          jsonb_build_object('enforce','off'))
+  returning id into v_club2;
+
+  insert into tournaments (club_id, name, scheduled_at, status, buyin_cents, starting_stack)
+  values (v_club1, 'A', now(), 'running', 2000, 20000) returning id into v_t1;
+  insert into tournaments (club_id, name, scheduled_at, status, buyin_cents, starting_stack)
+  values (v_club2, 'B', now(), 'running', 2000, 20000) returning id into v_t2;
+
+  -- Zonder mailadres én zonder reden gaat het niet door.
+  begin
+    perform public.floor_add_entry(v_t1, null, 'Naamloos');
+  exception when check_violation then v_geweigerd := v_geweigerd + 1;
+  end;
+  assert v_geweigerd = 1, 'toevoegen zonder mailadres en zonder reden hoort te falen';
+
+  -- Een adres dat geen adres is, ook niet.
+  begin
+    perform public.floor_add_entry(v_t1, null, 'Fout', 'geen adres');
+  exception when check_violation then v_geweigerd := v_geweigerd + 1;
+  end;
+  assert v_geweigerd = 2, 'een ongeldig mailadres hoort geweigerd te worden';
+
+  -- Met mailadres: speler krijgt de status 'invited' en een uitnodiging.
+  v_tp := public.floor_add_entry(v_t1, null, 'Jan Peeters', upper(v_mail));
+  select player_id into v_p1 from tournament_players where id = v_tp;
+
+  assert (select email from players where id = v_p1) = v_mail,
+    'het mailadres hoort in kleine letters bewaard te worden';
+  assert (select link_state from players where id = v_p1) = 'invited',
+    'een speler met mailadres hoort op invited te staan';
+  select count(*) into v_n from player_invites
+  where player_id = v_p1 and sent_at is null;
+  assert v_n = 1, format('verwacht 1 uitnodiging in de wachtrij, kreeg %s', v_n);
+
+  -- Dezelfde man bij een andere club: hetzelfde profiel, geen tweede.
+  v_tp2 := public.floor_add_entry(v_t2, null, 'Jan P.', v_mail);
+  select player_id into v_p2 from tournament_players where id = v_tp2;
+  assert v_p1 = v_p2, 'hetzelfde mailadres hoorde dezelfde speler op te leveren';
+  assert (select display_name from players where id = v_p1) = 'Jan Peeters',
+    'een bestaande naam mag niet overschreven worden door een tweede club';
+  select count(*) into v_n from club_players where player_id = v_p1;
+  assert v_n = 2, format('speler hoort bij 2 clubs te staan, kreeg %s', v_n);
+
+  -- Zonder mailadres mág, maar dan met een reden.
+  v_tp := public.floor_add_entry(v_t1, null, 'Geen Mail', null, 'kent het niet uit het hoofd');
+  select player_id into v_p2 from tournament_players where id = v_tp;
+  assert (select email from players where id = v_p2) is null, 'er hoort geen adres te staan';
+  assert (select no_email_reason from players where id = v_p2) = 'kent het niet uit het hoofd',
+    'de reden werd niet vastgelegd';
+  assert (select link_state from players where id = v_p2) = 'shadow',
+    'zonder mailadres hoort de speler een schaduwprofiel te zijn';
+  assert (select count(*) from club_players_without_email where player_id = v_p2) >= 0,
+    'de aanvullijst is niet bevraagbaar';
+
+  -- Achteraf alsnog invullen.
+  perform public.set_player_email(v_p2, 'later-' || v_mail, v_club1);
+  assert (select email from players where id = v_p2) = 'later-' || v_mail,
+    'het adres werd niet bijgewerkt';
+  assert (select no_email_reason from players where id = v_p2) is null,
+    'de reden hoort te verdwijnen zodra het adres er is';
+  assert (select link_state from players where id = v_p2) = 'invited',
+    'na het invullen hoort de speler uitgenodigd te zijn';
+
+  -- Blijkt het adres van iemand anders te zijn, dan krijg je die terug in
+  -- plaats van een unieke-index-fout in het gezicht.
+  assert public.set_player_email(v_p2, v_mail, v_club1) = v_p1,
+    'een bestaand adres hoort naar de bestaande speler te wijzen';
+
+  raise notice 'mailadres OK: sleutel over clubs heen, uitweg met reden, aanvullen achteraf';
 end $$;
 
 rollback;

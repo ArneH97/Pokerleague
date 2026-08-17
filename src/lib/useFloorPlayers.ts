@@ -21,11 +21,13 @@ export interface FloorPlayer {
   reentriesUsed: number
   bountiesWon: number
   registeredAt: string
+  email: string | null
 }
 
 export interface ClubMember {
   playerId: string
   name: string
+  email: string | null
 }
 
 interface Row {
@@ -37,12 +39,12 @@ interface Row {
   reentries_used: number
   bounties_won: number
   registered_at: string
-  players: { display_name: string } | null
+  players: { display_name: string; email: string | null } | null
 }
 
 interface MemberRow {
   player_id: string
-  players: { display_name: string } | null
+  players: { display_name: string; email: string | null } | null
 }
 
 export function useFloorPlayers(tournamentId: string, clubId: string) {
@@ -57,13 +59,13 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
       supabase
         .from('tournament_players')
         .select(
-          'id,player_id,status,chip_count,finish_position,reentries_used,bounties_won,registered_at,players(display_name)',
+          'id,player_id,status,chip_count,finish_position,reentries_used,bounties_won,registered_at,players(display_name,email)',
         )
         .eq('tournament_id', tournamentId)
         .overrideTypes<Row[]>(),
       supabase
         .from('club_players')
-        .select('player_id,players(display_name)')
+        .select('player_id,players(display_name,email)')
         .eq('club_id', clubId)
         .overrideTypes<MemberRow[]>(),
     ])
@@ -85,11 +87,16 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
         reentriesUsed: r.reentries_used,
         bountiesWon: r.bounties_won,
         registeredAt: r.registered_at,
+        email: r.players?.email ?? null,
       })),
     )
     setMembers(
       (memberRes.data ?? [])
-        .map((m) => ({ playerId: m.player_id, name: m.players?.display_name ?? '' }))
+        .map((m) => ({
+          playerId: m.player_id,
+          name: m.players?.display_name ?? '',
+          email: m.players?.email ?? null,
+        }))
         .filter((m) => m.name !== ''),
     )
     setError(null)
