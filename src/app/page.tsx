@@ -106,7 +106,7 @@ export default async function Page() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/login"
+                  href="/registreren"
                   className="rounded-full bg-[var(--brand)] px-6 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
                   {t('site.hero.ctaPlayer')}
@@ -136,7 +136,7 @@ export default async function Page() {
               tag={t('site.who.playersTag')}
               title={t('site.who.playersTitle')}
               body={t('site.who.playersBody')}
-              href="/login"
+              href="/registreren"
               cta={t('site.hero.ctaPlayer')}
             />
             <Audience
