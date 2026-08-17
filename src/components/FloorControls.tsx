@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  resolveClock, formatDuration, formatBlinds,
+  resolveClock, formatDuration, formatBlinds, breakLabel,
   start, pause, resume, nextLevel, prevLevel, adjustTime,
   type ClockState,
 } from '@/lib/tournament/clock'
@@ -103,7 +103,7 @@ export function FloorControls({
       <section className="rounded-2xl bg-[var(--surface)] p-6 text-center">
         <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
           {resolved.level?.isBreak
-            ? (resolved.level.label ?? t('clock.break'))
+            ? breakLabel(resolved.level.label, t('clock.break'))
             : `${t('clock.level')} ${resolved.levelIdx + 1} ${t('common.of')} ${levels.length || '—'}`}
         </p>
         <p className="my-2 text-7xl font-bold tabular-nums leading-none">

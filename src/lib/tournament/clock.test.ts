@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   type BlindLevel, type ClockState,
   resolveClock, start, pause, resume, stop, nextLevel, prevLevel,
-  adjustTime, formatDuration, formatBlinds, averageStack,
+  adjustTime, formatDuration, formatBlinds, averageStack, breakLabel,
 } from './clock'
 
 const T0 = Date.parse('2026-09-06T20:00:00.000Z')
@@ -185,6 +185,21 @@ test('gebroken kloktijd verandert niets aan de resterende tijd', () => {
   const a = resolveClock(running(), levels, T0 + 300_000)
   const b = resolveClock(running(), levels, T0 + 300_000.5)
   assert.equal(Math.round(a.remainingMs / 1000), Math.round(b.remainingMs / 1000))
+})
+
+test('pauzelabel volgt de taal van de club, eigen tekst blijft staan', () => {
+  // Een structuur gemaakt in het Nederlands mag geen "Pauze" tonen op een
+  // Engelse klok. Standaardwoorden herkennen we en vervangen we.
+  assert.equal(breakLabel('Pauze', 'Break'), 'Break')
+  assert.equal(breakLabel('pause', 'Break'), 'Break')
+  assert.equal(breakLabel('BREAK', 'Pause'), 'Pause')
+  assert.equal(breakLabel('', 'Break'), 'Break')
+  assert.equal(breakLabel(null, 'Break'), 'Break')
+  assert.equal(breakLabel('   ', 'Break'), 'Break')
+
+  // Een echt eigen label blijft ongemoeid, in welke taal dan ook.
+  assert.equal(breakLabel('Rookpauze', 'Break'), 'Rookpauze')
+  assert.equal(breakLabel('  Souper  ', 'Break'), 'Souper')
 })
 
 test('weergave', () => {

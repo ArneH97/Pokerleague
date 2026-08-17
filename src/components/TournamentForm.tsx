@@ -70,7 +70,6 @@ export function TournamentForm({
   const [structureId, setStructureId] = useState(structures[0]?.id ?? '')
   const [payoutId, setPayoutId] = useState(payouts[0]?.id ?? '')
   const [seasonId, setSeasonId] = useState(seasons[0]?.id ?? '')
-  const [visibility, setVisibility] = useState<'private' | 'members' | 'public'>('members')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,7 +98,11 @@ export function TournamentForm({
         name: name.trim(),
         scheduled_at: new Date(when).toISOString(),
         status: 'scheduled',
-        player_visibility: visibility,
+        // Altijd publiek: elk tornooi hoort op PokerLeague te verschijnen.
+        // Wat een buitenstaander te zien krijgt zijn gebruikersnamen en
+        // klasseringen, nooit persoonsgegevens — dat wordt afgedwongen
+        // door de publieke views in de database, niet hier.
+        player_visibility: 'public',
         buyin_cents: buyinCents,
         fee_cents: feeCents,
         bounty_mode: bountyOn ? 'fixed' : 'none',
@@ -243,18 +246,6 @@ export function TournamentForm({
           </select>
         </Field>
       </div>
-
-      <Field label={t('tour.visibility')}>
-        <select
-          value={visibility}
-          onChange={(e) => setVisibility(e.target.value as typeof visibility)}
-          className={inputClass}
-        >
-          <option value="members">{t('tour.visMembers')}</option>
-          <option value="public">{t('tour.visPublic')}</option>
-          <option value="private">{t('tour.visPrivate')}</option>
-        </select>
-      </Field>
 
       {error && (
         <Notice tone="error">{error}</Notice>

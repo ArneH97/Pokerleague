@@ -8,6 +8,7 @@ import { useT } from '@/lib/i18n/context'
 import {
   generateLadder, makeLevel, nextBlinds, type EditorLevel,
 } from '@/lib/tournament/structure'
+import { isDefaultBreakLabel } from '@/lib/tournament/clock'
 
 /**
  * Blindstructuur bewerken.
@@ -106,7 +107,9 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
       p_structure_id: structureId,
       p_levels: levels.map((l) => ({
         is_break: l.isBreak,
-        label: l.isBreak ? (l.label || t('clock.break')) : null,
+        // Een gewoon pauzewoord slaan we niet op: dan volgt het label
+        // vanzelf de taal van de club in plaats van die van de maker.
+        label: l.isBreak && !isDefaultBreakLabel(l.label) ? l.label.trim() : null,
         small_blind: l.isBreak ? 0 : l.smallBlind,
         big_blind: l.isBreak ? 0 : l.bigBlind,
         ante: l.isBreak ? 0 : l.ante,

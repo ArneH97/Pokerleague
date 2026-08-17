@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { resolveClock, formatDuration, averageStack } from '@/lib/tournament/clock'
+import { resolveClock, formatDuration, averageStack, breakLabel } from '@/lib/tournament/clock'
 import { formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
@@ -126,43 +126,22 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
         />
       </div>
 
-      <header className="relative flex items-center justify-between gap-[3vw] px-[3.5vw] pt-[3.5vh]">
-        <div className="flex min-w-0 items-center gap-[1.6vw]">
-          {club?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={club.logo_url}
-              alt=""
-              className="h-[14vh] w-auto max-w-[22vw] object-contain"
-            />
-          ) : (
-            <div
-              className="grid size-[8vh] shrink-0 place-items-center rounded-[1.6vh] text-[3.6vh] font-bold"
-              style={{ background: accent, color: '#07090c' }}
-            >
-              {(club?.name ?? '?').slice(0, 1)}
-            </div>
-          )}
-          <div className="min-w-0">
-            {/* Bevat het logo de clubnaam al, dan zetten we hem er niet nog
-                eens naast. */}
-            {!club?.logo_url && (
-              <p className="truncate text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
-                {club?.name ?? ''}
-              </p>
-            )}
-            <h1 className="truncate text-[3.6vh] font-semibold tracking-tight">{tournament.name}</h1>
-          </div>
+      <header className="relative flex items-start justify-between gap-[3vw] px-[3.5vw] pt-[3vh]">
+        <div className="min-w-0">
+          <p className="truncate text-[1.8vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
+            {club?.name ?? ''}
+          </p>
+          <h1 className="truncate text-[3.2vh] font-semibold tracking-tight">{tournament.name}</h1>
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
+          <p className="text-[1.8vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
             {isBreak ? t('clock.break') : running ? t('clock.level') : tournament.clock === 'paused' ? t('clock.paused') : t('clock.notStarted')}
           </p>
-          <p className="tnum text-[5.2vh] font-bold leading-none" style={{ color: accent }}>
+          <p className="tnum text-[4.6vh] font-bold leading-none" style={{ color: accent }}>
             {isBreak ? '—' : playIdx}
             {!isBreak && (
-              <span className="text-[2.6vh] font-medium text-[var(--text-faint)]">
+              <span className="text-[2.4vh] font-medium text-[var(--text-faint)]">
                 {' '}/ {playLevels}
               </span>
             )}
@@ -171,12 +150,23 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
       </header>
 
       <section className="relative flex flex-1 flex-col items-center justify-center px-[3vw]">
+        {/* Het logo hoort hier, boven de tijd: dat is waar iedereen in de zaal
+            toch al naar kijkt. */}
+        {club?.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={club.logo_url}
+            alt=""
+            className="mb-[1.5vh] h-[13vh] w-auto max-w-[34vw] object-contain"
+          />
+        ) : null}
+
         {isBreak && (
           <p
             className="mb-[1vh] text-[6.5vh] font-bold uppercase tracking-[0.25em]"
             style={{ color: accent }}
           >
-            {level?.label ?? t('clock.break')}
+            {breakLabel(level?.label, t('clock.break'))}
           </p>
         )}
 
@@ -185,7 +175,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             urgency === 'critical' ? 'animate-pulse' : ''
           }`}
           style={{
-            fontSize: 'min(36vh, 32vw)',
+            fontSize: club?.logo_url ? 'min(30vh, 28vw)' : 'min(36vh, 32vw)',
             color: urgency === 'idle' && !isBreak ? '#ffffff' : accent,
             textShadow: `0 0 9vh ${accent}55`,
           }}
@@ -204,11 +194,24 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
         <p className="mt-[2.5vh] text-[2.5vh] text-[var(--text-faint)]">
           {resolved.nextLevel
             ? resolved.nextLevel.isBreak
-              ? `${t('clock.next')} — ${resolved.nextLevel.label ?? t('clock.break')}`
+              ? `${t('clock.next')} — ${breakLabel(resolved.nextLevel.label, t('clock.break'))}`
               : `${t('clock.next')} — ${resolved.nextLevel.smallBlind.toLocaleString('nl-BE')} / ${resolved.nextLevel.bigBlind.toLocaleString('nl-BE')}`
             : t('clock.lastLevel')}
         </p>
       </section>
+
+      {sound.supported && !sound.enabled && (
+        <div className="relative flex justify-center pb-[1.5vh]">
+          <button
+            type="button"
+            onClick={() => void sound.enable()}
+            className="rounded-full px-[2.5vw] py-[1.2vh] text-[1.8vh] font-semibold shadow-2xl transition hover:brightness-110"
+            style={{ background: accent, color: '#07090c' }}
+          >
+            {t('clock.enableSound')}
+          </button>
+        </div>
+      )}
 
       <LevelPips levels={levels} current={levelIdx} accent={accent} />
 
@@ -240,7 +243,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             style={{ fontSize: 'min(20vh, 15vw)', color: accent }}
           >
             {isBreak
-              ? (level.label ?? t('clock.break'))
+              ? breakLabel(level.label, t('clock.break'))
               : `${level.smallBlind.toLocaleString('nl-BE')} / ${level.bigBlind.toLocaleString('nl-BE')}`}
           </p>
           {!isBreak && level.ante > 0 && (
@@ -249,17 +252,6 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             </p>
           )}
         </div>
-      )}
-
-      {sound.supported && !sound.enabled && (
-        <button
-          type="button"
-          onClick={() => void sound.enable()}
-          className="absolute bottom-[2.5vh] left-1/2 -translate-x-1/2 rounded-full px-[2.5vw] py-[1.4vh] text-[1.9vh] font-semibold shadow-2xl transition hover:brightness-110"
-          style={{ background: accent, color: '#07090c' }}
-        >
-          {t('clock.enableSound')}
-        </button>
       )}
 
       {!live && (

@@ -219,6 +219,27 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+/**
+ * Standaardwoorden voor een pauze, in de talen die we ondersteunen.
+ *
+ * Een label als "Pauze" wordt opgeslagen in de taal waarin de structuur is
+ * gemaakt, en blijft daarna Nederlands staan op een Engelse klok. Herkennen
+ * we het als een gewoon pauzewoord, dan tonen we in plaats daarvan de
+ * vertaling. Alleen een écht eigen label — "Rookpauze", "Souper" — blijft
+ * staan zoals de club het typte.
+ */
+const DEFAULT_BREAK_WORDS = new Set(['pauze', 'pause', 'break'])
+
+export function isDefaultBreakLabel(label: string | null | undefined): boolean {
+  const v = (label ?? '').trim().toLowerCase()
+  return v === '' || DEFAULT_BREAK_WORDS.has(v)
+}
+
+/** Het label voor een pauze, met de vertaling als het geen eigen tekst is. */
+export function breakLabel(label: string | null | undefined, fallback: string): string {
+  return isDefaultBreakLabel(label) ? fallback : (label as string).trim()
+}
+
 export function formatBlinds(level: BlindLevel | null): string {
   if (!level) return '—'
   if (level.isBreak) return level.label ?? 'Pauze'
