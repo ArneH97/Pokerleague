@@ -99,15 +99,26 @@ export function resolveClock(
   let elapsed = rawElapsedMs(state, nowMs)
   let rolled = 0
 
-  if (state.status === 'running') {
-    while (idx < sorted.length && elapsed >= levelDurationMs(sorted[idx])) {
-      const spent = levelDurationMs(sorted[idx])
-      // Een level van 0 seconden zou hier oneindig lussen.
-      if (spent === 0) { idx += 1; rolled += 1; break }
-      elapsed -= spent
-      idx += 1
-      rolled += 1
-    }
+  // Doorrollen gebeurt op de opgebouwde tijd, niet op de wandklok — en dus
+  // ongeacht of de klok loopt.
+  //
+  // Dat onderscheid is het hele punt. Bij een gepauzeerde klok groeit de
+  // opgebouwde tijd niet, dus een pauze van een uur schuift nooit een level
+  // op; dat blijft precies zoals het hoort. Maar staat er méér tijd geboekt
+  // dan het level lang duurt, dan is dat een stand die niet kan bestaan, en
+  // die stand moet het scherm niet als 00:00 tonen maar uitrekenen waar de
+  // klok werkelijk staat.
+  //
+  // Zonder dit bleef zo'n stand hangen: het scherm sprong bij het pauzeren op
+  // 00:00 en kwam er nooit meer vanaf, want een gepauzeerde klok kreeg de
+  // kans niet zichzelf recht te trekken. Nu herstelt elke berekening hem.
+  while (idx < sorted.length && elapsed >= levelDurationMs(sorted[idx])) {
+    const spent = levelDurationMs(sorted[idx])
+    // Een level van 0 seconden zou hier oneindig lussen.
+    if (spent === 0) { idx += 1; rolled += 1; break }
+    elapsed -= spent
+    idx += 1
+    rolled += 1
   }
 
   if (idx >= sorted.length) {
@@ -165,6 +176,15 @@ export function start(nowIso: string): ClockState {
  * bewaard wordt.
  */
 export function normalise(state: ClockState, levels: BlindLevel[], nowMs: number): ClockState {
+  // Geen structuur bij de hand — een netwerkhik, of de levels zijn nog niet
+  // binnen. Zonder levelgrenzen valt er niets door te rollen, maar de tijd
+  // die sinds het startmoment gelopen heeft kunnen we wél gewoon bijboeken.
+  // Dat is het verschil tussen een pauze die de klok bewaart en een pauze die
+  // hem op nul zet.
+  if (levels.length === 0) {
+    return { ...state, levelElapsedMs: rawElapsedMs(state, nowMs) }
+  }
+
   const resolved = resolveClock(state, levels, nowMs)
   return {
     ...state,
@@ -232,10 +252,22 @@ export function adjustTime(
   // Eerst gelijkzetten, anders trek je een minuut af van een tijd die al
   // voorbij het einde van het level ligt en gebeurt er zichtbaar niets.
   const here = normalise(state, levels, nowMs)
+  const banked = Math.round(clamp(here.levelElapsedMs - deltaMs, 0))
+
+  // Een minuut van de klok halen kan de levelgrens over duwen. Dan hoort de
+  // klok door te schuiven naar het volgende level, niet op 00:00 te blijven
+  // plakken. Nog eens normaliseren met de tijd als vaste voorraad — vandaar
+  // levelStartedAt op null — doet precies dat.
+  const rolled = normalise(
+    { ...here, levelStartedAt: null, levelElapsedMs: banked },
+    levels,
+    nowMs,
+  )
+
   return {
-    ...here,
+    ...rolled,
+    status: state.status,
     levelStartedAt: state.status === 'running' ? nowIso : null,
-    levelElapsedMs: Math.round(clamp(here.levelElapsedMs - deltaMs, 0)),
   }
 }
 

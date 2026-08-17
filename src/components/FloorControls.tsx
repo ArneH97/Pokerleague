@@ -9,7 +9,7 @@ import {
   start, pause, resume, nextLevel, prevLevel, adjustTime, normalise,
   type ClockState,
 } from '@/lib/tournament/clock'
-import { toClockState } from '@/lib/types'
+import { expectedChipsInPlay, toClockState } from '@/lib/types'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
 import { useT } from '@/lib/i18n/context'
@@ -82,10 +82,17 @@ export function FloorControls({
   // ze lopen weer gelijk. Zonder dit blijft de database op het oude level
   // staan tot de floor iets aanraakt — en dat merk je pas bij het pauzeren,
   // of wanneer iemand het scherm heropent.
+  //
+  // Dit geldt ook voor een gepauzeerde klok. Die rolt niet door van het
+  // wachten — de opgebouwde tijd staat stil — maar staat er méér tijd geboekt
+  // dan het level lang duurt, dan klopt de opgeslagen stand niet en hoort ze
+  // rechtgezet te worden. Het startmoment blijft dan leeg; anders zou de klok
+  // van het bijwerken alleen al gaan lopen.
   useEffect(() => {
     if (!tournament || levels.length === 0) return
-    if (tournament.clock !== 'running') return
+    if (tournament.clock === 'stopped') return
 
+    const running = tournament.clock === 'running'
     const state = toClockState(tournament)
     const here = resolveClock(state, levels, nowMs())
     if (here.rolledOver === 0 || here.finished) return
@@ -97,7 +104,7 @@ export function FloorControls({
       .from('tournaments')
       .update({
         level_idx: Math.round(fixed.levelIdx),
-        level_started_at: nowIso(),
+        level_started_at: running ? nowIso() : null,
         level_elapsed_ms: Math.round(fixed.levelElapsedMs),
       })
       .eq('id', tournamentId)
@@ -118,18 +125,30 @@ export function FloorControls({
   const running = tournament.clock === 'running'
   const neverStarted = tournament.clock === 'stopped' && !tournament.started_at
 
+  // Levels tellen zonder de pauzes mee te rekenen, net als op het zaalscherm.
+  // Anders staat hier "level 6 van 20" terwijl de zaal "5 / 17" leest, en dan
+  // gaat de floor door de telefoon een ander nummer zeggen dan de spelers voor
+  // zich zien. Een pauze is geen level: die heeft een naam, geen nummer.
+  const playLevels = levels.filter((l) => !l.isBreak).length
+  const playIdx = levels.slice(0, resolved.levelIdx + 1).filter((l) => !l.isBreak).length
+
+  // Hetzelfde nummer voor de structuurlijst onderaan, zodat "#5" daar naar
+  // hetzelfde level wijst als de kop hierboven.
+  const playNo = new Map<number, number>()
+  let n = 0
+  for (const l of levels) {
+    if (l.isBreak) continue
+    n += 1
+    playNo.set(l.idx, n)
+  }
+
   // Zolang er nog ingekocht kan worden verandert de pot. Het prijzengeld
   // vastleggen heeft pas zin daarna; het paneel waarschuwt daarvoor.
-  const playIdx = levels.slice(0, resolved.levelIdx + 1).filter((l) => !l.isBreak).length
   const entriesClosed =
     tournament.late_reg_level !== null && playIdx > tournament.late_reg_level
 
-  // Hoeveel chips er in spel horen te zijn. Elke inkoop en elke rebuy legt
-  // een startstack op tafel, een addon zijn eigen aantal. Dit is het ijkpunt
-  // waartegen de floor zijn telling aan de finaletafel afzet.
-  const expectedChips =
-    (stats.buyins + stats.rebuys + stats.reentries) * (tournament.starting_stack ?? 0) +
-    stats.addons * (tournament.addon_stack ?? tournament.starting_stack ?? 0)
+  // Het ijkpunt waartegen de floor zijn telling aan de finaletafel afzet.
+  const expectedChips = expectedChipsInPlay(tournament, stats)
 
   return (
     <Shell back={back}>
@@ -164,7 +183,7 @@ export function FloorControls({
         <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
           {resolved.level?.isBreak
             ? breakLabel(resolved.level.label, t('clock.break'))
-            : `${t('clock.level')} ${resolved.levelIdx + 1} ${t('common.of')} ${levels.length || '—'}`}
+            : `${t('clock.level')} ${playIdx} ${t('common.of')} ${playLevels || '—'}`}
         </p>
         <p className="my-2 text-7xl font-bold tabular-nums leading-none">
           {formatDuration(resolved.remainingMs)}
@@ -290,7 +309,7 @@ export function FloorControls({
                 } ${l.isBreak ? 'text-[#7dd3fc]' : ''}`}
               >
                 <span className="w-16 text-[var(--text-faint)]">
-                  {l.isBreak ? t('clock.break') : `#${l.idx + 1}`}
+                  {l.isBreak ? t('clock.break') : `#${playNo.get(l.idx) ?? l.idx + 1}`}
                 </span>
                 <span className="flex-1 tabular-nums">{formatBlinds(l)}</span>
                 <span className="tabular-nums text-[var(--text-faint)]">

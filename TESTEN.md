@@ -64,7 +64,14 @@ scherm wakker, dus de laptop valt niet in slaap tijdens het spelen.
 
 Links staan spelers, rebuys en add-ons; rechts prijzenpot, gemiddelde stack met
 het aantal big blinds erbij, en gespeelde tijd. De C van Cutoff staat als
-watermerk achter de tijd.
+watermerk achter de tijd. Zodra de inkopen dicht zijn loopt de prijzenladder
+onderaan als een balk door — permanent, niet als popup.
+
+De **gemiddelde stack** rekent met wat er in spel hoort te zijn: elke inkoop en
+rebuy legt een startstack op tafel, een add-on zijn eigen aantal. Niet met de
+opgetelde chipcounts, want die vult bijna niemand in — dan zou het gemiddelde de
+hele avond op de startstack blijven staan in plaats van te stijgen bij elke
+afvaller.
 
 Geluid moet je één keer aanzetten met de knop — browsers weigeren audio tot je
 iets aangeklikt hebt. Daarna: een piep bij de laatste minuut, een drieklank bij
@@ -124,6 +131,15 @@ hoeveel tijd er al opgebouwd was. De resterende tijd is een berekening tegen
 servertijd. Daarom overleeft hij een refresh, een tweede scherm en een laptop
 die in slaap valt — en loopt hij gewoon door als niemand doorklikt.
 
+Doorrollen gebeurt op die opgebouwde tijd, niet op de wandklok. Een pauze van
+een uur schuift dus nooit een level op — de opgebouwde tijd staat stil. Maar
+staat er meer tijd geboekt dan het level lang duurt, dan rekent het scherm uit
+waar de klok werkelijk staat in plaats van 00:00 te tonen, en de floor-pagina
+zet die stand meteen recht in de database.
+
+**Levels worden geteld zonder de pauzes.** Wat de zaal leest als "5 / 17" heet
+op de floor ook level 5 van 17. Een pauze heeft een naam, geen nummer.
+
 **De server telt, de browser toont.** Eindplaatsen, prijzengeld en punten worden
 in de database berekend, onder een vergrendeling. Twee toestellen die tegelijk
 iemand wegklikken kunnen dus niet dezelfde plaats uitdelen.
@@ -150,7 +166,8 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
 - [ ] Geluid aanzetten en één level laten aflopen — piep, drieklank, gesproken
       blinds.
 - [ ] Volledig scherm aan en met Escape er weer uit.
-- [ ] Wacht op de prijzenladder die om de minuut tien tellen onderaan verschijnt.
+- [ ] Onderaan het zaalscherm hoort de prijzenladder als lopende balk te blijven
+      schuiven, zonder weg te gaan.
 - [ ] Voeg een speler toe die al lid is, en daarna één met een nieuw mailadres.
 - [ ] Probeer iemand toe te voegen zonder mailadres — hij hoort een reden te
       vragen.

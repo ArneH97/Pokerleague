@@ -70,13 +70,56 @@ test('klok blijft staan op het einde van de structuur', () => {
   assert.equal(r.levelIdx, 3)
 })
 
-test('gepauzeerde klok rolt nooit door', () => {
+test('gepauzeerde klok schuift niet op van het wachten', () => {
+  // Dit is waar het om gaat bij een pauze: hoe lang de zaal ook stilligt, er
+  // gaat geen level voorbij. De opgebouwde tijd staat stil, dus de stand ook.
   const paused: ClockState = {
-    status: 'paused', levelIdx: 0, levelStartedAt: null, levelElapsedMs: 5_000_000,
+    status: 'paused', levelIdx: 0, levelStartedAt: null, levelElapsedMs: 300_000,
   }
-  const r = resolveClock(paused, levels, T0 + 10 * 3600_000)
-  assert.equal(r.levelIdx, 0)
-  assert.equal(r.rolledOver, 0)
+  const kort = resolveClock(paused, levels, T0)
+  const uren = resolveClock(paused, levels, T0 + 10 * 3600_000)
+  assert.equal(uren.levelIdx, kort.levelIdx)
+  assert.equal(uren.remainingMs, kort.remainingMs)
+  assert.equal(uren.rolledOver, 0)
+})
+
+test('gepauzeerde klok met te veel geboekte tijd toont waar hij werkelijk staat', () => {
+  // Zo'n stand kan niet echt bestaan: 45 minuten geboekt op een level van 20.
+  // Ze komt uit een oude opgeslagen stand of uit een structuur die achteraf
+  // korter is gemaakt. Vroeger sprong het scherm dan op 00:00 en kwam het er
+  // niet meer vanaf, want een gepauzeerde klok rolde niet door.
+  const scheef: ClockState = {
+    status: 'paused', levelIdx: 0, levelStartedAt: null, levelElapsedMs: 45 * 60_000,
+  }
+  const r = resolveClock(scheef, levels, T0)
+  assert.equal(r.levelIdx, 2, 'level 0 en 1 zijn op; we zitten in de pauze')
+  assert.equal(r.remainingMs, 5 * 60_000, 'en niet op 00:00')
+
+  // En pauzeren op zo'n stand mag hem niet alsnog op 00:00 vastzetten.
+  const opnieuw = pause({ ...scheef, status: 'running', levelStartedAt: iso(T0) }, levels, T0)
+  assert.equal(opnieuw.levelIdx, 2)
+  assert.equal(resolveClock(opnieuw, levels, T0).remainingMs, 5 * 60_000)
+})
+
+test('pauzeren zonder geladen structuur gooit de tijd niet weg', () => {
+  // Een hik in het netwerk mag geen tijd kosten. Zonder levels valt er niets
+  // uit te rekenen, dus blijft de stand zoals hij was.
+  const s = running(1, T0, 400_000)
+  const na = pause(s, [], T0 + 100_000)
+  assert.equal(na.status, 'paused')
+  assert.equal(na.levelIdx, 1, 'het level blijft staan')
+  assert.equal(na.levelElapsedMs, 500_000, '400s geboekt + 100s gelopen')
+})
+
+test('een minuut eraf duwt netjes over de levelgrens', () => {
+  // Nog 30 seconden te gaan, en de floor haalt er een minuut af. Dan hoort de
+  // klok in het volgende level te staan met 30 seconden verstreken — niet op
+  // 00:00 te blijven hangen.
+  const s = running(0, T0, 0)
+  const na = adjustTime(s, levels, -60_000, T0 + 1_170_000, iso(T0 + 1_170_000))
+  assert.equal(na.levelIdx, 1)
+  assert.equal(na.levelElapsedMs, 30_000)
+  assert.equal(resolveClock(na, levels, T0 + 1_170_000).remainingMs, 1_170_000)
 })
 
 test('volgend en vorig level zetten de teller op nul', () => {

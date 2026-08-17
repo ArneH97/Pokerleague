@@ -163,3 +163,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
 }
+
+/* ---------------------------------------------------------------------------
+   Lopende balk voor de prijzenverdeling op het zaalscherm.
+
+   De inhoud staat er twee keer in en schuift precies de helft op; op het
+   moment dat de eerste kopie eruit loopt staat de tweede exact op de plaats
+   waar de eerste begon. Zo is er geen sprong te zien en heb je geen
+   JavaScript nodig dat elke frame iets verzet.
+
+   prefers-reduced-motion zet hem stil: wie bewegende beelden liever vermijdt
+   ziet de eerste bedragen gewoon stilstaan.
+--------------------------------------------------------------------------- */
+@keyframes pl-ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.pl-ticker {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: pl-ticker 45s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-ticker { animation: none; }
+}

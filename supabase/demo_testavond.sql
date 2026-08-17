@@ -28,6 +28,7 @@ declare
   v_tour   uuid;
   v_tp     uuid;
   v_player uuid;
+  v_winner uuid;
   v_tps    uuid[] := array[]::uuid[];
   v_namen  text[] := array[
     'Jan Peeters','Bart Verhoeven','Kevin De Smet','Nico Maes','Tom Willems',
@@ -109,15 +110,35 @@ begin
   perform public.floor_rebuy(v_tps[7], 'rebuy');
 
   -- ---------------------------------------------------------- chipstanden ---
+  -- Willekeurige getallen zetten leek onschuldig maar klopte niet: de som
+  -- moet gelijk zijn aan wat er in spel is (elke inkoop legt een startstack
+  -- op tafel). Anders staat de controle bij de deal meteen op 73% en lijkt
+  -- er iets mis met de software terwijl het de demodata is.
+  --
+  -- Daarom: iedereen krijgt eerst een startstack, en daarna verschuiven we
+  -- chips tussen spelers onderling. Zo blijft het totaal exact kloppen en
+  -- zijn de stapels toch verschillend.
   for i in 1 .. array_length(v_tps, 1) loop
-    update tournament_players
-    set chip_count = 8000 + ((i * 37) % 55) * 1000
+    update tournament_players set chip_count = 20000 where id = v_tps[i];
+  end loop;
+
+  -- De twee spelers met een rebuy hebben er een tweede stack bij liggen.
+  update tournament_players set chip_count = chip_count + 20000
+  where id in (v_tps[2], v_tps[7]);
+
+  -- Wat schuiven: even spelers winnen van oneven spelers.
+  for i in 1 .. array_length(v_tps, 1) - 1 by 2 loop
+    update tournament_players set chip_count = chip_count - (3000 + (i * 1300) % 9000)
     where id = v_tps[i];
+    update tournament_players set chip_count = chip_count + (3000 + (i * 1300) % 9000)
+    where id = v_tps[i + 1];
   end loop;
 
   -- ------------------------------------------------------- uitschakelen ---
   -- Negen spelers eruit; vijf blijven er zitten. De server bepaalt de
-  -- plaatsen, dus de eindstand klopt straks gewoon.
+  -- plaatsen, dus de eindstand klopt straks gewoon. De chips van wie afvalt
+  -- gaan naar de grootste stapel aan tafel — zo verdwijnen ze niet uit het
+  -- spel en klopt het totaal op het einde nog altijd.
   for i in 1 .. 9 loop
     select tp.id into v_tp
     from tournament_players tp
@@ -125,13 +146,20 @@ begin
     order by tp.chip_count asc, tp.registered_at asc
     limit 1;
 
-    perform public.floor_eliminate(
-      v_tp,
-      (select tp2.id from tournament_players tp2
-       where tp2.tournament_id = v_tour and tp2.status in ('active','registered')
-         and tp2.id <> v_tp
-       order by tp2.chip_count desc limit 1)
-    );
+    select tp2.id into v_winner
+    from tournament_players tp2
+    where tp2.tournament_id = v_tour and tp2.status in ('active','registered')
+      and tp2.id <> v_tp
+    order by tp2.chip_count desc limit 1;
+
+    update tournament_players
+    set chip_count = chip_count
+      + (select coalesce(chip_count, 0) from tournament_players where id = v_tp)
+    where id = v_winner;
+
+    update tournament_players set chip_count = 0 where id = v_tp;
+
+    perform public.floor_eliminate(v_tp, v_winner);
   end loop;
 
   -- --------------------------------------------------------------- klok ---

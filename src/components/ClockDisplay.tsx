@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { resolveClock, formatDuration, averageStack, breakLabel } from '@/lib/tournament/clock'
-import { formatMoney, toClockState } from '@/lib/types'
+import { expectedChipsInPlay, formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
@@ -119,8 +119,13 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const playLevels = levels.filter((l) => !l.isBreak).length
   const playIdx = levels.slice(0, levelIdx + 1).filter((l) => !l.isBreak).length
 
-  const avg = stats.totalChips > 0
-    ? averageStack(stats.totalChips, stats.playersLeft)
+  // Gemiddelde stack = chips in spel gedeeld door wie er nog zit. Niet de
+  // som van de doorgegeven chipcounts: die zijn onvolledig, en dan zou dit
+  // cijfer de hele avond blijven hangen op de startstack in plaats van te
+  // stijgen naarmate er spelers afvallen.
+  const inPlay = expectedChipsInPlay(tournament, stats)
+  const avg = inPlay > 0
+    ? averageStack(inPlay, stats.playersLeft)
     : tournament.starting_stack ?? 0
   const bigBlind = level && !level.isBreak ? level.bigBlind : (resolved.nextLevel?.bigBlind ?? 0)
 
@@ -134,12 +139,13 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
     lateReg !== null && !isBreak && playIdx === lateReg && secondsLeft <= 300 && secondsLeft > 0
   const entriesClosed = lateReg !== null && playIdx > lateReg
 
-  // Tien seconden per minuut, en alleen als er iets te tonen valt: de
-  // inkopen zijn dicht, er ligt geen dealvoorstel, en er is geen
-  // levelaankondiging bezig.
-  const inPrizeWindow = Math.floor(nowMs() / 1000) % 60 < 10
-  const showPrizes =
-    inPrizeWindow && entriesClosed && prizes.length > 0 && !deal && !announcing
+  // De prijzenverdeling loopt onderaan mee zodra de pot vastligt. Een balk
+  // die blijft lopen is rustiger dan iets dat elke minuut opduikt en weer
+  // verdwijnt, en de zaal kan er op elk moment naar kijken in plaats van te
+  // moeten wachten tot het weer voorbijkomt. Staat er geen late reg
+  // ingesteld, dan is er nooit een moment waarop de inkopen "sluiten" en
+  // tonen we hem gewoon.
+  const showPrizes = prizes.length > 0 && (entriesClosed || lateReg === null)
 
   const elapsedTotal = tournament.started_at
     ? Math.max(0, nowMs() - Date.parse(tournament.started_at))
@@ -377,6 +383,39 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
       <LevelPips levels={levels} current={levelIdx} accent={accent} />
 
+      {showPrizes && (
+        <div
+          className="relative mt-[1.2vh] overflow-hidden border-t py-[1.1vh]"
+          style={{
+            borderColor: `${accent}33`,
+            background: `linear-gradient(90deg, transparent, ${accent}0f 20%, ${accent}0f 80%, transparent)`,
+          }}
+        >
+          {/* Twee identieke reeksen achter elkaar: als de eerste eruit loopt
+              staat de tweede precies op zijn plaats. */}
+          <div className="pl-ticker">
+            {[0, 1].map((copy) => (
+              <span key={copy} className="inline-flex shrink-0 items-baseline">
+                <span
+                  className="px-[2vw] text-[1.7vh] font-semibold uppercase tracking-[0.3em]"
+                  style={{ color: accent }}
+                >
+                  {t('payout.title')}
+                </span>
+                {prizes.map((cents, i) => (
+                  <span key={i} className="inline-flex items-baseline gap-[0.6vw] px-[1.6vw]">
+                    <span className="text-[1.9vh] text-[var(--text-faint)]">{i + 1}</span>
+                    <span className="tnum text-[2.8vh] font-bold">
+                      {formatMoney(cents, club?.currency ?? 'EUR')}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {announcing && level && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-sm">
@@ -472,40 +511,6 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           </div>
         )
       })()}
-
-      {/* De prijzenverdeling, om de minuut tien tellen in beeld. Zodra de
-          inkopen dicht zijn ligt de pot vast en wil de zaal weten wat er te
-          winnen valt — maar het permanent tonen kost de plaats van de klok.
-          Het venster volgt uit de servertijd, dus alle schermen in de zaal
-          flitsen op hetzelfde moment. */}
-      {showPrizes && (
-        <div className="absolute inset-x-0 bottom-[9vh] z-30 flex justify-center px-[3vw]">
-          <div
-            className="rounded-[1.6vh] border px-[2.5vw] py-[1.6vh] backdrop-blur"
-            style={{
-              borderColor: `${accent}55`,
-              background: 'color-mix(in oklab, var(--bg) 88%, transparent)',
-            }}
-          >
-            <p
-              className="mb-[1vh] text-center text-[1.7vh] font-medium uppercase tracking-[0.28em]"
-              style={{ color: accent }}
-            >
-              {t('payout.title')}
-            </p>
-            <div className="flex flex-wrap items-end justify-center gap-x-[2.5vw] gap-y-[1vh]">
-              {prizes.slice(0, 9).map((cents, i) => (
-                <span key={i} className="text-center">
-                  <span className="block text-[1.6vh] text-[var(--text-faint)]">{i + 1}</span>
-                  <span className="tnum block text-[3.4vh] font-bold">
-                    {formatMoney(cents, club?.currency ?? 'EUR')}
-                  </span>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {!live && (
         <p className="absolute bottom-2 right-3 text-[1.5vh] text-[#fbbf24]">

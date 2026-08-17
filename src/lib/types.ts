@@ -76,6 +76,27 @@ export interface TournamentStats {
   addons: number
 }
 
+/**
+ * Hoeveel chips er in spel horen te zijn.
+ *
+ * Elke inkoop en elke rebuy of re-entry legt een startstack op tafel, een
+ * addon zijn eigen aantal. Dit getal is exact: het volgt uit het geldregister
+ * en niet uit wat spelers doorgeven.
+ *
+ * Daarom rekent de gemiddelde stack hiermee en niet met de opgetelde
+ * chipcounts. Die counts zijn een schatting — op een gewone avond vult bijna
+ * niemand ze in — en dan zou de gemiddelde stack de hele avond op de
+ * startstack blijven staan in plaats van te stijgen bij elke afvaller.
+ */
+export function expectedChipsInPlay(
+  t: Pick<TournamentRow, 'starting_stack' | 'addon_stack'>,
+  stats: Pick<TournamentStats, 'buyins' | 'rebuys' | 'reentries' | 'addons'>,
+): number {
+  const start = t.starting_stack ?? 0
+  return (stats.buyins + stats.rebuys + stats.reentries) * start
+    + stats.addons * (t.addon_stack ?? start)
+}
+
 /** Databaserij omzetten naar de klokstand die clock.ts verwacht. */
 export function toClockState(t: TournamentRow) {
   return {
