@@ -40,8 +40,29 @@ export function normalizeHost(host: string | null): string {
   return (host ?? '').toLowerCase().split(':')[0].replace(/^www\./, '')
 }
 
+/**
+ * De domeinen waaronder een clubnaam als subdomein gelezen mag worden.
+ *
+ * Bewust een lijst en niet één instelling. NEXT_PUBLIC_LEAGUE_DOMAIN staat er
+ * als eerste in, zodat een andere omgeving zijn eigen hoofddomein kan opgeven
+ * — maar pokerleague.be staat er hoe dan ook bij. Dat is geen geheim en geen
+ * variabele: het is het adres van het platform.
+ *
+ * Zonder die vaste tweede waarde hangt cutoff.pokerleague.be af van of er
+ * ergens in een dashboard een omgevingsvariabele juist staat, en dat is een
+ * afhankelijkheid die je pas ontdekt wanneer een club belt dat zijn adres het
+ * niet doet.
+ */
+export function leagueDomains(): string[] {
+  const set = new Set<string>()
+  const env = normalizeHost(process.env.NEXT_PUBLIC_LEAGUE_DOMAIN ?? '')
+  if (env) set.add(env)
+  set.add('pokerleague.be')
+  return [...set]
+}
+
 export function leagueDomain(): string {
-  return normalizeHost(process.env.NEXT_PUBLIC_LEAGUE_DOMAIN ?? 'pokerleague.be')
+  return leagueDomains()[0]
 }
 
 /**
@@ -59,7 +80,7 @@ const RESERVED = new Set([
 /** Domeinen die nooit bij een club horen. */
 export function isPlatformHost(host: string): boolean {
   return (
-    host === leagueDomain() ||
+    leagueDomains().includes(host) ||
     host === 'localhost' ||
     host === '127.0.0.1' ||
     host.endsWith('.vercel.app')
@@ -76,7 +97,7 @@ export function isPlatformHost(host: string): boolean {
 export function platformSubdomainSlug(host: string): string | null {
   if (!host || isPlatformHost(host)) return null
 
-  for (const base of [leagueDomain(), 'localhost']) {
+  for (const base of [...leagueDomains(), 'localhost']) {
     const suffix = `.${base}`
     if (!host.endsWith(suffix)) continue
 

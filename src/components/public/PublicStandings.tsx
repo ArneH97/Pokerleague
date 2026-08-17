@@ -83,7 +83,7 @@ export async function PublicStandings({
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={r.player_name} className="border-b border-[var(--line)] last:border-0">
+                <tr key={`${r.player_name}-${i}`} className="border-b border-[var(--line)] last:border-0">
                   <td className="px-5 py-3 align-baseline">
                     <span
                       className={`tnum text-sm ${

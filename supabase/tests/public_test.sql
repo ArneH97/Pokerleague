@@ -143,10 +143,20 @@ declare
 begin
   select id into v_open from tournaments where name = 'Open avond';
   select player_name into v_naam from public.club_public_seats(v_open) limit 1;
-  if v_naam not like 'Speler %' or v_naam !~ '^Speler [1-4]$' then
-    raise exception 'FOUT: met public_names aan hoort de echte naam er te staan, kreeg %', v_naam;
+  -- Met public_names aan staat er een naam, maar afgekort: voornaam plus de
+  -- eerste letter. De testspelers heten "Speler 1" tot "Speler 4", dus dat
+  -- wordt "Speler 1." — één woord plus een initiaal met punt.
+  if v_naam !~ '^Speler [1-4]\.$' then
+    raise exception 'FOUT: verwacht een afgekorte naam, kreeg %', v_naam;
   end if;
-  raise notice 'OK  met public_names aan toont de club de naam (%)', v_naam;
+  raise notice 'OK  met public_names aan toont de club de afgekorte naam (%)', v_naam;
+
+  -- En de afkorting zelf, op de vormen die in Vlaanderen echt voorkomen.
+  if public.short_name('Arne Halsberghe')     <> 'Arne H.'        then raise exception 'FOUT: Arne H.'; end if;
+  if public.short_name('Marcel Van de Putte') <> 'Marcel V.'      then raise exception 'FOUT: tussenvoegsel'; end if;
+  if public.short_name('Jean-Pierre Dupont')  <> 'Jean-Pierre D.' then raise exception 'FOUT: dubbele voornaam'; end if;
+  if public.short_name('Julien')              <> 'Julien'         then raise exception 'FOUT: naam van een woord'; end if;
+  raise notice 'OK  namen worden afgekort tot voornaam plus initiaal';
 end $$;
 
 reset role;

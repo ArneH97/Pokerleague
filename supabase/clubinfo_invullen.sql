@@ -18,9 +18,9 @@ update clubs set
 
   maps_url = 'https://www.google.com/maps/place//data=!4m2!3m1!1s0x47c395d2753ef089:0x59fd489e68cdbd89?sa=X&ved=1t:8290&hl=nl&ictx=111',
 
-  -- Wanneer er gespeeld wordt, in mensentaal. Nog niet ingevuld: zolang dit
-  -- leeg is leidt de pagina het af uit de geplande tornooien.
-  play_rhythm = null,           -- bijvoorbeeld: 'Elke zaterdag — deuren 19u30, start 20u'
+  -- Wanneer er gespeeld wordt, in mensentaal. Vul gerust de uren aan zodra
+  -- die vastliggen — deze regel is vrije tekst en komt zo op de pagina.
+  play_rhythm = 'Elke zondag en woensdag',
 
   contact_email = 'julien@cutoff.be',
   contact_phone = '+32 467 82 72 33',

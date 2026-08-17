@@ -56,3 +56,21 @@ test('paden die nooit doorgeschreven worden', () => {
   assert.ok(!isPassthroughPath('/klok/1'))
   assert.ok(!isPassthroughPath('/'))
 })
+
+test('het platformdomein hangt niet af van een omgevingsvariabele', () => {
+  // Staat de variabele verkeerd of helemaal niet, dan blijft
+  // cutoff.pokerleague.be gewoon werken. Anders ontdek je die fout pas
+  // wanneer een club belt dat zijn adres het niet doet.
+  const bewaard = process.env.NEXT_PUBLIC_LEAGUE_DOMAIN
+  try {
+    delete process.env.NEXT_PUBLIC_LEAGUE_DOMAIN
+    assert.equal(platformSubdomainSlug('cutoff.pokerleague.be'), 'cutoff')
+    assert.ok(isPlatformHost('pokerleague.be'))
+
+    process.env.NEXT_PUBLIC_LEAGUE_DOMAIN = 'pokerleague-sable.vercel.app'
+    assert.equal(platformSubdomainSlug('cutoff.pokerleague.be'), 'cutoff')
+  } finally {
+    if (bewaard === undefined) delete process.env.NEXT_PUBLIC_LEAGUE_DOMAIN
+    else process.env.NEXT_PUBLIC_LEAGUE_DOMAIN = bewaard
+  }
+})

@@ -165,7 +165,7 @@ export async function PublicClubHome({ club, locale }: { club: Club; locale: Loc
             <>
               <ol className="mt-3 divide-y divide-[var(--line)]">
                 {top.map((s, i) => (
-                  <li key={s.player_name} className="flex items-baseline gap-3 py-2.5">
+                  <li key={`${s.player_name}-${i}`} className="flex items-baseline gap-3 py-2.5">
                     <span
                       className={`tnum w-6 shrink-0 text-sm ${
                         i < 3 ? 'font-semibold text-[var(--brand)]' : 'text-[var(--text-faint)]'
