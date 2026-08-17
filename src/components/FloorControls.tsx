@@ -91,6 +91,12 @@ export function FloorControls({
   const running = tournament.clock === 'running'
   const neverStarted = tournament.clock === 'stopped' && !tournament.started_at
 
+  // Zolang er nog ingekocht kan worden verandert de pot. Het prijzengeld
+  // vastleggen heeft pas zin daarna; het paneel waarschuwt daarvoor.
+  const playIdx = levels.slice(0, resolved.levelIdx + 1).filter((l) => !l.isBreak).length
+  const entriesClosed =
+    tournament.late_reg_level !== null && playIdx > tournament.late_reg_level
+
   return (
     <Shell back={back}>
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -229,6 +235,8 @@ export function FloorControls({
           addonCents: tournament.addon_cents,
           currency: club?.currency ?? 'EUR',
         }}
+        potCents={stats.prizePoolCents}
+        entriesClosed={entriesClosed}
       />
 
       {levels.length > 0 && (

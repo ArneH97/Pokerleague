@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { DealPanel } from '@/components/DealPanel'
+import { PayoutPanel } from '@/components/PayoutPanel'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/types'
 import { useFloorPlayers } from '@/lib/useFloorPlayers'
@@ -36,6 +37,8 @@ export function FloorPlayers({
   maxReentries,
   finished,
   money,
+  potCents,
+  entriesClosed,
 }: {
   tournamentId: string
   clubId: string
@@ -45,6 +48,9 @@ export function FloorPlayers({
   finished: boolean
   /** Bedragen op de knoppen zetten: je ziet wát je boekt voor je klikt. */
   money: { buyinCents: number; addonCents: number | null; currency: string }
+  /** Prijzenpot en of de inkopen al gesloten zijn; voor het prijzengeldpaneel. */
+  potCents: number
+  entriesClosed: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
   const { players, members, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
@@ -66,6 +72,7 @@ export function FloorPlayers({
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
   const [dealOpen, setDealOpen] = useState(false)
+  const [payoutOpen, setPayoutOpen] = useState(false)
 
   const active = players
     .filter((p) => p.status === 'active' || p.status === 'registered')
@@ -253,6 +260,18 @@ export function FloorPlayers({
           {/* De deal komt pas in beeld als er nog maar een handvol spelers
               zit. Eerder is het geen gesprek dat gevoerd wordt, en een knop
               die je de hele avond ziet maar nooit gebruikt is ruis. */}
+          <button
+            type="button"
+            onClick={() => setPayoutOpen((v) => !v)}
+            className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+              payoutOpen
+                ? 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+            }`}
+          >
+            {payoutOpen ? t('deal.close') : t('payout.open')}
+          </button>
+
           {active.length >= 2 && active.length <= 9 && (
             <button
               type="button"
@@ -267,6 +286,19 @@ export function FloorPlayers({
             </button>
           )}
         </div>
+      )}
+
+      {payoutOpen && !finished && (
+        <PayoutPanel
+          tournamentId={tournamentId}
+          currency={money.currency}
+          buyinCents={money.buyinCents}
+          potCents={potCents}
+          entries={players.length}
+          entriesClosed={entriesClosed}
+          onClose={() => setPayoutOpen(false)}
+          onChanged={() => void reload()}
+        />
       )}
 
       {dealOpen && !finished && (
