@@ -56,6 +56,9 @@ export interface ClubRow {
   name: string
   currency: string
   timezone: string
+  /** De taal van de club. Stuurt de floor- en zaalschermen, en is het
+      vertrekpunt voor de taal van een speler die aan de deur wordt ingetikt. */
+  locale: string
   logo_url: string | null
   /** Alleen het beeldmerk, vrijstaand. Zie migratie 0009. */
   mark_url: string | null

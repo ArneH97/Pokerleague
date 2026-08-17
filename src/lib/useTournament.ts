@@ -89,7 +89,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
     }
 
     const [clubRes, levelRes, playerRes, potRes, dealRes, prizeRes] = await Promise.all([
-      supabase.from('clubs').select('id,slug,name,currency,timezone,logo_url,mark_url,primary_color')
+      supabase.from('clubs').select('id,slug,name,currency,timezone,locale,logo_url,mark_url,primary_color')
         .eq('id', t.club_id).maybeSingle<ClubRow>(),
       t.structure_id
         ? supabase.from('blind_levels').select('*')

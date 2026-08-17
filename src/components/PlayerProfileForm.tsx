@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import { Field, inputClass } from '@/components/ui'
 import { savePlayerProfile } from '@/lib/playerActions'
 import { useT } from '@/lib/i18n/context'
+import { LOCALES, LOCALE_NAMES } from '@/lib/i18n/dictionaries'
 
 /**
  * Wat een speler zelf over zichzelf mag wijzigen.
@@ -27,6 +28,7 @@ export function PlayerProfileForm({
     last_name: string | null
     username: string | null
     email: string | null
+    locale: string
     public_listing: boolean
     public_profile: boolean
   }
@@ -60,6 +62,18 @@ export function PlayerProfileForm({
 
         <Field label={t('common.email')} hint={t('me.emailFixed')}>
           <input value={me.email ?? ''} readOnly disabled className={`${inputClass} opacity-60`} />
+        </Field>
+
+        {/* De taal waarin je post krijgt, niet de taal van dit scherm — die
+            kies je bovenaan en die geldt alleen voor dit bezoek. Twee
+            verschillende dingen die makkelijk door elkaar lopen, vandaar dat
+            het er letterlijk bij staat. */}
+        <Field label={t('me.mailLanguage')} hint={t('me.mailLanguageHint')}>
+          <select name="locale" defaultValue={me.locale} className={inputClass}>
+            {LOCALES.map((l) => (
+              <option key={l} value={l}>{LOCALE_NAMES[l]}</option>
+            ))}
+          </select>
         </Field>
 
         <label className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--line)] p-3.5">

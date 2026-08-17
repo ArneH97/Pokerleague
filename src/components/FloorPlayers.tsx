@@ -9,6 +9,7 @@ import { formatMoney } from '@/lib/types'
 import { useFloorPlayers } from '@/lib/useFloorPlayers'
 import { usePayouts, type PayoutRow } from '@/lib/usePayouts'
 import { useT } from '@/lib/i18n/context'
+import { LOCALES, type Locale } from '@/lib/i18n/dictionaries'
 
 /**
  * Spelersbeheer aan de floor.
@@ -42,6 +43,7 @@ export function FloorPlayers({
   potCents,
   entriesClosed,
   expectedChips,
+  clubLocale,
 }: {
   tournamentId: string
   clubId: string
@@ -56,6 +58,8 @@ export function FloorPlayers({
   entriesClosed: boolean
   /** Hoeveel chips er in spel horen te zijn; ijkpunt bij het tellen. */
   expectedChips: number
+  /** De taal van de club. Vertrekpunt voor de taalkeuze bij een nieuwe speler. */
+  clubLocale: string
 }) {
   const supabase = useMemo(() => createClient(), [])
   const { players, members, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
@@ -181,13 +185,16 @@ export function FloorPlayers({
     }))
   }
 
-  async function addNew(name: string, email: string | null, reason: string | null) {
+  async function addNew(
+    name: string, email: string | null, reason: string | null, locale: string,
+  ) {
     closeAdd()
     await run(() => supabase.rpc('floor_add_entry', {
       p_tournament_id: tournamentId,
       p_new_name: name,
       p_email: email,
       p_no_email_reason: reason,
+      p_locale: locale,
     }))
   }
 
@@ -498,8 +505,9 @@ export function FloorPlayers({
         <NewPlayerForm
           draft={draft}
           busy={busy}
+          clubLocale={clubLocale}
           onCancel={closeAdd}
-          onSubmit={(name, email, reason) => void addNew(name, email, reason)}
+          onSubmit={(name, email, reason, locale) => void addNew(name, email, reason, locale)}
         />
       )}
 
@@ -746,20 +754,29 @@ function looksLikeEmail(v: string): boolean {
  * die zijn adres niet uit het hoofd kent, typt binnen de kortste keren
  * jan@jan.be — en een vervuilde sleutel is erger dan een ontbrekende. Wie
  * overslaat moet wel zeggen waarom, zodat je die spelers achteraf terugvindt.
+ *
+ * De taal staat er sinds er post vertrekt. Dit is het enige moment waarop
+ * iemand het écht weet: de floor staat met die persoon te praten. Vandaar drie
+ * knopjes met de taal van de club al aangeduid — in verreweg de meeste
+ * gevallen klopt dat, en dan is het één blik en geen handeling.
  */
 function NewPlayerForm({
-  draft, busy, onCancel, onSubmit,
+  draft, busy, clubLocale, onCancel, onSubmit,
 }: {
   draft: { name: string; email: string }
   busy: boolean
+  clubLocale: string
   onCancel: () => void
-  onSubmit: (name: string, email: string | null, reason: string | null) => void
+  onSubmit: (name: string, email: string | null, reason: string | null, locale: string) => void
 }) {
   const t = useT()
   const [name, setName] = useState(draft.name)
   const [email, setEmail] = useState(draft.email)
   const [reason, setReason] = useState<string | null>(null)
   const [askingReason, setAskingReason] = useState(false)
+  const [locale, setLocale] = useState(
+    LOCALES.includes(clubLocale as Locale) ? (clubLocale as Locale) : 'nl',
+  )
 
   const reasons = [
     t('players.reasonUnknown'),
@@ -803,7 +820,7 @@ function NewPlayerForm({
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && nameOk && emailOk && !busy) {
-                onSubmit(name.trim(), email.trim(), null)
+                onSubmit(name.trim(), email.trim(), null, locale)
               }
             }}
             className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 outline-none focus:border-[var(--brand)]"
@@ -814,6 +831,32 @@ function NewPlayerForm({
       <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
         {t('players.emailHint')}
       </p>
+
+      {/* --------------------------------------------------------------- taal
+          Naast het mailadres en niet in een instellingenscherm, want dit is
+          waar het antwoord op tafel ligt. Wie hier verkeerd klikt, stuurt
+          iemand een uitnodiging in een taal die hij niet leest — en dan is de
+          kans klein dat hij nog iets doet. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-[var(--text-muted)]">{t('players.language')}</span>
+        <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] p-0.5">
+          {LOCALES.map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLocale(l)}
+              className={`rounded-md px-2.5 py-1 text-xs uppercase tracking-wide transition ${
+                locale === l
+                  ? 'bg-[var(--brand)] text-[var(--on-brand)]'
+                  : 'text-[var(--text-faint)] hover:text-[var(--text)]'
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-[var(--text-faint)]">{t('players.languageHint')}</span>
+      </div>
 
       {askingReason ? (
         <div className="mt-3 rounded-lg bg-[var(--surface-2)] p-3">
@@ -845,7 +888,7 @@ function NewPlayerForm({
           <div className="mt-3 flex flex-wrap gap-2">
             <Primary
               disabled={busy || !nameOk || (reason ?? '').trim() === ''}
-              onClick={() => onSubmit(name.trim(), null, (reason ?? '').trim())}
+              onClick={() => onSubmit(name.trim(), null, (reason ?? '').trim(), locale)}
             >
               {t('players.addAnyway')}
             </Primary>
@@ -858,7 +901,7 @@ function NewPlayerForm({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Primary
             disabled={busy || !nameOk || !emailOk}
-            onClick={() => onSubmit(name.trim(), email.trim(), null)}
+            onClick={() => onSubmit(name.trim(), email.trim(), null, locale)}
           >
             {t('players.addConfirm')}
           </Primary>

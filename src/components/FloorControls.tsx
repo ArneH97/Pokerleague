@@ -302,6 +302,7 @@ export function FloorControls({
         potCents={stats.prizePoolCents}
         entriesClosed={entriesClosed}
         expectedChips={expectedChips}
+        clubLocale={club?.locale ?? 'nl'}
       />
 
       {levels.length > 0 && (

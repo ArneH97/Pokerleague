@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { isLocale } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -30,9 +31,16 @@ export async function savePlayerProfile(_prev: Result | null, fd: FormData): Pro
     return { ok: false, error: 'Een gebruikersnaam is 3 tot 24 tekens: letters, cijfers, punt, streepje.' }
   }
 
+  // Alleen een taal die we ook echt spreken. Wie het formulier zelf in elkaar
+  // knutselt kan hier van alles insturen, en een onbekende taal betekent dat
+  // de mailer stil terugvalt op Nederlands zonder dat iemand snapt waarom.
+  const rawLocale = txt('locale')
+  const locale = isLocale(rawLocale) ? rawLocale : undefined
+
   const { error } = await supabase
     .from('players')
     .update({
+      ...(locale ? { locale } : {}),
       first_name: txt('first_name'),
       last_name: txt('last_name'),
       username,

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Card, Field, Notice, inputClass } from '@/components/ui'
-import { useT } from '@/lib/i18n/context'
+import { useLocale, useT } from '@/lib/i18n/context'
 
 /**
  * Registreren als speler.
@@ -41,6 +41,9 @@ export function RegisterForm({
 } = {}) {
   const router = useRouter()
   const t = useT()
+  // De taal waarin hij dit formulier leest. Dat is een sterkere aanwijzing dan
+  // wat de floor ooit gokte, en we hoeven er niets voor te vragen.
+  const locale = useLocale()
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -67,7 +70,10 @@ export function RegisterForm({
         // het profiel opgeeist wordt. Zo hoeven ze nergens tussentijds in een
         // tabel te blijven hangen — en overleven ze de omweg langs de mailbox,
         // want op dat moment is het formulier allang weg.
-        data: { first_name: firstName, last_name: lastName, username, public_listing: listing },
+        data: {
+          first_name: firstName, last_name: lastName, username,
+          public_listing: listing, locale,
+        },
         // Zonder dit landt de bevestigingslink op de voorpagina en mag hij
         // zelf zoeken waar zijn profiel staat.
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/ik`,
@@ -97,6 +103,7 @@ export function RegisterForm({
       p_last_name: lastName,
       p_username: username || null,
       p_listing: listing,
+      p_locale: locale,
     })
 
     router.push('/ik')

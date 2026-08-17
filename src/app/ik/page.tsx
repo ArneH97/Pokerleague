@@ -264,6 +264,7 @@ export default async function Page() {
               last_name: me.last_name,
               username: me.username,
               email: me.email,
+              locale: me.locale,
               public_listing: me.public_listing,
               public_profile: me.public_profile,
             }}
