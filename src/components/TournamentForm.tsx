@@ -280,7 +280,7 @@ export function TournamentForm({
         <Field label={t('tour.startingStack')}>
           <input inputMode="numeric" value={stack} onChange={(e) => setStack(e.target.value)} className={inputClass} />
         </Field>
-        <Field label={t('tour.reentries')} hint={t('tour.reentriesHint')}>
+        <Field label={t('tour.maxRebuys')} hint={t('tour.maxRebuysHint')}>
           <input inputMode="numeric" value={reentries} onChange={(e) => setReentries(e.target.value)} className={inputClass} />
         </Field>
         <Field label={t('tour.lateReg')} hint={t('tour.lateRegHint')}>

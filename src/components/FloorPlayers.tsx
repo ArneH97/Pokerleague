@@ -416,10 +416,22 @@ export function FloorPlayers({
               </div>
 
               {openMoney === p.id && (
-                <div className="mt-2.5 flex flex-wrap gap-1.5 rounded-lg bg-[var(--surface-2)] p-2.5">
-                  <Small onClick={() => void rebuy(p.id, 'rebuy')} disabled={busy}>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 rounded-lg bg-[var(--surface-2)] p-2.5">
+                  {/* Op = op. De club stelt bij het aanmaken in hoeveel
+                      rebuys er per speler mogen; is dat aantal bereikt, dan
+                      gaat de knop op slot in plaats van dat de databank het
+                      pas weigert nadat je geklikt hebt. */}
+                  <Small
+                    onClick={() => void rebuy(p.id, 'rebuy')}
+                    disabled={busy || p.reentriesUsed + p.rebuysUsed >= maxReentries}
+                  >
                     {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
                   </Small>
+                  {p.reentriesUsed + p.rebuysUsed >= maxReentries && (
+                    <span className="text-xs text-[var(--text-faint)]">
+                      {t('players.rebuyLimit')}
+                    </span>
+                  )}
                   <Small onClick={() => void rebuy(p.id, 'addon')} disabled={busy}>
                     {t('players.addon')}{' '}
                     {formatMoney(money.addonCents ?? money.buyinCents, money.currency)}

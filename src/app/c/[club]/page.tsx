@@ -132,11 +132,16 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         </section>
       )}
 
-      {canManage && (
-        <p className="pt-2 text-sm text-[var(--text-faint)]">
-          <Link href={`/c/${slug}/structuren`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-            {t('club.manageStructures')}
+      {role && (
+        <p className="flex flex-wrap gap-x-5 gap-y-2 pt-2 text-sm text-[var(--text-faint)]">
+          <Link href={`/c/${slug}/klassement`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
+            {t('standings.view')}
           </Link>
+          {canManage && (
+            <Link href={`/c/${slug}/structuren`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
+              {t('club.manageStructures')}
+            </Link>
+          )}
         </p>
       )}
     </Page>
@@ -165,9 +170,18 @@ function Item({
           {formatMoney(t.buyin_cents + t.fee_cents, club.currency)}
         </p>
       </div>
+      {/* Een afgelopen avond bedien je niet meer, die bekijk je. */}
       <div className="flex shrink-0 items-center gap-2">
-        <ButtonLink size="sm" href={`/c/${club.slug}/klok/${t.id}`}>{tr('club.clock')}</ButtonLink>
-        <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/floor/${t.id}`}>{tr('club.floor')}</ButtonLink>
+        {t.status === 'finished' || t.status === 'cancelled' ? (
+          <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/tornooien/${t.id}`}>
+            {tr('result.view')}
+          </ButtonLink>
+        ) : (
+          <>
+            <ButtonLink size="sm" href={`/c/${club.slug}/klok/${t.id}`}>{tr('club.clock')}</ButtonLink>
+            <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/floor/${t.id}`}>{tr('club.floor')}</ButtonLink>
+          </>
+        )}
       </div>
     </div>
   )

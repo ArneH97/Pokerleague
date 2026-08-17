@@ -52,7 +52,17 @@ export function FloorControls({
         // level_elapsed_ms is een bigint; hier nog eens afronden zodat er
         // nooit een gebroken getal naar de database kan.
         level_elapsed_ms: Math.round(next.levelElapsedMs),
-        ...(next.status === 'running' ? { status: 'running' as const } : {}),
+        ...(next.status === 'running'
+          ? {
+              status: 'running' as const,
+              // Het startmoment van de avond, één keer gezet bij de eerste
+              // keer starten. Hierop draait de teller "gespeeld" op het
+              // zaalscherm; die stond leeg omdat dit nergens werd
+              // weggeschreven. Pauzeren en hervatten raken het niet — dan
+              // zou de avond telkens opnieuw beginnen.
+              ...(tournament?.started_at ? {} : { started_at: nowIso() }),
+            }
+          : {}),
       })
       .eq('id', tournamentId)
 
