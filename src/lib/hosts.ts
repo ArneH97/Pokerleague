@@ -1,14 +1,26 @@
 /**
  * Van domeinnaam naar club.
  *
- * Elke club krijgt zijn eigen domein — Cutoff draait op app.cutoff.be, en het
- * spelersplatform op pokerleague.be. Onder de motorkap is dat dezelfde app:
- * de proxy schrijft een verzoek op een clubdomein door naar /c/<slug>/…, zodat
- * de club schone URL's ziet zonder clubnaam erin.
+ * Eén app, veel adressen. Een verzoek op een clubdomein wordt doorgeschreven
+ * naar /c/<slug>/…, zodat de club schone URL's ziet zonder zijn eigen naam er
+ * nog eens in.
  *
- * Waarom niet gewoon subdomeinen van één hoofddomein? Omdat een club die
- * betaalt voor "hun eigen platform" ook hun eigen adres verwacht. Dat kost
- * hier één opzoeking, en die cachen we.
+ * Er zijn twee soorten clubadressen, en dat is bewust:
+ *
+ * **cutoff.pokerleague.be** — werkt vanaf het moment dat de club bestaat. Eén
+ * jokerteken in DNS en in de hosting, één keer door ons gezet, en elke
+ * volgende club is meteen bereikbaar zonder dat er iemand iets moet doen. Dat
+ * is wat je wil op de dag dat een club zich aanmeldt.
+ *
+ * **app.cutoff.be** — het eigen domein van de club. Mooier op een affiche, en
+ * een club die betaalt voor "hun eigen platform" verwacht ook hun eigen adres.
+ * Maar het kost aan beide kanten werk: de club zet een CNAME, wij zetten het
+ * domein bij de hosting en vullen clubs.custom_domain in. Daarom een keuze en
+ * geen voorwaarde: een club begint op het subdomein en verhuist wanneer het
+ * hem uitkomt. Beide blijven daarna werken.
+ *
+ * Het subdomein wordt hier afgeleid zonder de database aan te raken; alleen
+ * een eigen domein kost een opzoeking, en die cachen we.
  */
 
 /** Hoe lang een gevonden koppeling blijft hangen voor we opnieuw kijken. */
@@ -28,15 +40,54 @@ export function normalizeHost(host: string | null): string {
   return (host ?? '').toLowerCase().split(':')[0].replace(/^www\./, '')
 }
 
+export function leagueDomain(): string {
+  return normalizeHost(process.env.NEXT_PUBLIC_LEAGUE_DOMAIN ?? 'pokerleague.be')
+}
+
+/**
+ * Namen die we nooit als clubnaam lezen.
+ *
+ * Zonder deze lijst zou een toekomstige status.pokerleague.be of
+ * mail.pokerleague.be als club "status" of "mail" doorgeschreven worden. Beter
+ * hier een korte lijst dan later een raadsel.
+ */
+const RESERVED = new Set([
+  'www', 'app', 'api', 'admin', 'auth', 'mail', 'smtp', 'ftp',
+  'status', 'docs', 'blog', 'cdn', 'static', 'assets', 'staging', 'test',
+])
+
 /** Domeinen die nooit bij een club horen. */
 export function isPlatformHost(host: string): boolean {
-  const league = normalizeHost(process.env.NEXT_PUBLIC_LEAGUE_DOMAIN ?? 'pokerleague.be')
   return (
-    host === league ||
+    host === leagueDomain() ||
     host === 'localhost' ||
     host === '127.0.0.1' ||
     host.endsWith('.vercel.app')
   )
+}
+
+/**
+ * De clubnaam uit een subdomein van het platform, of null.
+ *
+ * Ook `cutoff.localhost` telt mee: zo kan je de clubkant en de platformkant
+ * lokaal naast elkaar openen zonder je hosts-bestand aan te raken — elke
+ * browser stuurt *.localhost vanzelf naar je eigen machine.
+ */
+export function platformSubdomainSlug(host: string): string | null {
+  if (!host || isPlatformHost(host)) return null
+
+  for (const base of [leagueDomain(), 'localhost']) {
+    const suffix = `.${base}`
+    if (!host.endsWith(suffix)) continue
+
+    const label = host.slice(0, -suffix.length)
+    // Alleen één laag diep. a.b.pokerleague.be is geen club.
+    if (!label || label.includes('.')) return null
+    if (RESERVED.has(label)) return null
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)) return null
+    return label
+  }
+  return null
 }
 
 /**
@@ -45,6 +96,12 @@ export function isPlatformHost(host: string): boolean {
  */
 export async function clubSlugForHost(host: string): Promise<string | null> {
   if (!host || isPlatformHost(host)) return null
+
+  // Een subdomein van het platform kost geen opzoeking: de naam ís de slug.
+  // Bestaat die club niet, dan loopt het verzoek op /c/<naam> gewoon op een
+  // 404 — goedkoper dan hier eerst gaan kijken.
+  const sub = platformSubdomainSlug(host)
+  if (sub) return sub
 
   const hit = cache.get(host)
   if (hit && Date.now() - hit.at < TTL_MS) return hit.slug

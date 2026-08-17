@@ -164,7 +164,13 @@ ze bewaren of doorsturen.
 Nieuw: alles hierboven is voor jou en je floor. Daarnaast heeft de club nu
 pagina's voor de zaal, zonder login en mobiel eerst.
 
-`app.cutoff.be` (of `/c/cutoff`) is één adres met twee gezichten. Log je in
+De club is bereikbaar op **cutoff.pokerleague.be** zodra jij één jokerteken in
+DNS en in Vercel zet — daarna is elke volgende club gratis bereikbaar. Een
+eigen domein als app.cutoff.be is een verbetering achteraf, geen voorwaarde
+vooraf. De volledige werkwijze staat in `docs/domeinen.md`, en
+`clubdomein_zetten.sql` koppelt het domein zodra de DNS actief is.
+
+Dat clubadres (of `/c/cutoff`) is één adres met twee gezichten. Log je in
 als staf, dan krijg je het dashboard dat je kent. Iedereen anders krijgt de
 publieke voorpagina: wat er nu loopt, wanneer de volgende avond is, de laatste
 uitslag en de kop van het klassement.
