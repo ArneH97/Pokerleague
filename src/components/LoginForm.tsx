@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Card, Field, Notice, inputClass } from '@/components/ui'
+import { useT } from '@/lib/i18n/context'
 
 /**
  * Aanmelden met e-mail en wachtwoord.
@@ -29,6 +30,7 @@ interface Props {
 function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
   const router = useRouter()
   const params = useSearchParams()
+  const t = useT()
   const next = params.get('next') ?? fallbackNext
 
   const [email, setEmail] = useState('')
@@ -47,7 +49,7 @@ function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
     if (err) {
       setError(
         err.message === 'Invalid login credentials'
-          ? 'E-mailadres of wachtwoord klopt niet.'
+          ? t('login.badCredentials')
           : err.message,
       )
       setBusy(false)
@@ -70,13 +72,13 @@ function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
             <p className="truncate text-[0.7rem] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
               {brandName}
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight">Aanmelden</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{t('common.signIn')}</h1>
           </div>
         </div>
 
         <Card>
           <form onSubmit={onSubmit} className="space-y-4">
-            <Field label="E-mailadres">
+            <Field label={t('common.email')}>
               <input
                 type="email"
                 required
@@ -87,7 +89,7 @@ function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
               />
             </Field>
 
-            <Field label="Wachtwoord">
+            <Field label={t('common.password')}>
               <input
                 type="password"
                 required
@@ -107,7 +109,7 @@ function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
               disabled={busy}
               className="w-full"
             >
-              {busy ? 'Bezig…' : 'Aanmelden'}
+              {busy ? t('common.busy') : t('common.signIn')}
             </Button>
           </form>
         </Card>

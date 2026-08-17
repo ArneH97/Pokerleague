@@ -2,9 +2,10 @@ import { notFound, redirect } from 'next/navigation'
 import { NewStructureButton } from '@/components/NewStructureButton'
 import { ButtonLink, Card, EmptyState, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
+import { isLocale, translator, type T } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 
-export const metadata = { title: 'Blindstructuren' }
+
 
 interface Row {
   id: string
@@ -24,6 +25,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
 
   const role = await getClubRole(club.id)
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
+  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
 
   const { data } = await supabase
     .from('blind_structures')
@@ -41,29 +43,29 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
       <PageHeader
         backHref={`/c/${slug}`}
         backLabel={club.name}
-        title="Blindstructuren"
-        subtitle="Bepalen wat de klok aftelt tijdens een tornooi"
+        title={t('struct.title')}
+        subtitle={t('struct.subtitle')}
         actions={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
       />
 
       {own.length === 0 ? (
         <EmptyState
-          title="Nog geen eigen structuur"
+          title={t('struct.none')}
           action={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
         >
-          Maak er een aan, of kopieer een sjabloon hieronder als vertrekpunt.
+          {t('struct.noneBody')}
         </EmptyState>
       ) : (
         <section>
-          <SectionTitle>Van {club.name}</SectionTitle>
-          <List items={own} slug={slug} clubId={club.id} />
+          <SectionTitle>{t('struct.ownOf')} {club.name}</SectionTitle>
+          <List items={own} slug={slug} clubId={club.id} t={t} />
         </section>
       )}
 
       {templates.length > 0 && (
         <section>
-          <SectionTitle>Sjablonen</SectionTitle>
-          <List items={templates} slug={slug} clubId={club.id} template />
+          <SectionTitle>{t('struct.templates')}</SectionTitle>
+          <List items={templates} slug={slug} clubId={club.id} template t={t} />
         </section>
       )}
     </Page>
@@ -71,12 +73,13 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
 }
 
 function List({
-  items, slug, clubId, template,
+  items, slug, clubId, template, t,
 }: {
   items: Row[]
   slug: string
   clubId: string
   template?: boolean
+  t: T
 }) {
   return (
     <Card padded={false} className="overflow-hidden">
@@ -91,9 +94,9 @@ function List({
             <div className="min-w-0">
               <p className="truncate font-medium">{s.name}</p>
               <p className="tnum mt-0.5 text-sm text-[var(--text-muted)]">
-                {play} levels
+                {play} {t('struct.levels')}
                 <span className="mx-1.5 text-[var(--text-faint)]">·</span>
-                {Math.floor(minutes / 60)}u{String(minutes % 60).padStart(2, '0')} speelduur
+                {Math.floor(minutes / 60)}u{String(minutes % 60).padStart(2, '0')} {t('struct.playTime')}
               </p>
             </div>
             {template ? (
@@ -101,11 +104,11 @@ function List({
                 clubId={clubId}
                 clubSlug={slug}
                 copyFrom={s.id}
-                label="Kopiëren"
-                suggestedName={`${s.name} (kopie)`}
+                label={t('struct.copy')}
+                suggestedName={`${s.name} (${t('struct.copySuffix')})`}
               />
             ) : (
-              <ButtonLink size="sm" href={`/c/${slug}/structuren/${s.id}`}>Bewerken</ButtonLink>
+              <ButtonLink size="sm" href={`/c/${slug}/structuren/${s.id}`}>{t('struct.edit')}</ButtonLink>
             )}
           </div>
         )

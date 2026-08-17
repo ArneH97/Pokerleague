@@ -55,24 +55,48 @@
  * een landingspagina die iemand overdag op zijn telefoon opent, hoort niet
  * aan te voelen als een bedieningspaneel.
  */
-[data-light] {
+/**
+ * De publieke kant van PokerLeague: twee kleuren.
+ *
+ * Diepgroen als drager — pokervilt, en donker genoeg om er volle banden mee
+ * te maken zonder dat het somber wordt. Goud als accent, naar de fiches.
+ * Verder warm gebroken wit in plaats van steriel wit, want een pagina die
+ * volledig #ffffff is voelt onaf.
+ */
+[data-site] {
   --bg:            #ffffff;
   --surface:       #ffffff;
-  --surface-2:     #f6f7f9;
-  --surface-hover: #eef0f4;
-  --line:          #e5e8ed;
-  --line-strong:   #d3d8e0;
+  --surface-2:     #f4f6f3;
+  --surface-hover: #e9ede8;
+  --line:          #e2e7e1;
+  --line-strong:   #cbd3c9;
 
-  --text:          #0f1620;
-  --text-muted:    #5a6472;
-  --text-faint:    #8b95a3;
+  --text:          #10231a;
+  --text-muted:    #4d6157;
+  --text-faint:    #82938a;
 
-  --brand:         #047857;
+  --brand:         #0d5238;
   --on-brand:      #ffffff;
+  --gold:          #c98f2e;
+  --gold-soft:     #f2e3c6;
 
-  --danger:        #b91c1c;
-  --warn:          #92400e;
-  --ok:            #047857;
+  --danger:        #b3261e;
+  --warn:          #8a5a00;
+  --ok:            #0d5238;
+}
+
+/** Donkere band binnen de publieke pagina. */
+[data-band="dark"] {
+  --bg:            #0b2a1e;
+  --surface:       #10362654;
+  --surface-2:     #123a29;
+  --line:          #1d4a37;
+  --line-strong:   #2a5f48;
+  --text:          #f2f7f4;
+  --text-muted:    #a9c4b7;
+  --text-faint:    #7fa393;
+  --brand:         #e0b563;
+  --on-brand:      #0b2a1e;
 }
 
 @theme inline {

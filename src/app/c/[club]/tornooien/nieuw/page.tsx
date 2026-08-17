@@ -2,9 +2,10 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { TournamentForm, type Option } from '@/components/TournamentForm'
 import { getClub, getClubRole } from '@/lib/club'
+import { isLocale, translator } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 
-export const metadata = { title: 'Nieuw tornooi' }
+
 
 export default async function Page({ params }: PageProps<'/c/[club]/tornooien/nieuw'>) {
   const { club: slug } = await params
@@ -16,11 +17,12 @@ export default async function Page({ params }: PageProps<'/c/[club]/tornooien/ni
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/tornooien/nieuw`)
 
   const role = await getClubRole(club.id)
+  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
   if (!role || !['owner', 'admin', 'floor'].includes(role)) {
     return (
-      <main className="mx-auto min-h-dvh max-w-2xl bg-[var(--bg)] p-6 text-white">
+      <main className="mx-auto min-h-dvh max-w-2xl p-6">
         <p className="rounded-xl border border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] p-4 text-sm text-[var(--warn)]">
-          Je hebt geen rechten om tornooien aan te maken bij deze club.
+          {t('tour.noRights')}
         </p>
       </main>
     )
@@ -74,7 +76,7 @@ export default async function Page({ params }: PageProps<'/c/[club]/tornooien/ni
         <Link href={`/c/${slug}`} className="text-sm text-[var(--text-faint)] hover:text-[var(--text-muted)]">
           ← {club.name}
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold">Nieuw tornooi</h1>
+        <h1 className="mt-1 text-2xl font-semibold">{t('tour.new')}</h1>
       </header>
 
       <TournamentForm

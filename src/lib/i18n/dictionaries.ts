@@ -167,6 +167,11 @@ const nl = {
   'tour.visPrivate': 'Alleen de staf',
   'tour.create': 'Tornooi aanmaken',
   'tour.noRights': 'Je hebt geen rechten om tornooien aan te maken bij deze club.',
+  'struct.newName': 'Nieuwe structuur',
+  'struct.copySuffix': 'kopie',
+  'struct.noRightsCreate': 'Geen rechten om structuren aan te maken.',
+  'struct.needsOneLevel': 'Een structuur moet minstens één level bevatten.',
+  'club.city': 'Gemeente',
 } as const
 
 export type Key = keyof typeof nl
@@ -307,6 +312,11 @@ const fr: Record<Key, string> = {
   'tour.visPrivate': 'Le staff uniquement',
   'tour.create': 'Créer le tournoi',
   'tour.noRights': "Vous n'avez pas les droits pour créer des tournois dans ce club.",
+  'struct.newName': 'Nouvelle structure',
+  'struct.copySuffix': 'copie',
+  'struct.noRightsCreate': 'Pas les droits pour créer des structures.',
+  'struct.needsOneLevel': 'Une structure doit contenir au moins un niveau.',
+  'club.city': 'Commune',
 }
 
 const en: Record<Key, string> = {
@@ -445,6 +455,11 @@ const en: Record<Key, string> = {
   'tour.visPrivate': 'Staff only',
   'tour.create': 'Create tournament',
   'tour.noRights': 'You do not have permission to create tournaments for this club.',
+  'struct.newName': 'New structure',
+  'struct.copySuffix': 'copy',
+  'struct.noRightsCreate': 'No permission to create structures.',
+  'struct.needsOneLevel': 'A structure needs at least one level.',
+  'club.city': 'Town',
 }
 
 export const dictionaries: Record<Locale, Record<Key, string>> = { nl, fr, en }

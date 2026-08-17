@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui'
+import { useT } from '@/lib/i18n/context'
 
 /**
  * Maakt een nieuwe blindstructuur aan en gaat er meteen naartoe.
@@ -22,6 +23,7 @@ export function NewStructureButton({
 }) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const t = useT()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,7 +35,7 @@ export function NewStructureButton({
       const { data, error: err } = await supabase.rpc('duplicate_blind_structure', {
         p_structure_id: copyFrom,
         p_club_id: clubId,
-        p_name: suggestedName ?? 'Kopie',
+        p_name: suggestedName ?? t('struct.copySuffix'),
       })
       if (err) { setError(err.message); setBusy(false); return }
       router.push(`/c/${clubSlug}/structuren/${data as string}`)
@@ -42,14 +44,14 @@ export function NewStructureButton({
 
     const { data, error: err } = await supabase
       .from('blind_structures')
-      .insert({ club_id: clubId, name: 'Nieuwe structuur' })
+      .insert({ club_id: clubId, name: t('struct.newName') })
       .select('id')
       .single<{ id: string }>()
 
     if (err) {
       setError(
         err.code === '42501' || err.message.includes('row-level security')
-          ? 'Geen rechten om structuren aan te maken.'
+          ? t('struct.noRightsCreate')
           : err.message,
       )
       setBusy(false)
@@ -66,7 +68,7 @@ export function NewStructureButton({
         onClick={create}
         disabled={busy}
       >
-        {busy ? 'Bezig…' : label}
+        {busy ? t('common.busy') : (label ?? t('struct.new'))}
       </Button>
       {error && <span className="text-xs text-[var(--danger)]">{error}</span>}
     </div>

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Card, Field, Notice, SectionTitle, inputClass } from '@/components/ui'
+import { useT } from '@/lib/i18n/context'
 import {
   generateLadder, makeLevel, nextBlinds, type EditorLevel,
 } from '@/lib/tournament/structure'
@@ -26,6 +27,7 @@ interface Props {
 export function StructureEditor({ structureId, clubSlug, initialName, initialLevels }: Props) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const t = useT()
 
   const [name, setName] = useState(initialName)
   const [levels, setLevels] = useState<EditorLevel[]>(
@@ -58,7 +60,7 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
   }
 
   function addBreak() {
-    setLevels((ls) => [...ls, makeLevel({ isBreak: true, label: 'Pauze', minutes: 10 })])
+    setLevels((ls) => [...ls, makeLevel({ isBreak: true, label: t('clock.break'), minutes: 10 })])
     setSaved(false)
   }
 
@@ -91,7 +93,7 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
 
     const { error: nameErr } = await supabase
       .from('blind_structures')
-      .update({ name: name.trim() || 'Naamloos' })
+      .update({ name: name.trim() || t('struct.newName') })
       .eq('id', structureId)
 
     if (nameErr) {
@@ -104,7 +106,7 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
       p_structure_id: structureId,
       p_levels: levels.map((l) => ({
         is_break: l.isBreak,
-        label: l.isBreak ? (l.label || 'Pauze') : null,
+        label: l.isBreak ? (l.label || t('clock.break')) : null,
         small_blind: l.isBreak ? 0 : l.smallBlind,
         big_blind: l.isBreak ? 0 : l.bigBlind,
         ante: l.isBreak ? 0 : l.ante,
@@ -125,42 +127,42 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
 
   return (
     <div className="space-y-6">
-      <Field label="Naam van de structuur">
+      <Field label={t('struct.name')}>
         <input
           value={name}
           onChange={(e) => { setName(e.target.value); setSaved(false) }}
           className={inputClass}
-          placeholder="Standaard 20 min"
+          placeholder={`${t('struct.new')}`}
         />
       </Field>
 
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
         <div className="tnum text-sm">
-          <span className="text-[var(--text-muted)]">Speelduur</span>{' '}
+          <span className="text-[var(--text-muted)]">{t('struct.duration')}</span>{' '}
           <span className="font-semibold">
             {Math.floor(totalMinutes / 60)}u{String(totalMinutes % 60).padStart(2, '0')}
           </span>
           <span className="mx-2 text-[var(--text-faint)]">·</span>
-          <span className="text-[var(--text-muted)]">{playLevels} levels</span>
+          <span className="text-[var(--text-muted)]">{playLevels} {t('struct.levels')}</span>
           <span className="mx-2 text-[var(--text-faint)]">·</span>
           <span className="text-[var(--text-muted)]">
-            {levels.length - playLevels} pauze{levels.length - playLevels === 1 ? '' : 's'}
+            {levels.length - playLevels} {t('struct.breaks')}
           </span>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <span className="self-center text-xs text-[var(--text-faint)]">Snel opzetten:</span>
+          <span className="self-center text-xs text-[var(--text-faint)]">{t('struct.quickSetup')}</span>
           {[3, 4, 5, 6].map((h) => (
-            <Button key={h} size="sm" onClick={() => generate(h)} type="button">{h} uur</Button>
+            <Button key={h} size="sm" onClick={() => generate(h)} type="button">{h} {t('struct.hours')}</Button>
           ))}
         </div>
       </div>
 
       <div>
-        <SectionTitle>Levels</SectionTitle>
+        <SectionTitle>{t('struct.levels')}</SectionTitle>
         <Card padded={false} className="overflow-hidden">
           <div className="hidden grid-cols-[2.5rem_1fr_1fr_1fr_5rem_5.5rem] gap-2 border-b border-[var(--line)] px-4 py-2.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)] sm:grid">
             <span>#</span><span>Small blind</span><span>Big blind</span><span>Ante</span>
-            <span>Minuten</span><span />
+            <span>{t('struct.minutes')}</span><span />
           </div>
 
           {levels.map((l, i) => {
@@ -180,7 +182,7 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
                   <input
                     value={l.label}
                     onChange={(e) => patch(l.key, { label: e.target.value })}
-                    placeholder="Pauze"
+                    placeholder={t('clock.break')}
                     className={`${inputClass} col-span-1 sm:col-span-3`}
                   />
                 ) : (
@@ -194,9 +196,9 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
                 <NumberCell value={l.minutes} onChange={(v) => patch(l.key, { minutes: v })} />
 
                 <div className="flex items-center justify-end gap-1">
-                  <IconButton label="Omhoog" disabled={i === 0} onClick={() => move(l.key, -1)}>↑</IconButton>
-                  <IconButton label="Omlaag" disabled={i === levels.length - 1} onClick={() => move(l.key, 1)}>↓</IconButton>
-                  <IconButton label="Verwijderen" disabled={levels.length <= 1} onClick={() => remove(l.key)} danger>×</IconButton>
+                  <IconButton label={t('struct.up')} disabled={i === 0} onClick={() => move(l.key, -1)}>↑</IconButton>
+                  <IconButton label={t('struct.down')} disabled={i === levels.length - 1} onClick={() => move(l.key, 1)}>↓</IconButton>
+                  <IconButton label={t('struct.remove')} disabled={levels.length <= 1} onClick={() => remove(l.key)} danger>×</IconButton>
                 </div>
               </div>
             )
@@ -213,14 +215,14 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
 
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="brand" size="lg" onClick={save} disabled={busy}>
-          {busy ? 'Opslaan…' : 'Opslaan'}
+          {busy ? t('common.saving') : t('common.save')}
         </Button>
-        {saved && <span className="text-sm text-[var(--ok)]">Opgeslagen</span>}
+        {saved && <span className="text-sm text-[var(--ok)]">{t('common.saved')}</span>}
         <a
           href={`/c/${clubSlug}/structuren`}
           className="text-sm text-[var(--text-faint)] underline underline-offset-4 hover:text-[var(--text-muted)]"
         >
-          Terug naar overzicht
+          {t('struct.backToList')}
         </a>
       </div>
     </div>

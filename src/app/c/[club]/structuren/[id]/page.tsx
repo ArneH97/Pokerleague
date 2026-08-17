@@ -3,9 +3,10 @@ import { StructureEditor } from '@/components/StructureEditor'
 import { makeLevel, type EditorLevel } from '@/lib/tournament/structure'
 import { Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
+import { isLocale, translator } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 
-export const metadata = { title: 'Blindstructuur' }
+
 
 interface StructureRow {
   id: string
@@ -34,6 +35,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren/
 
   const role = await getClubRole(club.id)
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
+  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
 
   const [structRes, levelRes] = await Promise.all([
     supabase.from('blind_structures').select('id,name,club_id').eq('id', id)
@@ -63,20 +65,19 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren/
     <Page>
       <PageHeader
         backHref={`/c/${slug}/structuren`}
-        backLabel="Blindstructuren"
+        backLabel={t('struct.title')}
         title={structure.name}
         subtitle={club.name}
       />
 
       {isTemplate && (
         <Notice tone="warn">
-          Dit is een platformsjabloon en kan niet aangepast worden. Maak er een
-          kopie van in het overzicht en bewerk die.
+          {t('struct.templateReadOnly')}
         </Notice>
       )}
 
       {!isTemplate && !canManage && (
-        <Notice tone="warn">Je hebt geen rechten om structuren te wijzigen bij deze club.</Notice>
+        <Notice tone="warn">{t('struct.noRights')}</Notice>
       )}
 
       {!isTemplate && canManage && (

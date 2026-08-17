@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button, ButtonLink, Card, Field, Notice, inputClass } from '@/components/ui'
+import { useT } from '@/lib/i18n/context'
 
 /**
  * Tornooi aanmaken.
@@ -48,6 +49,7 @@ export function TournamentForm({
 }: Props) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const t = useT()
 
   const nextFriday = useMemo(() => {
     const d = new Date()
@@ -112,7 +114,7 @@ export function TournamentForm({
     if (err) {
       setError(
         err.code === '42501' || err.message.includes('row-level security')
-          ? 'Je hebt geen rechten om tornooien aan te maken bij deze club.'
+          ? t('tour.noRights')
           : err.message,
       )
       setBusy(false)
@@ -125,17 +127,17 @@ export function TournamentForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      <Field label="Naam">
+      <Field label={t('tour.name')}>
         <input
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Vrijdagavondtornooi"
+          placeholder={t('tour.namePlaceholder')}
           className={inputClass}
         />
       </Field>
 
-      <Field label="Wanneer">
+      <Field label={t('tour.when')}>
         <input
           type="datetime-local"
           required
@@ -146,10 +148,10 @@ export function TournamentForm({
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`Buy-in (${currency})`} hint="Gaat naar de prijzenpot">
+        <Field label={`${t('tour.buyin')} (${currency})`} hint={t('tour.buyinHint')}>
           <input inputMode="decimal" value={buyin} onChange={(e) => setBuyin(e.target.value)} className={inputClass} />
         </Field>
-        <Field label={`Clubbijdrage (${currency})`} hint="Blijft bij de club">
+        <Field label={`${t('tour.fee')} (${currency})`} hint={t('tour.feeHint')}>
           <input inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} className={inputClass} />
         </Field>
       </div>
@@ -162,59 +164,57 @@ export function TournamentForm({
             onChange={(e) => setBountyOn(e.target.checked)}
             className="size-4"
           />
-          <span>Bounty per knock-out</span>
+          <span>{t('tour.bounty')}</span>
         </label>
         {bountyOn && (
           <div className="mt-3">
             <input inputMode="decimal" value={bounty} onChange={(e) => setBounty(e.target.value)} className={inputClass} />
             <p className="mt-1 text-xs text-[var(--text-faint)]">
-              Wordt rechtstreeks uitbetaald aan wie de speler uitschakelt, buiten de prijzenpot om.
+              {t('tour.bountyHint')}
             </p>
           </div>
         )}
       </Card>
 
       <p className="text-sm text-[var(--text-muted)]">
-        Totaal per speler: <span className="tnum font-semibold text-[var(--text)]">
+        {t('tour.totalPerPlayer')} <span className="tnum font-semibold text-[var(--text)]">
           {new Intl.NumberFormat('nl-BE', { style: 'currency', currency }).format(totalCents / 100)}
         </span>
       </p>
 
       {overLimit && (
         <Notice tone="warn">
-          Boven de €50 die het gedoogbeleid van de Kansspelcommissie toelaat per
-          tornooi. Je kan doorgaan — de grens staat per club ingesteld — maar
-          weet dat je er dan buiten valt.
+          {t('tour.overLimit')}
         </Notice>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Startstack">
+        <Field label={t('tour.startingStack')}>
           <input inputMode="numeric" value={stack} onChange={(e) => setStack(e.target.value)} className={inputClass} />
         </Field>
-        <Field label="Re-entries" hint="Max. per speler">
+        <Field label={t('tour.reentries')} hint={t('tour.reentriesHint')}>
           <input inputMode="numeric" value={reentries} onChange={(e) => setReentries(e.target.value)} className={inputClass} />
         </Field>
-        <Field label="Late reg t/m level" hint="Leeg = onbeperkt">
+        <Field label={t('tour.lateReg')} hint={t('tour.lateRegHint')}>
           <input inputMode="numeric" value={lateReg} onChange={(e) => setLateReg(e.target.value)} className={inputClass} />
         </Field>
       </div>
 
       <Field
-        label="Blindstructuur"
+        label={t('tour.structure')}
         hint={
           structures.length === 0
             ? undefined
-            : 'Bepaalt wat de klok aftelt'
+            : t('tour.structureHint')
         }
       >
         {structures.length === 0 ? (
           <Notice tone="warn">
-            Deze club heeft nog geen blindstructuur.{' '}
+            {t('tour.noStructure')}{' '}
             <Link href={`/c/${clubSlug}/structuren`} className="underline">
-              Maak er eerst een aan
+              {t('tour.noStructureLink')}
             </Link>{' '}
-            — zonder structuur heeft de klok niets om af te tellen.
+            {t('tour.noStructureTail')}
           </Notice>
         ) : (
           <div className="flex gap-2">
@@ -225,34 +225,34 @@ export function TournamentForm({
                 </option>
               ))}
             </select>
-            <ButtonLink href={`/c/${clubSlug}/structuren`} className="shrink-0">Beheren</ButtonLink>
+            <ButtonLink href={`/c/${clubSlug}/structuren`} className="shrink-0">{t('tour.manage')}</ButtonLink>
           </div>
         )}
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Prijzenverdeling">
+        <Field label={t('tour.payouts')}>
           <select value={payoutId} onChange={(e) => setPayoutId(e.target.value)} className={inputClass}>
             {payouts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        <Field label="Seizoen" hint="Voor de ranking">
+        <Field label={t('tour.season')} hint={t('tour.seasonHint')}>
           <select value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={inputClass}>
-            <option value="">Telt niet mee</option>
+            <option value="">{t('tour.seasonNone')}</option>
             {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
       </div>
 
-      <Field label="Zichtbaar voor">
+      <Field label={t('tour.visibility')}>
         <select
           value={visibility}
           onChange={(e) => setVisibility(e.target.value as typeof visibility)}
           className={inputClass}
         >
-          <option value="members">Leden van de club</option>
-          <option value="public">Iedereen, ook op PokerLeague</option>
-          <option value="private">Alleen de staf</option>
+          <option value="members">{t('tour.visMembers')}</option>
+          <option value="public">{t('tour.visPublic')}</option>
+          <option value="private">{t('tour.visPrivate')}</option>
         </select>
       </Field>
 
@@ -262,9 +262,9 @@ export function TournamentForm({
 
       <div className="flex gap-3">
         <Button type="submit" variant="brand" size="lg" disabled={busy || structures.length === 0}>
-          {busy ? 'Bezig…' : 'Tornooi aanmaken'}
+          {busy ? t('common.busy') : t('tour.create')}
         </Button>
-        <ButtonLink href={`/c/${clubSlug}`} size="lg">Annuleren</ButtonLink>
+        <ButtonLink href={`/c/${clubSlug}`} size="lg">{t('common.cancel')}</ButtonLink>
       </div>
     </form>
   )
