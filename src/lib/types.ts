@@ -24,6 +24,7 @@ export interface TournamentRow {
   buyin_cents: number
   fee_cents: number
   bounty_cents: number
+  bounty_mode: string
   starting_stack: number
   max_reentries: number
   late_reg_level: number | null

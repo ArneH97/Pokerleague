@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+import { FloorPlayers } from '@/components/FloorPlayers'
 import { createClient } from '@/lib/supabase/client'
 import {
   resolveClock, formatDuration, formatBlinds, breakLabel,
@@ -203,6 +204,17 @@ export function FloorControls({
           }
         />
       </section>
+
+      {/* Het spelersbeheer staat onder de klok en niet op een aparte pagina:
+          aan de deur en aan tafel gebeurt alles door elkaar, en wisselen van
+          scherm midden in een level is precies wanneer je iets vergeet. */}
+      <FloorPlayers
+        tournamentId={tournamentId}
+        clubId={tournament.club_id}
+        bountyMode={tournament.bounty_mode}
+        maxReentries={tournament.max_reentries}
+        finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
+      />
 
       {levels.length > 0 && (
         <section>

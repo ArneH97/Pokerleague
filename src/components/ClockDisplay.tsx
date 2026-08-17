@@ -130,18 +130,20 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           style={{
             // Het masker vervaagt het merk naar de randen toe, zodat er geen
             // zichtbare grens is tussen beeld en achtergrond.
-            maskImage: 'radial-gradient(closest-side, #000 42%, transparent 88%)',
-            WebkitMaskImage: 'radial-gradient(closest-side, #000 42%, transparent 88%)',
+            maskImage: 'radial-gradient(closest-side, #000 58%, transparent 94%)',
+            WebkitMaskImage: 'radial-gradient(closest-side, #000 58%, transparent 94%)',
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={club.mark_url}
             alt=""
-            className="h-[84vh] w-auto max-w-[86vw] object-contain"
+            className="h-[88vh] w-auto max-w-[90vw] object-contain"
             style={{
-              opacity: isBreak ? 0.14 : 0.1,
-              filter: 'saturate(1.1)',
+              // Genoeg om het merk te herkennen, te weinig om met de cijfers
+              // te concurreren. De tijd blijft wit en helder bovenop.
+              opacity: isBreak ? 0.34 : 0.26,
+              filter: 'saturate(1.15) brightness(1.1)',
               transition: 'opacity 700ms ease',
             }}
           />
