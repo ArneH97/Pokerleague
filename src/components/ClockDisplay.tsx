@@ -6,6 +6,7 @@ import { formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
+import { useT } from '@/lib/i18n/context'
 
 /** Hoe lang de aankondiging van een nieuw level blijft staan. */
 const ANNOUNCE_MS = 8_000
@@ -26,6 +27,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const { tournament, club, levels, stats, loading, error, live } = useTournament(tournamentId)
   const { nowMs } = useServerTime()
   const sound = useClockSound()
+  const t = useT()
   useTicker(200)
 
   const resolved = tournament
@@ -62,9 +64,9 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
     }
   }, [running, levelIdx, secondsLeft, resolved?.level, sound])
 
-  if (loading) return <Centered>Laden…</Centered>
+  if (loading) return <Centered>{t('common.loading')}</Centered>
   if (error || !tournament || !resolved) {
-    return <Centered tone="error">{error ?? 'Onbekend tornooi'}</Centered>
+    return <Centered tone="error">{error ?? t('clock.unknown')}</Centered>
   }
 
   const brand = club?.primary_color ?? '#10b981'
@@ -151,7 +153,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
         <div className="shrink-0 text-right">
           <p className="text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
-            {isBreak ? 'Pauze' : running ? 'Level' : tournament.clock === 'paused' ? 'Gepauzeerd' : 'Nog niet gestart'}
+            {isBreak ? t('clock.break') : running ? t('clock.level') : tournament.clock === 'paused' ? t('clock.paused') : t('clock.notStarted')}
           </p>
           <p className="tnum text-[5.2vh] font-bold leading-none" style={{ color: accent }}>
             {isBreak ? '—' : playIdx}
@@ -170,7 +172,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             className="mb-[1vh] text-[6.5vh] font-bold uppercase tracking-[0.25em]"
             style={{ color: accent }}
           >
-            {level?.label ?? 'Pauze'}
+            {level?.label ?? t('clock.break')}
           </p>
         )}
 
@@ -189,57 +191,57 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
 
         {!isBreak && level && (
           <div className="mt-[2.5vh] flex items-end gap-[3vw]">
-            <BlindChip label="Small blind" value={level.smallBlind} />
-            <BlindChip label="Big blind" value={level.bigBlind} big accent={accent} />
-            {level.ante > 0 && <BlindChip label="Ante" value={level.ante} />}
+            <BlindChip label={t('clock.smallBlind')} value={level.smallBlind} />
+            <BlindChip label={t('clock.bigBlind')} value={level.bigBlind} big accent={accent} />
+            {level.ante > 0 && <BlindChip label={t('clock.ante')} value={level.ante} />}
           </div>
         )}
 
         <p className="mt-[2.5vh] text-[2.5vh] text-[var(--text-faint)]">
           {resolved.nextLevel
             ? resolved.nextLevel.isBreak
-              ? `Hierna — ${resolved.nextLevel.label ?? 'pauze'}`
-              : `Hierna — ${resolved.nextLevel.smallBlind.toLocaleString('nl-BE')} / ${resolved.nextLevel.bigBlind.toLocaleString('nl-BE')}`
-            : 'Laatste level'}
+              ? `${t('clock.next')} — ${resolved.nextLevel.label ?? t('clock.break')}`
+              : `${t('clock.next')} — ${resolved.nextLevel.smallBlind.toLocaleString('nl-BE')} / ${resolved.nextLevel.bigBlind.toLocaleString('nl-BE')}`
+            : t('clock.lastLevel')}
         </p>
       </section>
 
       <LevelPips levels={levels} current={levelIdx} accent={accent} />
 
       <footer className="relative grid grid-cols-4 gap-[1.6vw] px-[3.5vw] pb-[3.5vh] pt-[1.8vh]">
-        <Stat label="Spelers over" value={String(stats.playersLeft)} sub={`van ${stats.entriesTotal}`} />
+        <Stat label={t('clock.playersLeft')} value={String(stats.playersLeft)} sub={`${t('common.of')} ${stats.entriesTotal}`} />
         <Stat
-          label="Gem. stack"
+          label={t('clock.avgStack')}
           value={(stats.totalChips > 0
             ? averageStack(stats.totalChips, stats.playersLeft)
             : tournament.starting_stack ?? 0
           ).toLocaleString('nl-BE')}
         />
         <Stat
-          label="Prijzenpot"
+          label={t('clock.prizePool')}
           value={stats.prizePoolCents > 0
             ? formatMoney(stats.prizePoolCents, club?.currency ?? 'EUR')
             : '—'}
         />
-        <Stat label="Gespeeld" value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
+        <Stat label={t('clock.elapsed')} value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
       </footer>
 
       {announcing && level && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-sm">
           <p className="text-[3.2vh] font-medium uppercase tracking-[0.35em] text-[var(--text-muted)]">
-            {isBreak ? 'Pauze' : `Level ${playIdx}`}
+            {isBreak ? t('clock.break') : `${t('clock.level')} ${playIdx}`}
           </p>
           <p
             className="tnum mt-[2vh] text-center font-bold leading-none"
             style={{ fontSize: 'min(20vh, 15vw)', color: accent }}
           >
             {isBreak
-              ? (level.label ?? 'Pauze')
+              ? (level.label ?? t('clock.break'))
               : `${level.smallBlind.toLocaleString('nl-BE')} / ${level.bigBlind.toLocaleString('nl-BE')}`}
           </p>
           {!isBreak && level.ante > 0 && (
             <p className="mt-[2vh] text-[4vh] text-[var(--text-muted)]">
-              Ante {level.ante.toLocaleString('nl-BE')}
+              {t('clock.ante')} {level.ante.toLocaleString('nl-BE')}
             </p>
           )}
         </div>
@@ -252,13 +254,13 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           className="absolute bottom-[2.5vh] left-1/2 -translate-x-1/2 rounded-full px-[2.5vw] py-[1.4vh] text-[1.9vh] font-semibold shadow-2xl transition hover:brightness-110"
           style={{ background: accent, color: '#07090c' }}
         >
-          Geluid aanzetten
+          {t('clock.enableSound')}
         </button>
       )}
 
       {!live && (
         <p className="absolute bottom-2 right-3 text-[1.5vh] text-[#fbbf24]">
-          Verbinding kwijt — scherm ververst trager
+          {t('clock.offline')}
         </p>
       )}
     </main>

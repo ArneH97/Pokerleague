@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getClub, themeVars } from '@/lib/club'
+import { LocaleProvider } from '@/lib/i18n/context'
+import { isLocale } from '@/lib/i18n/dictionaries'
 
 /**
  * Omhulsel van de clubomgeving.
@@ -20,10 +22,16 @@ export default async function ClubLayout({ children, params }: LayoutProps<'/c/[
 
   if (!club) notFound()
 
+  // De taal is een instelling van de club, niet iets wat de floor elke avond
+  // opnieuw kiest. Op de zaalklok wil je al helemaal geen keuzescherm.
+  const locale = isLocale(club.locale) ? club.locale : 'nl'
+
   return (
-    <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]" style={themeVars(club)}>
-      {children}
-    </div>
+    <LocaleProvider locale={locale}>
+      <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]" style={themeVars(club)}>
+        {children}
+      </div>
+    </LocaleProvider>
   )
 }
 

@@ -10,6 +10,7 @@ import {
 import { toClockState } from '@/lib/types'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
+import { useT } from '@/lib/i18n/context'
 
 /**
  * Bedieningsscherm voor de floor.
@@ -31,6 +32,7 @@ export function FloorControls({
   const { nowMs, nowIso } = useServerTime()
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const t = useT()
   useTicker(250)
 
   async function apply(next: ClockState) {
@@ -52,16 +54,16 @@ export function FloorControls({
     if (err) {
       setActionError(
         err.message.includes('row-level security') || err.code === '42501'
-          ? 'Geen rechten om dit tornooi te bedienen.'
+          ? t('floor.noRights')
           : err.message,
       )
     }
     setBusy(false)
   }
 
-  if (loading) return <Shell><p className="text-[var(--text-muted)]">Laden…</p></Shell>
+  if (loading) return <Shell><p className="text-[var(--text-muted)]">{t('common.loading')}</p></Shell>
   if (error || !tournament) {
-    return <Shell><p className="text-[var(--danger)]">{error ?? 'Onbekend tornooi'}</p></Shell>
+    return <Shell><p className="text-[var(--danger)]">{error ?? t('clock.unknown')}</p></Shell>
   }
 
   const state = toClockState(tournament)
@@ -74,7 +76,7 @@ export function FloorControls({
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
-            {club?.name} · Floor
+            {club?.name} · {t('floor.title')}
           </p>
           <h1 className="text-2xl font-semibold">{tournament.name}</h1>
         </div>
@@ -85,7 +87,7 @@ export function FloorControls({
             }`}
           >
             <span className={`size-2 rounded-full ${live ? 'bg-[var(--ok)]' : 'bg-[var(--warn)]'}`} />
-            {live ? 'Live' : 'Verbinding kwijt'}
+            {live ? t('floor.live') : t('floor.offline')}
           </span>
           <a
             href={clockHref}
@@ -93,7 +95,7 @@ export function FloorControls({
             rel="noreferrer"
             className="rounded-lg border border-[var(--line-strong)] px-3 py-1.5 text-sm hover:bg-[var(--surface-hover)]"
           >
-            Zaalscherm openen ↗
+            {t('floor.openHallScreen')} ↗
           </a>
         </div>
       </header>
@@ -101,28 +103,26 @@ export function FloorControls({
       <section className="rounded-2xl bg-[var(--surface)] p-6 text-center">
         <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
           {resolved.level?.isBreak
-            ? (resolved.level.label ?? 'Pauze')
-            : `Level ${resolved.levelIdx + 1} van ${levels.length || '—'}`}
+            ? (resolved.level.label ?? t('clock.break'))
+            : `${t('clock.level')} ${resolved.levelIdx + 1} ${t('common.of')} ${levels.length || '—'}`}
         </p>
         <p className="my-2 text-7xl font-bold tabular-nums leading-none">
           {formatDuration(resolved.remainingMs)}
         </p>
         <p className="text-2xl text-[var(--text-muted)]">{formatBlinds(resolved.level)}</p>
         <p className="mt-1 text-sm text-[var(--text-faint)]">
-          {resolved.nextLevel ? `Hierna: ${formatBlinds(resolved.nextLevel)}` : 'Laatste level'}
+          {resolved.nextLevel ? `${t('clock.next')}: ${formatBlinds(resolved.nextLevel)}` : t('clock.lastLevel')}
         </p>
         {resolved.rolledOver > 0 && running && (
           <p className="mt-3 text-sm text-[var(--warn)]">
-            {resolved.rolledOver} level{resolved.rolledOver > 1 ? 's' : ''} automatisch
-            doorgerold — de klok liep door zonder dat er geklikt werd.
+            {resolved.rolledOver} {t('floor.rolledOver')}
           </p>
         )}
       </section>
 
       {levels.length === 0 && (
         <p className="rounded-xl border border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] p-4 text-sm text-[var(--warn)]">
-          Dit tornooi heeft nog geen blindstructuur. Koppel er een aan voor je start,
-          anders heeft de klok niets om af te tellen.
+          {t('floor.noStructure')}
         </p>
       )}
 
@@ -133,15 +133,15 @@ export function FloorControls({
             disabled={busy || levels.length === 0}
             onClick={() => apply(start(nowIso()))}
           >
-            Tornooi starten
+            {t('floor.start')}
           </Button>
         ) : running ? (
           <Button primary disabled={busy} onClick={() => apply(pause(state, nowMs()))}>
-            Pauzeren
+            {t('floor.pause')}
           </Button>
         ) : (
           <Button primary disabled={busy} onClick={() => apply(resume(state, nowIso()))}>
-            Hervatten
+            {t('floor.resume')}
           </Button>
         )}
 
@@ -149,26 +149,26 @@ export function FloorControls({
           disabled={busy || resolved.levelIdx === 0}
           onClick={() => apply(prevLevel(state, levels, nowMs(), nowIso()))}
         >
-          ← Vorig level
+          ← {t('floor.prevLevel')}
         </Button>
         <Button
           disabled={busy || resolved.levelIdx >= levels.length - 1}
           onClick={() => apply(nextLevel(state, levels, nowMs(), nowIso()))}
         >
-          Volgend level →
+          {t('floor.nextLevel')} →
         </Button>
         <div className="grid grid-cols-2 gap-3">
           <Button
             disabled={busy}
             onClick={() => apply(adjustTime(state, -60_000, nowMs(), nowIso()))}
           >
-            −1 min
+            {t('floor.minusMinute')}
           </Button>
           <Button
             disabled={busy}
             onClick={() => apply(adjustTime(state, 60_000, nowMs(), nowIso()))}
           >
-            +1 min
+            {t('floor.plusMinute')}
           </Button>
         </div>
       </section>
@@ -180,10 +180,10 @@ export function FloorControls({
       )}
 
       <section className="grid grid-cols-3 gap-3 text-center">
-        <Tile label="Spelers over" value={`${stats.playersLeft} / ${stats.entriesTotal}`} />
-        <Tile label="Inkopen" value={String(stats.entriesTotal)} />
+        <Tile label={t('clock.playersLeft')} value={`${stats.playersLeft} / ${stats.entriesTotal}`} />
+        <Tile label={t('floor.entries')} value={String(stats.entriesTotal)} />
         <Tile
-          label="Prijzenpot"
+          label={t('clock.prizePool')}
           value={
             stats.prizePoolCents > 0
               ? new Intl.NumberFormat('nl-BE', {
@@ -197,7 +197,7 @@ export function FloorControls({
 
       {levels.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm uppercase tracking-widest text-[var(--text-faint)]">Structuur</h2>
+          <h2 className="mb-2 text-sm uppercase tracking-widest text-[var(--text-faint)]">{t('floor.structure')}</h2>
           <ol className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
             {levels.map((l) => (
               <li
@@ -207,11 +207,11 @@ export function FloorControls({
                 } ${l.isBreak ? 'text-[#7dd3fc]' : ''}`}
               >
                 <span className="w-16 text-[var(--text-faint)]">
-                  {l.isBreak ? 'Pauze' : `#${l.idx + 1}`}
+                  {l.isBreak ? t('clock.break') : `#${l.idx + 1}`}
                 </span>
                 <span className="flex-1 tabular-nums">{formatBlinds(l)}</span>
                 <span className="tabular-nums text-[var(--text-faint)]">
-                  {Math.round(l.durationS / 60)} min
+                  {Math.round(l.durationS / 60)} {t('floor.min')}
                 </span>
               </li>
             ))}

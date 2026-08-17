@@ -4,6 +4,7 @@ import {
   Badge, ButtonLink, Card, EmptyState, Notice, Page, PageHeader, SectionTitle,
 } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
+import { isLocale, translator, type Key, type T } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -16,13 +17,13 @@ interface Row {
   fee_cents: number
 }
 
-const STATUS: Record<string, { label: string; tone: 'neutral' | 'live' | 'ok' }> = {
-  draft: { label: 'Concept', tone: 'neutral' },
-  scheduled: { label: 'Gepland', tone: 'neutral' },
-  running: { label: 'Bezig', tone: 'live' },
-  paused: { label: 'Gepauzeerd', tone: 'neutral' },
-  finished: { label: 'Afgelopen', tone: 'neutral' },
-  cancelled: { label: 'Geannuleerd', tone: 'neutral' },
+const STATUS: Record<string, { key: Key; tone: 'neutral' | 'live' | 'ok' }> = {
+  draft: { key: 'status.draft', tone: 'neutral' },
+  scheduled: { key: 'status.scheduled', tone: 'neutral' },
+  running: { key: 'status.running', tone: 'live' },
+  paused: { key: 'status.paused', tone: 'neutral' },
+  finished: { key: 'status.finished', tone: 'neutral' },
+  cancelled: { key: 'status.cancelled', tone: 'neutral' },
 }
 
 export default async function Page_({ params }: PageProps<'/c/[club]'>) {
@@ -35,6 +36,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
   if (!claims?.claims) redirect(`/c/${slug}/login`)
 
   const role = await getClubRole(club.id)
+  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
 
   const { data } = await supabase
     .from('tournaments')
@@ -51,7 +53,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
     .reverse()
   const past = all.filter((t) => t.status === 'finished' || t.status === 'cancelled')
 
-  const fmt = new Intl.DateTimeFormat('nl-BE', {
+  const fmt = new Intl.DateTimeFormat(`${club.locale}-BE`, {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     timeZone: club.timezone,
   })
@@ -61,77 +63,70 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
   return (
     <Page>
       <PageHeader
+        logoUrl={club.logo_url}
         overline={club.city ?? undefined}
         title={club.name}
-        subtitle="Tornooibeheer"
+        subtitle={t('club.subtitle')}
         actions={
           <>
             {canManage && (
               <ButtonLink variant="brand" href={`/c/${slug}/tornooien/nieuw`}>
-                Nieuw tornooi
+                {t('club.newTournament')}
               </ButtonLink>
             )}
             <form action="/auth/signout" method="post">
               <button className="inline-flex items-center rounded-[var(--radius)] border border-[var(--line-strong)] px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]">
-                Afmelden
+                {t('common.signOut')}
               </button>
             </form>
           </>
         }
       />
 
-      {club.logo_url && (
-        <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={club.logo_url} alt="" className="size-12 rounded-[var(--radius)] object-contain" />
-        </div>
-      )}
-
       {!role && (
         <Notice tone="warn">
-          Je account is niet gekoppeld aan deze club, dus je ziet hier niets.
-          Vraag een beheerder om je toe te voegen.
+          {t('club.notLinked')}
         </Notice>
       )}
 
       {role && all.length === 0 && (
         <EmptyState
-          title="Nog geen tornooien"
+          title={t('club.noTournaments')}
           action={
             canManage && (
               <ButtonLink variant="brand" href={`/c/${slug}/tornooien/nieuw`}>
-                Eerste tornooi aanmaken
+                {t('club.firstTournament')}
               </ButtonLink>
             )
           }
         >
-          Maak er een aan om de klok te kunnen gebruiken.
+          {t('club.noTournamentsBody')}
         </EmptyState>
       )}
 
       {live.length > 0 && (
         <section>
-          <SectionTitle>Nu bezig</SectionTitle>
+          <SectionTitle>{t('club.nowPlaying')}</SectionTitle>
           <Card padded={false} className="overflow-hidden ring-1 ring-[color-mix(in_oklab,var(--ok)_25%,transparent)]">
-            {live.map((t) => <Item key={t.id} t={t} club={club} fmt={fmt} />)}
+            {live.map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} />)}
           </Card>
         </section>
       )}
 
       {upcoming.length > 0 && (
         <section>
-          <SectionTitle>Gepland</SectionTitle>
+          <SectionTitle>{t('club.scheduled')}</SectionTitle>
           <Card padded={false} className="overflow-hidden">
-            {upcoming.map((t) => <Item key={t.id} t={t} club={club} fmt={fmt} />)}
+            {upcoming.map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} />)}
           </Card>
         </section>
       )}
 
       {past.length > 0 && (
         <section>
-          <SectionTitle>Eerder</SectionTitle>
+          <SectionTitle>{t('club.earlier')}</SectionTitle>
           <Card padded={false} className="overflow-hidden">
-            {past.slice(0, 10).map((t) => <Item key={t.id} t={t} club={club} fmt={fmt} />)}
+            {past.slice(0, 10).map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} />)}
           </Card>
         </section>
       )}
@@ -139,7 +134,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
       {canManage && (
         <p className="pt-2 text-sm text-[var(--text-faint)]">
           <Link href={`/c/${slug}/structuren`} className="underline underline-offset-4 hover:text-[var(--text-muted)]">
-            Blindstructuren beheren
+            {t('club.manageStructures')}
           </Link>
         </p>
       )}
@@ -148,19 +143,20 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
 }
 
 function Item({
-  t, club, fmt,
+  t, club, fmt, tr,
 }: {
   t: Row
   club: { slug: string; currency: string }
   fmt: Intl.DateTimeFormat
+  tr: T
 }) {
-  const s = STATUS[t.status] ?? { label: t.status, tone: 'neutral' as const }
+  const s = STATUS[t.status]
   return (
     <div className="hairline flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="truncate font-medium">{t.name}</p>
-          <Badge tone={s.tone}>{s.label}</Badge>
+          <Badge tone={s?.tone ?? 'neutral'}>{s ? tr(s.key) : t.status}</Badge>
         </div>
         <p className="tnum mt-0.5 text-sm text-[var(--text-muted)]">
           {fmt.format(new Date(t.scheduled_at))}
@@ -169,8 +165,8 @@ function Item({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <ButtonLink size="sm" href={`/c/${club.slug}/klok/${t.id}`}>Klok</ButtonLink>
-        <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/floor/${t.id}`}>Floor</ButtonLink>
+        <ButtonLink size="sm" href={`/c/${club.slug}/klok/${t.id}`}>{tr('club.clock')}</ButtonLink>
+        <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/floor/${t.id}`}>{tr('club.floor')}</ButtonLink>
       </div>
     </div>
   )

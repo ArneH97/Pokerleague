@@ -81,7 +81,7 @@ export function Page({ children, width = 'md' }: { children: React.ReactNode; wi
 }
 
 export function PageHeader({
-  overline, title, subtitle, backHref, backLabel, actions,
+  overline, title, subtitle, backHref, backLabel, actions, logoUrl,
 }: {
   overline?: string
   title: string
@@ -89,10 +89,18 @@ export function PageHeader({
   backHref?: string
   backLabel?: string
   actions?: React.ReactNode
+  /** Clublogo, links naast de titel. Hoort bij de kop, niet ergens los. */
+  logoUrl?: string | null
 }) {
   return (
-    <header className="flex flex-wrap items-start justify-between gap-4">
-      <div className="min-w-0">
+    <header className="flex flex-wrap items-center justify-between gap-4">
+      {logoUrl && (
+        <div className="order-first flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoUrl} alt="" className="size-full object-contain p-1" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
         {backHref && (
           <Link
             href={backHref}

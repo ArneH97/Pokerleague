@@ -48,6 +48,33 @@
   --text-faint: #6b7484;
 }
 
+/**
+ * Lichte variant, voor de publieke kant van PokerLeague.
+ *
+ * De app zelf is donker omdat hij 's avonds in een zaal gebruikt wordt. Maar
+ * een landingspagina die iemand overdag op zijn telefoon opent, hoort niet
+ * aan te voelen als een bedieningspaneel.
+ */
+[data-light] {
+  --bg:            #ffffff;
+  --surface:       #ffffff;
+  --surface-2:     #f6f7f9;
+  --surface-hover: #eef0f4;
+  --line:          #e5e8ed;
+  --line-strong:   #d3d8e0;
+
+  --text:          #0f1620;
+  --text-muted:    #5a6472;
+  --text-faint:    #8b95a3;
+
+  --brand:         #047857;
+  --on-brand:      #ffffff;
+
+  --danger:        #b91c1c;
+  --warn:          #92400e;
+  --ok:            #047857;
+}
+
 @theme inline {
   --color-bg:            var(--bg);
   --color-surface:       var(--surface);
