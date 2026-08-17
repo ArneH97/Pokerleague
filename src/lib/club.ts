@@ -51,6 +51,10 @@ export interface Club {
   contact_phone: string | null
   /** Openingsdag. Zolang die er is en er niets gespeeld is, telt de pagina af. */
   opens_on: string | null
+  /** Toont deze club namen aan buitenstaanders? Zie migratie 0023. */
+  public_names: boolean
+  /** Gedoogbeleid. Vorm staat in 0001_schema.sql; instelbaar per club. */
+  compliance: Record<string, unknown> | null
 }
 
 export const getClub = cache(async (slug: string): Promise<Club | null> => {
@@ -58,7 +62,8 @@ export const getClub = cache(async (slug: string): Promise<Club | null> => {
   const { data } = await supabase
     .from('clubs')
     .select('id,slug,name,city,currency,timezone,locale,logo_url,mark_url,primary_color,settings,'
-      + 'intro,address_line,maps_url,play_rhythm,contact_email,contact_phone,opens_on')
+      + 'intro,address_line,maps_url,play_rhythm,contact_email,contact_phone,opens_on,'
+      + 'public_names,compliance')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle<Club>()

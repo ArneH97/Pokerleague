@@ -18,7 +18,7 @@ export function ClubNav({
   slug, active, canManage, t,
 }: {
   slug: string
-  active: 'tournaments' | 'standings' | 'members' | 'stats' | 'structures'
+  active: 'tournaments' | 'standings' | 'members' | 'stats' | 'structures' | 'settings'
   canManage: boolean
   t: T
 }) {
@@ -28,6 +28,7 @@ export function ClubNav({
     { key: 'members', href: `/c/${slug}/leden`, label: t('members.title'), staff: true },
     { key: 'stats', href: `/c/${slug}/statistieken`, label: t('stats.title'), staff: true },
     { key: 'structures', href: `/c/${slug}/structuren`, label: t('struct.title'), staff: true },
+    { key: 'settings', href: `/c/${slug}/instellingen`, label: t('settings.title'), staff: true },
   ]
 
   return (

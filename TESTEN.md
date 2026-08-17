@@ -28,9 +28,11 @@ de losse migraties die je nog niet had, in volgorde:
 0021_payout_list.sql        de uitbetaallijst voor aan de kassa
 0022_whole_points.sql       punten zonder cijfers na de komma
 0023_public_club.sql        de publieke clubpagina's voor spelers
+0024_club_profile.sql       adres, speeldagen, contact en openingsdag
+0025_short_names.sql        publieke namen als "Arne H."
 ```
 
-Alle zestien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
+Alle achttien zijn meerdere keren te draaien zonder schade — ik heb ze twee keer
 na elkaar over een gevulde database gehaald. Weet je niet meer waar je stond,
 draai ze dan gewoon allemaal.
 
@@ -43,7 +45,11 @@ demo_testavond.sql    één avond die nu middenin de finaletafel staat
 
 En `demo_cutoff_wissen.sql` haalt beide er weer uit. Doe dat vóór 6 september.
 
-Los daarvan staat `publieke_namen_aan.sql`. Draai je die, dan tonen de
+Los daarvan staan een paar losse scripts. `cutoff_leegmaken.sql` haalt alle
+tornooien, uitslagen en leden weg maar laat je staf, structuren, sjablonen en
+seizoenen staan — dat is wat je vóór de opening draait.
+
+En `publieke_namen_aan.sql`. Draai je die, dan tonen de
 publieke pagina's van Cutoff de namen van je spelers in plaats van
 gebruikersnamen. Zie de uitleg onder *De publieke kant*.
 
@@ -147,6 +153,29 @@ aantal spelers. Daar staat een aparte knop voor op het telscherm.
 
 `/c/cutoff/tornooien/<id>` toont de uitslag met prijzengeld en punten, en
 waarschuwt als het uitbetaalde bedrag afwijkt van de pot.
+
+### Instellingen
+
+`/c/cutoff/instellingen`, alleen voor de eigenaar en beheerders. Hier staat
+alles wat vroeger alleen met een SQL van mij te wijzigen was: naam en gemeente,
+taal en tijdzone, logo en clubkleur, de hele publieke pagina, de
+prijzenverdeling per veldgrootte, het puntensysteem, de seizoenen en het
+gedoogbeleid.
+
+Elk blok heeft zijn eigen bewaarknop. Een fout in het ene blok houdt het
+andere niet tegen, en je hebt niet het gevoel dat je met de clubkleur ook het
+gedoogbeleid mee wegschrijft.
+
+De **prijzenverdeling** typ je als één regel per veldgrootte:
+`9;17;50, 30, 20` betekent dat bij negen tot zeventien deelnemers de eerste
+drie 50, 30 en 20 procent krijgen. De som hoort rond de honderd te liggen; ver
+ernaast weigert hij, want dat is een tikfout.
+
+Wat er bewust niet bij staat: het adres van de club, want daar hangt DNS aan
+die niet mee verhuist, en de blindstructuren, want die hebben hun eigen scherm.
+
+Een **floor kan hier niets wijzigen**. Dat wordt niet in het scherm bewaakt
+maar in de database, en er staat een test op die het probeert.
 
 Verder in het menu bovenaan: **Klassement** (per seizoen, jaar of maand, met de
 puntenformule eronder uitgelegd), **Leden** (met bovenaan wie er geen mailadres
@@ -281,6 +310,13 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
       nieuw level bij te komen met hogere blinds, niet 00:00.
 - [ ] Cijfers: klik door dit jaar, deze maand en alles, en geef daarna zelf
       twee data in.
+- [ ] Instellingen: verander de clubkleur en kijk of de zaalklok meekleurt.
+- [ ] Instellingen: pas de prijzenverdeling aan, maak een nieuw tornooi en kijk
+      of de nieuwe ladder erin staat.
+- [ ] Instellingen: typ een regel met percentages die optellen tot 70. Hij
+      hoort te weigeren en te zeggen waarom.
+- [ ] Log in als iemand met de rol floor en open de instellingen. Je hoort een
+      melding te krijgen in plaats van een formulier.
 - [ ] Open `/c/cutoff` in een privévenster (dus uitgelogd). Je hoort de
       publieke voorpagina te zien en niet het inlogscherm.
 - [ ] Volg het live-bord op je telefoon terwijl je op de floor iemand
@@ -302,8 +338,6 @@ Loopt het spoor door? Draai `demo_testavond.sql` opnieuw; hij zet alles terug.
   stack ingeven, live klassement, resultaten over clubs heen.
 - **De uitnodigingsmails**: staan in de wachtrij, vertrekken pas zodra er een
   mailleverancier aanhangt (Resend of Brevo).
-- **Instellingen per club**: de prijzenverdeling per veldgrootte en het
-  puntensysteem zitten alleen in de database, daar is nog geen scherm voor.
 - **Mobiele pass** over de publieke kant.
 
 En op jouw lijstje: DNS voor pokerleague.be, en Supabase op Pro vóór
