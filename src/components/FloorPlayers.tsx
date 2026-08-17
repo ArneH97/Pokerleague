@@ -154,12 +154,17 @@ export function FloorPlayers({
       )}
 
       {/* ------------------------------------------------------- toevoegen */}
-      {!finished && (
+      {/* Zoekveld óf formulier, nooit allebei. Het uitklaplijstje zweeft over
+          de pagina heen; laat je dat openstaan terwijl het formulier eronder
+          verschijnt, dan overlappen ze elkaar. */}
+      {!finished && !draft && (
         <div className="relative">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('players.searchPlaceholder')}
+            autoComplete="off"
+            name="speler-zoeken"
             disabled={busy}
             className="w-full rounded-xl border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-3 text-base outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
           />
@@ -176,7 +181,16 @@ export function FloorPlayers({
                       onClick={() => void addExisting(m.playerId)}
                       className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--surface-hover)] disabled:opacity-45"
                     >
-                      <span>{m.name}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{m.name}</span>
+                        {/* Het adres erbij, want twee keer dezelfde naam is
+                            geen uitzondering in een ledenbestand. */}
+                        {m.email && (
+                          <span className="block truncate text-xs text-[var(--text-faint)]">
+                            {m.email}
+                          </span>
+                        )}
+                      </span>
                       {already && (
                         <span className="text-xs text-[var(--text-faint)]">{t('players.alreadyIn')}</span>
                       )}
@@ -443,6 +457,8 @@ function NewPlayerForm({
           <span className="mb-1 block text-xs text-[var(--text-muted)]">{t('players.name')}</span>
           <input
             autoFocus={draft.name === ''}
+            autoComplete="off"
+            name="speler-naam"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 outline-none focus:border-[var(--brand)]"
@@ -453,6 +469,8 @@ function NewPlayerForm({
           <input
             autoFocus={draft.name !== ''}
             type="email"
+            autoComplete="off"
+            name="speler-mail"
             inputMode="email"
             autoCapitalize="off"
             autoCorrect="off"
