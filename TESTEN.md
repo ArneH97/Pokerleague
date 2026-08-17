@@ -122,8 +122,12 @@ Onderaan zie je het getelde totaal naast wat er in spel hoort te zijn. Tussen
 **95% en 105%** is in orde; chip-ups geven altijd wat drift.
 
 **Voorstellen.** ICM, chipchop en even split naast elkaar. Klik op een kolomkop
-om die over te nemen, of typ zelf iets. Met de vinkjes kies je wat de zaal te
-zien krijgt — alle drie tegelijk mag.
+om die over te nemen, of typ zelf iets.
+
+Bovenaan staan drie knoppen: **wat de zaal ziet**. Alle drie aan laat de tafel
+het verschil zien, één aan maakt korter een einde aan de discussie. Staat het
+voorstel al op de beamer, dan gaat een klik er meteen naartoe — je hoeft niet
+apart te bewaren.
 
 Bij **Iedereen akkoord** vraagt hij eerst wélk voorstel de tafel afgesproken
 heeft, met de bedragen erbij. Staan er drie op het scherm, dan is dat de enige
@@ -225,7 +229,8 @@ waarvan 5 nog aan tafel, pot € 320, level 5, inkopen gesloten.
       Draai het daarna terug.
 - [ ] Deal: tel de stapels (probeer eens een totaal ver naast de waarheid — hij
       hoort te weigeren), bekijk de drie voorstellen, zet ze alle drie op het
-      zaalscherm, en sluit af. Hij hoort te vragen welk voorstel het geworden
+      zaalscherm, klik er daarna twee weg en kijk of de beamer meteen volgt,
+      en sluit af. Hij hoort te vragen welk voorstel het geworden
       is, en de klok hoort daarna stil te staan. Daarna hoort de
       uitbetaallijst de afgesproken bedragen per naam te tonen.
 - [ ] Pauzeer en hervat: het zaalscherm hoort "tornooi gepauzeerd" en

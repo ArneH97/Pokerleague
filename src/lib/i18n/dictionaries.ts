@@ -513,7 +513,11 @@ const nl = {
   'deal.needCount': 'Tel eerst de stapels; ICM en chipchop kunnen niet zonder.',
   'deal.paidOut': 'Al uitbetaald',
   'deal.project': 'Op het scherm',
-  'deal.projectHint': 'Vink aan wat de zaal te zien krijgt. Je mag er meerdere tegelijk tonen.',
+  'deal.projectHint':
+    'Klik aan wat op de beamer komt. Alle drie naast elkaar laat de tafel het verschil zien; één voorstel maakt korter een einde aan de discussie.',
+  'deal.projectCount': 'op het zaalscherm',
+  'deal.projectNone': 'Niets geselecteerd',
+  'deal.needCountShort': 'Eerst tellen',
   'deal.agreed': 'Afgesproken',
   'deal.saveStacks': 'Stapels bewaren',
   // Prijzenverdeling
@@ -1036,7 +1040,11 @@ const fr: Record<Key, string> = {
   'deal.needCount': 'Comptez d’abord les tapis ; l’ICM et le chip chop en ont besoin.',
   'deal.paidOut': 'Déjà versé',
   'deal.project': 'À l’écran',
-  'deal.projectHint': 'Cochez ce que la salle voit. Vous pouvez en afficher plusieurs à la fois.',
+  'deal.projectHint':
+    'Choisissez ce qui apparaît à l’écran. Les trois côte à côte montrent la différence ; une seule proposition écourte la discussion.',
+  'deal.projectCount': 'à l’écran de salle',
+  'deal.projectNone': 'Rien de sélectionné',
+  'deal.needCountShort': 'Comptez d’abord',
   'deal.agreed': 'Convenu',
   'deal.saveStacks': 'Enregistrer les tapis',
   'payout.title': 'Gains',
@@ -1556,7 +1564,11 @@ const en: Record<Key, string> = {
   'deal.needCount': 'Count the stacks first; ICM and chip chop cannot do without.',
   'deal.paidOut': 'Already paid out',
   'deal.project': 'On the screen',
-  'deal.projectHint': 'Tick what the room sees. You can show more than one at a time.',
+  'deal.projectHint':
+    'Pick what goes on the beamer. All three side by side lets the table see the difference; one proposal ends the discussion sooner.',
+  'deal.projectCount': 'on the hall screen',
+  'deal.projectNone': 'Nothing selected',
+  'deal.needCountShort': 'Count first',
   'deal.agreed': 'Agreed',
   'deal.saveStacks': 'Save the stacks',
   'payout.title': 'Prize money',

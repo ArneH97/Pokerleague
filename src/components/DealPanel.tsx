@@ -115,6 +115,27 @@ export function DealPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [n, prizes, seats, counts])
 
+  /**
+   * Een voorstel aan- of uitzetten.
+   *
+   * Staat het al op de beamer, dan gaat de wijziging er meteen naartoe. Eerst
+   * klikken en dan nog eens op "bewaren" moeten is precies het soort stap dat
+   * je aan een finaletafel vergeet — en dan staat de zaal naar een voorstel te
+   * kijken dat de floor al ingetrokken dacht te hebben.
+   */
+  function toggle(c: Col) {
+    const next = { ...show, [c]: !show[c] }
+    setShow(next)
+    if (openDeal && (next.icm || next.chop || next.even)) {
+      setBusy(true)
+      void saveDeal(next).finally(() => setBusy(false))
+    }
+  }
+
+  /** Hoeveel voorstellen er nu op het zaalscherm zouden komen. */
+  const shownCount = (['icm', 'chop', 'even'] as Col[])
+    .filter((c) => show[c] && (c === 'even' || counted)).length
+
   /** Wat een bepaald voorstel voor deze zitplaats uitkeert. */
   function valueOf(col: Col, i: number): number {
     const s = result.shares[i]
@@ -172,22 +193,25 @@ export function DealPanel({
    * eerst de akkoord-bedragen kan vastzetten en pas daarna de deal bevestigt
    * — anders sluit de database af op wat er stond vóór de laatste keuze.
    */
-  async function saveDeal(): Promise<boolean> {
+  async function saveDeal(showOverride?: Record<Col, boolean>): Promise<boolean> {
     setError(null)
+    // De keuze kan meekomen als argument: React heeft de nieuwe state nog
+    // niet doorgevoerd op het moment dat een knop hem meteen wil bewaren.
+    const vis = showOverride ?? show
     const shares = seats.map((s, i) => {
       const share = result.shares[i]
       return {
         tournament_player_id: s.id,
         name: s.name,
         chips: counted ? (counts[s.id] ?? 0) : 0,
-        icm_cents: show.icm && counted ? share.icmCents : null,
-        chop_cents: show.chop && counted ? share.chopCents : null,
-        even_cents: show.even ? (even[i] ?? 0) : null,
+        icm_cents: vis.icm && counted ? share.icmCents : null,
+        chop_cents: vis.chop && counted ? share.chopCents : null,
+        even_cents: vis.even ? (even[i] ?? 0) : null,
         agreed_cents: amounts[s.id] ?? 0,
       }
     })
-    const method = show.icm && show.chop && show.even ? 'all'
-      : show.icm ? 'icm' : show.chop ? 'chipchop' : 'even'
+    const method = vis.icm && vis.chop && vis.even ? 'all'
+      : vis.icm ? 'icm' : vis.chop ? 'chipchop' : 'even'
 
     const { error: err } = await supabase.rpc('deal_propose', {
       p_tournament_id: tournamentId,
@@ -330,27 +354,58 @@ export function DealPanel({
         </p>
       )}
 
-      {/* -------------------------------------------------- welke tonen we */}
-      <p className="mt-3 text-xs uppercase tracking-widest text-[var(--text-faint)]">
-        {t('deal.project')}
-      </p>
-      <div className="mt-1.5 flex flex-wrap gap-3">
-        {(['icm', 'chop', 'even'] as const).map((c) => (
-          <label key={c} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={show[c]}
-              disabled={c !== 'even' && !counted}
-              onChange={(e) => setShow((v) => ({ ...v, [c]: e.target.checked }))}
-              className="size-4"
-            />
-            <span className={c !== 'even' && !counted ? 'text-[var(--text-faint)]' : undefined}>
-              {c === 'icm' ? t('deal.icm') : c === 'chop' ? t('deal.chop') : t('deal.even')}
-            </span>
-          </label>
-        ))}
+      {/* -------------------------------------------------- welke tonen we
+          Drie knoppen en geen vinkjes. Dit is de keuze die de floor het
+          vaakst maakt aan de finaletafel — alle drie tonen zodat de tafel het
+          verschil ziet, of net één omdat er anders eindeloos onderhandeld
+          wordt — en die keuze hoort niet weggestopt te zitten in
+          aankruisvakjes die je pas ziet als je ernaar zoekt. Wat aanstaat is
+          wat er op de beamer komt; dat moet je in één oogopslag zien. */}
+      <div className="mt-4 rounded-xl border border-[var(--line-strong)] bg-[var(--surface-2)] p-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-xs uppercase tracking-widest text-[var(--text-faint)]">
+            {t('deal.project')}
+          </p>
+          <p className="text-xs text-[var(--text-faint)]">
+            {shownCount === 0 ? t('deal.projectNone') : `${shownCount} ${t('deal.projectCount')}`}
+          </p>
+        </div>
+
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {(['icm', 'chop', 'even'] as const).map((c) => {
+            const available = c === 'even' || counted
+            const on = show[c] && available
+            return (
+              <button
+                key={c}
+                type="button"
+                disabled={!available}
+                onClick={() => toggle(c)}
+                aria-pressed={on}
+                className={`rounded-lg border px-3 py-2.5 text-left transition disabled:opacity-30 ${
+                  on
+                    ? 'border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_16%,transparent)]'
+                    : 'border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                }`}
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <span aria-hidden className={on ? 'text-[var(--brand)]' : 'text-[var(--text-faint)]'}>
+                    {on ? '☑' : '☐'}
+                  </span>
+                  {c === 'icm' ? t('deal.icm') : c === 'chop' ? t('deal.chop') : t('deal.even')}
+                </span>
+                <span className="mt-0.5 block tabular-nums text-xs text-[var(--text-muted)]">
+                  {available
+                    ? seats.map((_, i) => formatMoney(valueOf(c, i), currency)).join(' · ')
+                    : t('deal.needCountShort')}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <p className="mt-2 text-xs text-[var(--text-faint)]">{t('deal.projectHint')}</p>
       </div>
-      <p className="mt-1 text-xs text-[var(--text-faint)]">{t('deal.projectHint')}</p>
 
       {/* -------------------------------------------------------- de tabel */}
       <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--line)]">
