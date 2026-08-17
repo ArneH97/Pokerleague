@@ -63,17 +63,19 @@ function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
   return (
     <main className="flex min-h-dvh items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center gap-3">
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="size-11 rounded-[var(--radius)] object-contain" />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-[0.7rem] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
+        <div className="mb-7 flex flex-col items-center gap-4 text-center">
+          {logoUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoUrl} alt={brandName} className="h-24 w-auto max-w-[13rem] object-contain" />
+              <h1 className="sr-only">{brandName}</h1>
+            </>
+          ) : (
+            <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
               {brandName}
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight">{t('common.signIn')}</h1>
-          </div>
+          )}
+          <h2 className="text-2xl font-semibold tracking-tight">{t('common.signIn')}</h2>
         </div>
 
         <Card>

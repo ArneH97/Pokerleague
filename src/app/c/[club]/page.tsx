@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { ClubHeader } from '@/components/ClubHeader'
 import {
-  Badge, ButtonLink, Card, EmptyState, Notice, Page, PageHeader, SectionTitle,
+  Badge, ButtonLink, Card, EmptyState, Notice, Page, SectionTitle,
 } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator, type Key, type T } from '@/lib/i18n/dictionaries'
@@ -62,11 +63,11 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
 
   return (
     <Page>
-      <PageHeader
-        logoUrl={club.logo_url}
-        overline={club.city ?? undefined}
-        title={club.name}
+      <ClubHeader
+        name={club.name}
+        city={club.city}
         subtitle={t('club.subtitle')}
+        logoUrl={club.logo_url}
         actions={
           <>
             {canManage && (

@@ -133,7 +133,7 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             <img
               src={club.logo_url}
               alt=""
-              className="h-[9vh] w-auto max-w-[18vw] object-contain"
+              className="h-[14vh] w-auto max-w-[22vw] object-contain"
             />
           ) : (
             <div
@@ -144,9 +144,13 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
-              {club?.name ?? ''}
-            </p>
+            {/* Bevat het logo de clubnaam al, dan zetten we hem er niet nog
+                eens naast. */}
+            {!club?.logo_url && (
+              <p className="truncate text-[1.9vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
+                {club?.name ?? ''}
+              </p>
+            )}
             <h1 className="truncate text-[3.6vh] font-semibold tracking-tight">{tournament.name}</h1>
           </div>
         </div>
