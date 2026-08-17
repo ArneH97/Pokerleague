@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { DaysToGo } from '@/components/public/DaysToGo'
 import { ClubMasthead, PublicShell } from '@/components/public/PublicShell'
+import { YourNumbers } from '@/components/public/YourNumbers'
 import type { Club } from '@/lib/club'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
 import {
@@ -59,6 +60,7 @@ export async function PublicClubHome({ club, locale }: { club: Club; locale: Loc
     return (
       <PublicShell club={club} locale={locale} active="home">
         <ClubMasthead club={club} locale={locale} />
+        <YourNumbers club={club} locale={locale} />
 
         <section className="mt-5 overflow-hidden rounded-3xl border border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-14">
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--brand)]">
@@ -88,6 +90,7 @@ export async function PublicClubHome({ club, locale }: { club: Club; locale: Loc
   return (
     <PublicShell club={club} locale={locale} active="home">
       <ClubMasthead club={club} locale={locale} />
+      <YourNumbers club={club} locale={locale} />
 
       <div className="mt-5 grid gap-4 lg:grid-cols-5">
         <div className="space-y-4 lg:col-span-3">

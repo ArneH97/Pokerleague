@@ -47,6 +47,23 @@ interface ClubRow {
   logo_url: string | null
 }
 
+/** Wat deze speler bij één club heeft staan. Zie migratie 0031. */
+interface ClubStat {
+  club_slug: string
+  club_name: string
+  club_city: string | null
+  logo_url: string | null
+  tournaments: number
+  points: number
+  best_position: number
+  cashes: number
+  knockouts: number
+  prize_cents: number
+  rank: number
+  of_players: number
+  last_played: string | null
+}
+
 interface StaffRow {
   slug: string
   name: string
@@ -82,17 +99,37 @@ export default async function Page() {
   // Ophalen of aanmaken. Zie de uitleg hierboven.
   await supabase.rpc('claim_my_player', {})
 
-  const [meRes, resultsRes, clubsRes, staffRes] = await Promise.all([
+  const [meRes, resultsRes, clubsRes, staffRes, statsRes] = await Promise.all([
     supabase.rpc('my_player'),
     supabase.rpc('my_results'),
     supabase.rpc('my_clubs'),
     supabase.rpc('my_staff_clubs'),
+    supabase.rpc('my_club_stats', {}),
   ])
 
   const me = ((meRes.data ?? []) as unknown as Me[])[0] ?? null
   const results = (resultsRes.data ?? []) as unknown as ResultRow[]
   const clubs = (clubsRes.data ?? []) as unknown as ClubRow[]
   const staff = (staffRes.data ?? []) as unknown as StaffRow[]
+  const stats = (statsRes.data ?? []) as unknown as ClubStat[]
+
+  // Lidmaatschap en resultaten zijn twee verschillende dingen, en ze lopen
+  // niet gelijk. Je bent lid vanaf het moment dat de floor je toevoegt; je
+  // hebt pas cijfers nadat er een avond afgesloten is. Een club waar je vorige
+  // week voor het eerst was hoort dus in de lijst te staan, met een lege
+  // regel — anders lijkt het alsof je er niet bij hoort.
+  const byClub = new Map(stats.map((s) => [s.club_slug, s]))
+  const mijnClubs = [
+    ...clubs.map((c) => ({ club: c, stat: byClub.get(c.slug) ?? null })),
+    // En omgekeerd: wie ergens speelde maar uit het ledenbestand verdween,
+    // heeft daar wél een verleden. Dat hoor je niet stil te laten vallen.
+    ...stats
+      .filter((s) => !clubs.some((c) => c.slug === s.club_slug))
+      .map((s) => ({
+        club: { slug: s.club_slug, name: s.club_name, city: s.club_city, logo_url: s.logo_url },
+        stat: s,
+      })),
+  ]
 
   if (!me) {
     return (
@@ -134,6 +171,12 @@ export default async function Page() {
             {me.username && (
               <p className="mt-1 text-sm text-[var(--text-faint)]">@{me.username}</p>
             )}
+            {/* Eén regel die zegt wat deze pagina is. Zonder die regel is dit
+                gewoon "een tweede site met ook iets van mij erop" — en dat is
+                precies de verwarring die dit platform veroorzaakte. */}
+            <p className="mt-2 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
+              {t('me.lede')}
+            </p>
           </div>
 
           {/* --------------------------------------------------- waar hoor ik
@@ -146,24 +189,54 @@ export default async function Page() {
               {t('me.where')}
             </h2>
 
-            {clubs.length === 0 ? (
+            {mijnClubs.length === 0 ? (
               <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
                 {t('me.noClubs')}
               </p>
             ) : (
-              <ul className="mt-3 space-y-1.5">
-                {clubs.map((c) => (
-                  <li key={c.slug}>
-                    <Link
-                      href={`/c/${c.slug}`}
-                      className="text-sm underline-offset-4 hover:underline"
-                    >
-                      {c.name}
-                      {c.city ? <span className="text-[var(--text-faint)]"> · {c.city}</span> : null}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {/* Deze zin blijft staan ook als er clubs zijn. Hij verdween
+                    vroeger zodra je er eentje had — net op het moment dat het
+                    onderscheid tussen account en lidmaatschap begint te tellen. */}
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
+                  {t('me.clubsBody')}
+                </p>
+
+                <ul className="mt-4 space-y-2">
+                  {mijnClubs.map(({ club: c, stat }) => (
+                    <li key={c.slug}>
+                      <Link
+                        href={`/c/${c.slug}`}
+                        className="group flex items-center gap-3 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 transition hover:border-[var(--line-strong)]"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{c.name}</span>
+                          {stat ? (
+                            <span className="tnum mt-0.5 block text-xs text-[var(--text-faint)]">
+                              {stat.rank}{t('me.rankOf')}{stat.of_players} ·{' '}
+                              {stat.tournaments} {t('me.playedShort')} ·{' '}
+                              {Math.round(Number(stat.points))} {t('pub.pts')}
+                              {Number(stat.prize_cents) > 0
+                                ? ` · ${formatMoney(Number(stat.prize_cents), 'EUR')}`
+                                : ''}
+                            </span>
+                          ) : (
+                            <span className="mt-0.5 block text-xs text-[var(--text-faint)]">
+                              {c.city ? `${c.city} · ` : ''}{t('me.noneHereYet')}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          aria-hidden
+                          className="shrink-0 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"
+                        >
+                          ›
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
 
             {staff.length > 0 && (
