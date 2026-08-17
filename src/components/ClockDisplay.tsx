@@ -234,8 +234,11 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             big
             accent={accent}
           />
-          <Stat label={t('clock.buyins')} value={String(stats.buyins)} />
-          {/* Rebuy en re-entry zijn technisch twee dingen — de ene legt chips
+          {/* Geen aparte tegel voor de inkopen: "2 van 3" bij de spelers
+              zegt al hoeveel er ingekocht hebben. Twee keer hetzelfde getal
+              laat de zaal zoeken naar het verschil dat er niet is.
+
+              Rebuy en re-entry zijn technisch twee dingen — de ene legt chips
               bij iemand die nog zit, de andere haalt een uitgevallen speler
               terug — maar voor de zaal is het één vraag: hoeveel keer is er
               opnieuw ingekocht. Twee tegels met elk een 1 erin zegt niemand

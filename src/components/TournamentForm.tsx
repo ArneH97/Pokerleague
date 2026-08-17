@@ -177,49 +177,49 @@ export function TournamentForm({
           één afspraak die stilzwijgend ook voor rebuys gold — maar clubs
           doen dat niet allemaal hetzelfde, en je moet kunnen aantonen wat
           een speler betaald heeft. Naast elke rij staat het totaal dat de
-          speler afrekent, want dát is het cijfer aan de kassa. */}
-      <Card>
-        <div className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-x-3 gap-y-3">
-          <span />
-          <span className="text-center text-xs uppercase tracking-widest text-[var(--text-faint)]">
-            {t('tour.toPot')}
-          </span>
-          <span className="text-center text-xs uppercase tracking-widest text-[var(--text-faint)]">
-            {t('tour.toClub')}
-          </span>
-          <span className="text-right text-xs uppercase tracking-widest text-[var(--text-faint)]">
-            {t('tour.total')}
-          </span>
+          speler afrekent, want dát is het cijfer aan de kassa.
 
-          <MoneyRow
-            label={t('tour.buyin')}
-            sub={t('tour.buyinAlsoReentry')}
-            pot={buyin} onPot={setBuyin}
-            fee={fee} onFee={setFee}
-            totalCents={buyinCents + feeCents + bountyCents}
-            currency={currency}
-          />
-
-          <MoneyRow
-            label={t('tour.rebuy')}
-            pot={rebuyPrice} onPot={setRebuyPrice}
-            fee={rebuyFee} onFee={setRebuyFee}
-            totalCents={rebuyCents + rebuyFeeCents + (bountyOn ? bountyCents : 0)}
-            currency={currency}
-          />
-
-          {addonOn && (
+          Een echte tabel en geen grid met vaste breedtes: de invoervelden
+          dragen zelf al w-full mee, en die won het van elke breedte die ik
+          er hier naast zette — met een dichtgeknepen naamkolom tot gevolg. */}
+      <Card padded={false} className="overflow-x-auto">
+        <table className="w-full min-w-[30rem]">
+          <thead>
+            <tr className="text-xs uppercase tracking-widest text-[var(--text-faint)]">
+              <th className="px-4 pb-1 pt-4 text-left font-medium" />
+              <th className="w-32 px-2 pb-1 pt-4 text-right font-medium">{t('tour.toPot')}</th>
+              <th className="w-32 px-2 pb-1 pt-4 text-right font-medium">{t('tour.toClub')}</th>
+              <th className="w-28 px-4 pb-1 pt-4 text-right font-medium">{t('tour.total')}</th>
+            </tr>
+          </thead>
+          <tbody>
             <MoneyRow
-              label={t('tour.addonRow')}
-              pot={addonPrice} onPot={setAddonPrice}
-              fee={addonFee} onFee={setAddonFee}
-              totalCents={addonCents + addonFeeCents}
+              label={t('tour.buyin')}
+              sub={t('tour.buyinAlsoReentry')}
+              pot={buyin} onPot={setBuyin}
+              fee={fee} onFee={setFee}
+              totalCents={buyinCents + feeCents + bountyCents}
               currency={currency}
             />
-          )}
-        </div>
-
-        <p className="mt-3 text-xs leading-relaxed text-[var(--text-faint)]">
+            <MoneyRow
+              label={t('tour.rebuy')}
+              pot={rebuyPrice} onPot={setRebuyPrice}
+              fee={rebuyFee} onFee={setRebuyFee}
+              totalCents={rebuyCents + rebuyFeeCents + (bountyOn ? bountyCents : 0)}
+              currency={currency}
+            />
+            {addonOn && (
+              <MoneyRow
+                label={t('tour.addonRow')}
+                pot={addonPrice} onPot={setAddonPrice}
+                fee={addonFee} onFee={setAddonFee}
+                totalCents={addonCents + addonFeeCents}
+                currency={currency}
+              />
+            )}
+          </tbody>
+        </table>
+        <p className="px-4 pb-4 pt-2 text-xs leading-relaxed text-[var(--text-faint)]">
           {t('tour.moneyHint')}
         </p>
       </Card>
@@ -367,28 +367,32 @@ function MoneyRow({
   currency: string
 }) {
   return (
-    <>
-      <span className="min-w-0">
+    <tr className="align-middle">
+      <td className="px-4 py-2">
         <span className="block text-sm font-medium">{label}</span>
         {sub && <span className="block text-xs text-[var(--text-faint)]">{sub}</span>}
-      </span>
-      <input
-        inputMode="decimal"
-        aria-label={label}
-        value={pot}
-        onChange={(e) => onPot(e.target.value)}
-        className={`${inputClass} w-24 text-right tabular-nums`}
-      />
-      <input
-        inputMode="decimal"
-        aria-label={label}
-        value={fee}
-        onChange={(e) => onFee(e.target.value)}
-        className={`${inputClass} w-24 text-right tabular-nums`}
-      />
-      <span className="w-24 text-right text-sm font-semibold tabular-nums">
+      </td>
+      <td className="px-2 py-2">
+        <input
+          inputMode="decimal"
+          aria-label={label}
+          value={pot}
+          onChange={(e) => onPot(e.target.value)}
+          className={`${inputClass} text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <input
+          inputMode="decimal"
+          aria-label={label}
+          value={fee}
+          onChange={(e) => onFee(e.target.value)}
+          className={`${inputClass} text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums">
         {new Intl.NumberFormat('nl-BE', { style: 'currency', currency }).format(totalCents / 100)}
-      </span>
-    </>
+      </td>
+    </tr>
   )
 }
