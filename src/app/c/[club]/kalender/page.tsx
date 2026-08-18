@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { AccountWall } from '@/components/public/AccountWall'
 import { PublicShell } from '@/components/public/PublicShell'
 import { getClub } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
 import { visitorLocale } from '@/lib/i18n/server'
 import { getPublicTournaments, type PublicTournament } from '@/lib/publicClub'
+import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
 /**
@@ -31,6 +33,18 @@ export default async function Page_({ params }: PageProps<'/c/[club]/kalender'>)
   // de taal waarin de club zijn zaal bedient.
   const locale = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
   const t = translator(locale)
+
+  // De agenda hoort bij het platform, niet bij de etalage. Zie migratie 0034.
+  const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+  if (!claims?.claims) {
+    return (
+      <PublicShell club={club} locale={locale} active="calendar" signedIn={false}>
+        <AccountWall t={t} next={`/c/${club.slug}/kalender`} />
+      </PublicShell>
+    )
+  }
+
   const all = await getPublicTournaments(club.id)
 
   const live = all.filter((x) => x.status === 'running' || x.status === 'paused')

@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ClubHeader } from '@/components/ClubHeader'
 import { PublicClubHome } from '@/components/public/PublicClubHome'
 import { ClubNav } from '@/components/ClubNav'
@@ -9,6 +9,7 @@ import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator, type Key, type T } from '@/lib/i18n/dictionaries'
 import { visitorLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
+import { onPlatform } from '@/lib/whereAmI'
 import { formatMoney } from '@/lib/types'
 
 interface Row {
@@ -40,11 +41,23 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
   const role = claims?.claims ? await getClubRole(club.id) : null
   const t = translator(isLocale(club.locale) ? club.locale : 'nl')
 
-  // Eén adres, twee gezichten. Wie hier binnenkomt zonder bij de club te
-  // horen is een speler of een bezoeker en krijgt de publieke pagina; staf
-  // krijgt het dashboard. Dat scheelt de club een tweede domein en de spelers
-  // een URL die ze moeten onthouden — app.cutoff.be is gewoon "de club".
-  if (role === null || !['owner', 'admin', 'floor'].includes(role)) {
+  const isStaff = role !== null && ['owner', 'admin', 'floor'].includes(role)
+
+  // Twee werelden, en het adres bepaalt welke.
+  //
+  // Dit was ooit "één adres, twee gezichten": app.cutoff.be toonde de
+  // clubpagina aan bezoekers en het dashboard aan staf. Dat leek zuinig en
+  // was het niet. Een speler die daar landde, maakte er zijn account aan —
+  // op een domein waar de sessie van de floor thuishoort, en waar zijn eigen
+  // profiel vervolgens niet bestaat, want een koekje reist niet mee naar
+  // pokerleague.be. Twee plekken om aangemeld te zijn is één te veel.
+  //
+  // Nu: het clubdomein is werkgereedschap. Wie er zonder rol komt, krijgt het
+  // aanmeldscherm van de club — geen etalage. Alles voor spelers staat op het
+  // platform, en daar wijst dat scherm ook naartoe.
+  if (!isStaff) {
+    if (!(await onPlatform())) redirect(`/c/${slug}/login`)
+
     const visitor = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
     return <PublicClubHome club={club} locale={visitor} />
   }

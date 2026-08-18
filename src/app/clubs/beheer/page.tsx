@@ -5,17 +5,15 @@ import { publicLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * De clubgids.
+ * Clubkiezer voor personeel.
  *
- * Dit was een personeelsscherm — "Aanmelden als club", met een knop naar de
- * beheeromgeving. Dat is de verkeerde voordeur: wie op een spelersplatform op
- * "Clubs" klikt, zoekt een club om bij te spelen, geen inlogpagina voor
- * medewerkers. Die staat nu op /clubs/beheer, onderaan, als zijdeur.
+ * Elke club heeft zijn eigen werkomgeving op zijn eigen adres. Wie er werkt en
+ * dat adres niet uit het hoofd kent, vindt het hier.
  *
- * Elke kaart wijst naar de clubpagina op het platform en niet naar het
- * werkdomein van de club. Ook dat is met opzet: app.cutoff.be is sinds de
- * scheiding gereedschap voor de floor, en daar heeft een bezoeker niets te
- * zoeken.
+ * Bewust weggehaald van /clubs. Daar staat nu de clubgids voor spelers, en die
+ * mag hier niet op uitkomen: een gewoon lid dat "clubs" aanklikt hoort niet op
+ * een personeelsscherm te belanden. Dit is een zijdeur, geen voordeur — hij
+ * staat onderaan de gids en verder nergens.
  *
  * Dezelfde banden en dezelfde twee kleuren als de landingspagina: dit is nog
  * altijd PokerLeague, geen los inlogschermpje. Met één club in de lijst is
@@ -35,11 +33,8 @@ interface Row {
   slug: string
   name: string
   city: string | null
-  intro: string | null
   logo_url: string | null
-  play_rhythm: string | null
-  open_signup: boolean
-  members: number
+  custom_domain: string | null
 }
 
 export default async function Page() {
@@ -47,11 +42,14 @@ export default async function Page() {
   const t = translator(locale)
 
   const supabase = await createClient()
-  const { data } = await supabase.rpc('club_cards')
-  const clubs = (data ?? []) as unknown as Row[]
+  const { data } = await supabase
+    .from('clubs')
+    .select('slug,name,city,logo_url,custom_domain')
+    .eq('is_active', true)
+    .order('name')
+    .overrideTypes<Row[]>()
 
-  const { data: claims } = await supabase.auth.getClaims()
-  const signedIn = Boolean(claims?.claims)
+  const clubs = data ?? []
 
   return (
     <div data-site lang={locale} className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
@@ -112,7 +110,7 @@ export default async function Page() {
               {clubs.map((c) => (
                 <li key={c.slug}>
                   <Link
-                    href={`/c/${c.slug}`}
+                    href={`/c/${c.slug}/login`}
                     className="group flex h-full flex-col rounded-[1.5rem] border border-[var(--line)] bg-[var(--surface-2)] p-6 transition hover:-translate-y-0.5 hover:border-[var(--gold-soft)] hover:shadow-lg"
                   >
                     <div className="flex items-center gap-4">
@@ -142,21 +140,12 @@ export default async function Page() {
                       </span>
                     </div>
 
-                    {c.intro && (
-                      <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                        {c.intro}
-                      </p>
-                    )}
-
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {c.play_rhythm && (
+                    <div className="mt-5 flex flex-wrap items-center gap-2">
+                      {c.custom_domain && (
                         <span className="rounded-full border border-[var(--line)] bg-[var(--bg)] px-3 py-1 text-xs text-[var(--text-muted)]">
-                          {c.play_rhythm}
+                          {c.custom_domain}
                         </span>
                       )}
-                      <span className="rounded-full border border-[var(--line)] bg-[var(--bg)] px-3 py-1 text-xs text-[var(--text-muted)]">
-                        {c.members} {t('join.members')}
-                      </span>
                     </div>
 
                     <span className="mt-5 inline-flex items-center gap-1.5 font-medium text-[var(--brand)]">
@@ -164,15 +153,6 @@ export default async function Page() {
                       <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                     </span>
                   </Link>
-
-                  {c.open_signup && (
-                    <Link
-                      href={signedIn ? `/aansluiten/${c.slug}` : `/registreren?club=${c.slug}`}
-                      className="mt-2 block rounded-full border border-[var(--line-strong)] px-4 py-2.5 text-center text-sm font-medium transition hover:bg-[var(--surface-hover)]"
-                    >
-                      {t('join.cta').replace('{club}', c.name)}
-                    </Link>
-                  )}
                 </li>
               ))}
 
@@ -202,14 +182,7 @@ export default async function Page() {
           <Link href="/" className="text-[var(--text-faint)] transition-colors hover:text-[var(--text)]">
             ← {t('site.pick.backHome')}
           </Link>
-          {/* De zijdeur. Wie bij een club werkt weet dat hij hem zoekt; wie
-              hier als speler is, hoeft er niet over te struikelen. */}
-          <Link
-            href="/clubs/beheer"
-            className="text-[var(--text-faint)] transition-colors hover:text-[var(--text)]"
-          >
-            {t('site.pick.staffDoor')} →
-          </Link>
+          <p className="text-[var(--text-faint)]">{t('site.footer.tagline')}</p>
         </div>
       </footer>
     </div>

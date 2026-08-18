@@ -1,6 +1,7 @@
-import Link from 'next/link'
+
 import type { Club } from '@/lib/club'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
+import { leagueUrl } from '@/lib/site'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -59,18 +60,22 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
           {t('pub.joinBody').replace('{club}', club.name)}
         </p>
         <span className="flex shrink-0 items-center gap-3">
-          <Link
-            href="/registreren"
+          {/* Absolute adressen naar het platform, niet relatieve paden. Op
+              app.cutoff.be zou /registreren door de proxy vertaald worden naar
+              /c/cutoff/registreren — een pagina die niet bestaat — en /login
+              naar het personeelsscherm. Zie de uitleg in lib/site.ts. */}
+          <a
+            href={leagueUrl(`/registreren?club=${club.slug}`)}
             className="rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
           >
             {t('pub.joinCta')}
-          </Link>
-          <Link
-            href={`/login?next=/c/${club.slug}`}
+          </a>
+          <a
+            href={leagueUrl(`/aansluiten/${club.slug}`)}
             className="text-sm text-[var(--text-muted)] underline-offset-4 hover:underline"
           >
             {t('common.signIn')}
-          </Link>
+          </a>
         </span>
       </section>
     )
@@ -86,12 +91,12 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
         <p className="min-w-0 flex-1 text-sm leading-relaxed text-[var(--text-muted)]">
           {t('pub.yoursNone').replace('{club}', club.name)}
         </p>
-        <Link
-          href="/ik"
+        <a
+          href={leagueUrl('/ik')}
           className="shrink-0 text-sm text-[var(--brand)] underline-offset-4 hover:underline"
         >
           {t('pub.yoursAll')} →
-        </Link>
+        </a>
       </section>
     )
   }
@@ -103,12 +108,12 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
         <h2 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
           {t('pub.yours')}
         </h2>
-        <Link
-          href="/ik"
+        <a
+          href={leagueUrl('/ik')}
           className="text-sm text-[var(--brand)] underline-offset-4 hover:underline"
         >
           {t('pub.yoursAll')} →
-        </Link>
+        </a>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">

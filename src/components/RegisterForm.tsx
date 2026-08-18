@@ -35,9 +35,16 @@ import { useLocale, useT } from '@/lib/i18n/context'
 export function RegisterForm({
   invitedEmail,
   clubName,
+  joinSlug,
 }: {
   invitedEmail?: string
   clubName?: string
+  /**
+   * De club waar hij zich wil aansluiten. Reist mee tot ná de bevestigingsmail
+   * — anders is die keuze weg tegen de tijd dat hij terug is, en moet hij hem
+   * zelf opnieuw zoeken op een platform dat hij nog niet kent.
+   */
+  joinSlug?: string
 } = {}) {
   const router = useRouter()
   const t = useT()
@@ -76,7 +83,9 @@ export function RegisterForm({
         },
         // Zonder dit landt de bevestigingslink op de voorpagina en mag hij
         // zelf zoeken waar zijn profiel staat.
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/ik`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${
+          joinSlug ? `/aansluiten/${joinSlug}` : '/ik'
+        }`,
       },
     })
 
@@ -106,7 +115,7 @@ export function RegisterForm({
       p_locale: locale,
     })
 
-    router.push('/ik')
+    router.push(joinSlug ? `/aansluiten/${joinSlug}` : '/ik')
     router.refresh()
   }
 

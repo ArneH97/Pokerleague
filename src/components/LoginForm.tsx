@@ -25,9 +25,21 @@ interface Props {
   fallbackNext: string
   /** Gebruik de clubkleur voor de knop. */
   branded?: boolean
+  /**
+   * De uitweg voor wie hier per ongeluk staat.
+   *
+   * Het clubdomein is werkgereedschap geworden, dus wie app.cutoff.be intypt
+   * zonder er te werken belandt op dit scherm. Zonder deze regel is dat een
+   * doodlopende straat met een wachtwoordveld — en dan denkt iemand dat hij
+   * een wachtwoord vergeten is terwijl hij gewoon op het verkeerde adres is.
+   */
+  playerHref?: string
+  playerLabel?: string
 }
 
-function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
+function Form({
+  brandName, logoUrl, fallbackNext, branded, playerHref, playerLabel,
+}: Props) {
   const router = useRouter()
   const params = useSearchParams()
   const t = useT()
@@ -115,6 +127,18 @@ function Form({ brandName, logoUrl, fallbackNext, branded }: Props) {
             </Button>
           </form>
         </Card>
+
+        {playerHref && (
+          <p className="mt-5 text-center text-sm leading-relaxed text-[var(--text-muted)]">
+            {t('login.playerHere')}{' '}
+            <a
+              href={playerHref}
+              className="text-[var(--brand)] underline-offset-4 hover:underline"
+            >
+              {playerLabel} →
+            </a>
+          </p>
+        )}
       </div>
     </main>
   )

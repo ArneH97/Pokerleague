@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -6869,4 +6869,337 @@ begin
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     grant execute on function public.floor_add_entry(uuid, uuid, text, text, text, text) to authenticated;
   end if;
+end $$;
+
+-- =========================================================================
+-- 0033_join_club.sql
+-- =========================================================================
+
+-- Pokerleague — je bij een club aansluiten zonder er geweest te zijn
+--
+-- Tot nu kon je maar op één manier lid worden van een club: aan de deur, door
+-- de floor. Dat klopt voor wie er staat, maar het sluit de weg af die je juist
+-- wil hebben — iemand die de clubpagina vindt, ziet dat er zondag gespeeld
+-- wordt, en zich alvast wil aansluiten.
+--
+-- **Wat "lid" hier betekent, en wat niet.** Dit is een koppeling op het
+-- platform: deze club verschijnt op je profiel, hun klassement telt voor jou,
+-- en de floor vindt je terug zonder je naam opnieuw in te tikken. Het is geen
+-- toelating en geen leeftijdscontrole. Die blijven waar ze horen: aan de deur,
+-- waar er een identiteitskaart tegenover kan staan. Vandaar `self_joined`
+-- hieronder — de club hoort te kunnen zien wie er nog nooit geweest is.
+--
+-- **En waarom een club dit mag uitzetten.** Een besloten club die op
+-- uitnodiging werkt heeft niets aan een knop waarmee vreemden zich in het
+-- ledenbestand zetten. Standaard staat het aan, want de meeste clubs willen
+-- spelers; wie dat niet wil zet het uit.
+
+-- ---------------------------------------------------------------------------
+-- 1. Twee velden
+-- ---------------------------------------------------------------------------
+
+alter table clubs
+  add column if not exists open_signup boolean not null default true;
+
+comment on column clubs.open_signup is
+  'Mag iemand zich via de clubpagina zelf aansluiten? Standaard ja. Een club die op uitnodiging werkt zet dit uit; dan blijft de deur de enige weg naar het ledenbestand.';
+
+alter table club_players
+  add column if not exists self_joined boolean not null default false;
+
+comment on column club_players.self_joined is
+  'Deze speler heeft zichzelf online aangesloten en is hier nog nooit door de floor ingeschreven. Belangrijk aan de deur: zijn leeftijd en identiteit zijn niet gecontroleerd.';
+
+-- ---------------------------------------------------------------------------
+-- 2. Aansluiten
+-- ---------------------------------------------------------------------------
+-- Security definer, want `club_players` mag alleen door staf beschreven
+-- worden en dat blijft zo. De uitzondering staat hier, in één functie, met de
+-- voorwaarden erin — en niet als een extra policy die op elke andere
+-- schrijfactie ook van toepassing zou zijn.
+
+create or replace function public.join_club(p_club_slug text)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_club   uuid;
+  v_open   boolean;
+  v_player uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Niet aangemeld' using errcode = 'insufficient_privilege';
+  end if;
+
+  select id, open_signup into v_club, v_open
+  from clubs
+  where slug = p_club_slug and is_active;
+
+  if v_club is null then
+    return 'unknown';
+  end if;
+  if not v_open then
+    return 'closed';
+  end if;
+
+  -- Zijn profiel ophalen, en aanmaken als het er nog niet is. Iemand kan zich
+  -- registreren en meteen doorklikken naar een club zonder ooit op zijn eigen
+  -- pagina geweest te zijn; dan bestaat de spelersrij nog niet.
+  select id into v_player
+  from players
+  where auth_user_id = auth.uid() and merged_into_id is null;
+
+  if v_player is null then
+    v_player := public.claim_my_player();
+  end if;
+
+  if exists (select 1 from club_players where club_id = v_club and player_id = v_player) then
+    return 'already';
+  end if;
+
+  insert into club_players (club_id, player_id, joined_on, self_joined)
+  values (v_club, v_player, current_date, true);
+
+  -- Hij hoort hier al op het platform, dus een uitnodigingsmail zou raar zijn.
+  -- Voor de zekerheid toch: queue_invite slaat zelf over wie een account heeft.
+  perform public.queue_invite(v_club, v_player);
+
+  return 'joined';
+end;
+$$;
+
+comment on function public.join_club(text) is
+  'Sluit de aangemelde speler aan bij een club. Geeft joined, already, closed of unknown terug. Zet self_joined, zodat de floor ziet dat deze persoon hier nog nooit aan de deur stond.';
+
+-- ---------------------------------------------------------------------------
+-- 3. Waar kan ik me nog aansluiten?
+-- ---------------------------------------------------------------------------
+-- Voor het scherm meteen na het aansluiten. Alleen actieve clubs die
+-- openstaan, en niet die waar hij al bij hoort — een lijst met vinkjes waarvan
+-- de helft al aangevinkt en vastgezet is, leest als werk in plaats van als
+-- aanbod.
+
+create or replace function public.clubs_open_to_join()
+returns table (
+  slug      text,
+  name      text,
+  city      text,
+  logo_url  text,
+  intro     text,
+  members   int
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with me as (
+    select id from players
+    where auth_user_id = auth.uid() and merged_into_id is null
+  )
+  select
+    c.slug, c.name, c.city, c.logo_url, c.intro,
+    (select count(*)::int from club_players cp where cp.club_id = c.id)
+  from clubs c
+  where c.is_active
+    and c.open_signup
+    and not exists (
+      select 1 from club_players cp
+      where cp.club_id = c.id and cp.player_id = (select id from me)
+    )
+  order by c.name
+$$;
+
+comment on function public.clubs_open_to_join() is
+  'De clubs waar de aangemelde speler zich nog bij kan aansluiten. Toont alleen wat al publiek is over een club.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Rechten
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.join_club(text)          to authenticated;
+    grant execute on function public.clubs_open_to_join()     to authenticated;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0034_players_platform.sql
+-- =========================================================================
+
+-- Pokerleague — de speler doet alles op het platform, de club werkt op haar eigen domein
+--
+-- Tot nu stond bijna alles twee keer open. Een clubdomein toonde kalender,
+-- klassement en uitslagen aan iedereen, en het platform deed hetzelfde nog
+-- eens. Dat leverde twee problemen op die op hetzelfde neerkomen.
+--
+-- **Voor de speler was niet uit te leggen waar iets stond.** Zijn resultaten
+-- op de ene plek, het klassement op de andere, en op geen van beide iets dat
+-- naar de andere wees. Dat is de verwarring waar dit hele stuk over gaat.
+--
+-- **En het stond wijder open dan bedoeld.** Wie speelde, wanneer, en hoe hij
+-- eindigde — dat is met pseudoniemen nog altijd een tijdlijn van iemands
+-- avonden, leesbaar voor wie de clubnaam kent. Voor een uitslagenlijst van een
+-- pokerclub is "iedereen op internet" een ruimere kring dan nodig.
+--
+-- Vanaf nu:
+--
+--   * **Clubinfo blijft open.** Naam, gemeente, adres, speeldag, contact,
+--     openingsdatum. Dat is een uithangbord en dat hoort vindbaar te zijn,
+--     ook via Google — anders vindt een nieuwe speler de club nooit.
+--   * **Cijfers vragen een account.** Kalender, uitslagen, klassement en
+--     deelnemerslijsten. Gratis, in twee velden, maar wel een account.
+--   * **De zaalklok is voor de floor.** Die opent hij in de zaal; het is geen
+--     pagina om ergens naar door te sturen.
+
+-- ---------------------------------------------------------------------------
+-- 1. De publieke clubfuncties gaan dicht voor bezoekers
+-- ---------------------------------------------------------------------------
+-- Ze blijven bestaan en ze blijven precies hetzelfde doen — inclusief de
+-- naamregel, die is niet vervangen door deze afscherming maar staat erachter.
+-- Een aangemelde speler is nog altijd een vreemde voor de mensen op die lijst.
+--
+-- **Intrekken bij `anon` volstaat niet.** PostgreSQL geeft bij het aanmaken van
+-- een functie automatisch EXECUTE aan `PUBLIC`, en `anon` erft dat. Wie alleen
+-- `revoke ... from anon` schrijft, ziet zijn migratie zonder fout doorlopen en
+-- verandert precies niets — een afscherming die stilzwijgend niet werkt is
+-- erger dan geen afscherming, want je denkt dat het geregeld is. Dus eerst weg
+-- bij PUBLIC, dan gericht teruggeven aan wie het wél mag.
+
+do $$
+declare
+  fn text;
+  r   text;
+begin
+  foreach fn in array array[
+    'public.club_public_clock(uuid)',
+    'public.club_public_levels(uuid)',
+    'public.club_public_seats(uuid)',
+    'public.club_public_result(uuid)',
+    'public.club_public_standings(text, date, date)',
+    'public.tournament_prizes(uuid)'
+  ] loop
+    execute format('revoke execute on function %s from public', fn);
+
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke execute on function %s from anon', fn);
+    end if;
+
+    foreach r in array array['authenticated', 'service_role'] loop
+      if exists (select 1 from pg_roles where rolname = r) then
+        execute format('grant execute on function %s to %I', fn, r);
+      end if;
+    end loop;
+  end loop;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. En de agenda ook
+-- ---------------------------------------------------------------------------
+-- De kalender leest rechtstreeks uit `tournaments`, want daar staan geen namen
+-- bij. Die leesregel liet elk publiek tornooi door aan iedereen, ook zonder
+-- account. Nu moet je aangemeld zijn — en de rest van de regel blijft staan:
+-- staf ziet alles van de eigen club, leden zien wat voor leden bedoeld is.
+
+drop policy if exists tournaments_read on tournaments;
+create policy tournaments_read on tournaments
+  for select using (
+    public.is_club_member(club_id)
+    or (auth.uid() is not null and player_visibility = 'public')
+    or (player_visibility = 'members' and public.is_club_player(club_id))
+  );
+
+comment on policy tournaments_read on tournaments is
+  'Staf ziet alles van de eigen club. Een aangemelde speler ziet publieke tornooien van elke club en de ledentornooien van zijn eigen clubs. Een bezoeker zonder account ziet niets: de agenda hoort bij het platform, niet bij de etalage.';
+
+-- ---------------------------------------------------------------------------
+-- 3. Wat een bezoeker wél te zien krijgt
+-- ---------------------------------------------------------------------------
+-- Eén functie voor het visitekaartje, zodat de clubpagina niet meer op de hele
+-- `clubs`-rij hoeft te leunen. Die rij bevat namelijk ook `settings` en
+-- `compliance` — instellingen die niemand van buiten hoeft te kennen, en die
+-- vandaag gewoon meekomen in elke select die een pagina doet.
+--
+-- De kolommen hieronder zijn met opzet opgesomd en niet `select *`. Wie er
+-- later een veld bij zet op `clubs`, zet het niet per ongeluk op straat.
+
+create or replace function public.club_card(p_slug text)
+returns table (
+  slug          text,
+  name          text,
+  city          text,
+  intro         text,
+  address_line  text,
+  maps_url      text,
+  play_rhythm   text,
+  contact_email text,
+  contact_phone text,
+  opens_on      date,
+  logo_url      text,
+  primary_color text,
+  locale        text,
+  open_signup   boolean,
+  members       int
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    c.slug, c.name, c.city, c.intro, c.address_line, c.maps_url, c.play_rhythm,
+    c.contact_email, c.contact_phone, c.opens_on, c.logo_url, c.primary_color,
+    c.locale, c.open_signup,
+    (select count(*)::int from club_players cp where cp.club_id = c.id)
+  from clubs c
+  where c.slug = p_slug and c.is_active
+$$;
+
+comment on function public.club_card(text) is
+  'Het visitekaartje van een club: waar het is, wanneer er gespeeld wordt, aan wie je iets vraagt. Bewust open voor bezoekers zonder account — een club moet vindbaar zijn. Bewust een opsomming van kolommen en geen select *, zodat een nieuw veld op clubs niet vanzelf publiek wordt.';
+
+create or replace function public.club_cards()
+returns table (
+  slug        text,
+  name        text,
+  city        text,
+  intro       text,
+  logo_url    text,
+  play_rhythm text,
+  open_signup boolean,
+  members     int
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    c.slug, c.name, c.city, c.intro, c.logo_url, c.play_rhythm, c.open_signup,
+    (select count(*)::int from club_players cp where cp.club_id = c.id)
+  from clubs c
+  where c.is_active
+  order by c.name
+$$;
+
+comment on function public.club_cards() is
+  'Alle actieve clubs, voor de clubgids op het platform. Geen custom_domain: een bezoeker hoort naar de clubpagina op het platform te gaan, niet naar het werkdomein van de club.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Rechten
+-- ---------------------------------------------------------------------------
+
+do $$
+declare r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('grant execute on function public.club_card(text) to %I', r);
+      execute format('grant execute on function public.club_cards()    to %I', r);
+    end if;
+  end loop;
 end $$;

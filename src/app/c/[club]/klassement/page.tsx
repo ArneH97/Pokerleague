@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { AccountWall } from '@/components/public/AccountWall'
+import { PublicShell } from '@/components/public/PublicShell'
 import { PublicStandings } from '@/components/public/PublicStandings'
 import { Card, EmptyState, Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
@@ -110,6 +112,17 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
   const accountEmail = (claims?.claims?.email as string | undefined) ?? null
+
+  // Een klassement is een lijst van wie wanneer speelde. Sinds 0034 hoort daar
+  // een account bij; het visitekaartje van de club blijft wel open.
+  if (!claims?.claims) {
+    const visitor = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+    return (
+      <PublicShell club={club} locale={visitor} active="standings" signedIn={false}>
+        <AccountWall t={translator(visitor)} next={`/c/${club.slug}/klassement`} />
+      </PublicShell>
+    )
+  }
   const role = claims?.claims ? await getClubRole(club.id) : null
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
   const locale = isLocale(club.locale) ? club.locale : 'nl'

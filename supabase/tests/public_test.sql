@@ -1,12 +1,21 @@
--- Pokerleague — de publieke clubpagina's
+-- Pokerleague — wie ziet wat, en waar
 --
--- Het risico van deze laag zit niet in wat ze toont maar in wat ze per
--- ongeluk meeneemt. Vandaar dat dit bestand vooral controleert wat een
--- buitenstaander níét te zien krijgt: het geldregister, de mailadressen, de
--- blindstructuren van de club, en tornooien die niet publiek staan.
+-- Sinds 0034 loopt er een tweede grens door deze laag, en die is belangrijker
+-- dan hij lijkt. Er zijn nu drie kringen in plaats van twee:
 --
--- Getest als échte bezoeker: rol anon, geen JWT. Niet als eigenaar van de
--- database, want dan is elke afscherming vanzelf in orde.
+--   * **een bezoeker zonder account** ziet het visitekaartje van een club en
+--     verder niets. Geen kalender, geen uitslagen, geen klassement.
+--   * **een aangemelde speler** ziet de cijfers, met de naamregel erop.
+--   * **staf** ziet alles van de eigen club.
+--
+-- Dat de cijfers dichtgingen maakt de naamregel niet overbodig — die staat
+-- eróchter, niet ervoor. Een aangemelde speler is nog altijd een vreemde voor
+-- de mensen op die lijst. Vandaar dat alle controles op pseudoniemen en
+-- afkortingen hieronder gewoon blijven staan; ze draaien nu alleen als
+-- `authenticated` in plaats van als `anon`.
+--
+-- Getest als échte rol, niet als eigenaar van de database — want dan is elke
+-- afscherming vanzelf in orde.
 \set ON_ERROR_STOP on
 begin;
 
@@ -63,11 +72,22 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Vanaf hier zijn we een gewone bezoeker
+-- Een aangemelde speler die bij deze club niets te zoeken heeft
 -- ---------------------------------------------------------------------------
+-- Hij mag de cijfers zien — dat is waarvoor het platform bestaat — maar hij
+-- is geen lid en geen staf, dus de naamregel geldt onverkort.
 
-set local role anon;
-select set_config('request.jwt.claim.role', 'anon', true);
+do $$
+declare v_uid uuid;
+begin
+  insert into auth.users (email) values ('kijker@t23.be') returning id into v_uid;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'kijker@t23.be')::text, false);
+  perform set_config('request.jwt.claim.sub', v_uid::text, false);
+  perform set_config('request.jwt.claim.role', 'authenticated', false);
+end $$;
+
+set local role authenticated;
 
 do $$
 declare
@@ -82,7 +102,7 @@ begin
 
   select prize_pool_cents into v_pot from public.club_public_clock(v_open);
   if v_pot <> 8000 then raise exception 'FOUT: pot verwacht 8000, kreeg %', v_pot; end if;
-  raise notice 'OK  de klok is publiek leesbaar: 4 deelnemers, pot % cent', v_pot;
+  raise notice 'OK  een aangemelde speler ziet de avond: 4 deelnemers, pot % cent', v_pot;
 
   -- 2 ------------------------------------------------- de besloten avond --
   select count(*) into v_n from public.club_public_clock(v_hidden);
@@ -112,7 +132,7 @@ begin
   -- regressie ook niet meer.
   select player_name into v_naam from public.club_public_seats(v_open) limit 1;
   if v_naam ~ '^Speler [0-9a-f]{4}$' then
-    raise notice 'OK  zonder toestemming toont de lijst een pseudoniem (%)', v_naam;
+    raise notice 'OK  ook voor een aangemelde speler blijft het een pseudoniem (%)', v_naam;
   else
     raise exception 'FOUT: er stond een echte naam op de publieke lijst: %', v_naam;
   end if;
@@ -137,13 +157,71 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- En nu een bezoeker zonder account
+-- ---------------------------------------------------------------------------
+-- Dit is de grens die er sinds 0034 bij komt. Het visitekaartje blijft open,
+-- want een club moet vindbaar zijn; alles wat over gespeelde avonden gaat
+-- niet.
+
+do $$
+begin
+  perform set_config('request.jwt.claims', '', false);
+  perform set_config('request.jwt.claim.sub', '', false);
+  perform set_config('request.jwt.claim.role', 'anon', false);
+end $$;
+
+set local role anon;
+
+do $$
+declare v_n int; v_naam text; v_open uuid;
+begin
+  -- Het visitekaartje: open, en dat hoort zo.
+  select name into v_naam from public.club_card('t23');
+  if v_naam is null then raise exception 'FOUT: het visitekaartje is niet meer leesbaar'; end if;
+  select count(*) into v_n from public.club_cards();
+  if v_n < 1 then raise exception 'FOUT: de clubgids is leeg voor een bezoeker'; end if;
+  raise notice 'OK  een bezoeker zonder account ziet nog altijd wie de club is';
+
+  -- De cijfers: dicht. De functies bestaan nog, maar hij mag ze niet aanroepen.
+  --
+  -- Bewust de klok en niet het klassement: er is nog geen enkele avond
+  -- afgesloten, dus het klassement geeft ook mét rechten nul rijen terug. Een
+  -- controle die niet kan mislukken keurt alles goed.
+  select id into v_open from tournaments where name = 'Open avond';
+  begin
+    select count(*) into v_n from public.club_public_clock(v_open);
+    raise exception 'FOUT: de avond was zichtbaar zonder account (% rijen)', v_n;
+  exception
+    when insufficient_privilege then null;
+  end;
+  raise notice 'OK  de cijfers van een avond vragen een account';
+
+  -- En de agenda, die rechtstreeks uit de tabel komt.
+  select count(*) into v_n from tournaments;
+  if v_n <> 0 then
+    raise exception 'FOUT: % tornooien zichtbaar zonder account', v_n;
+  end if;
+  raise notice 'OK  de agenda vraagt een account';
+end $$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- En met namen aan
 -- ---------------------------------------------------------------------------
 
 update clubs set public_names = true where slug = 't23';
 
-set local role anon;
-select set_config('request.jwt.claim.role', 'anon', true);
+do $$
+declare v_uid uuid;
+begin
+  select id into v_uid from auth.users where email = 'kijker@t23.be';
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'kijker@t23.be')::text, false);
+  perform set_config('request.jwt.claim.role', 'authenticated', false);
+end $$;
+
+set local role authenticated;
 
 do $$
 declare

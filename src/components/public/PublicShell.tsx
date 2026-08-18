@@ -25,18 +25,27 @@ import { translator, type Locale } from '@/lib/i18n/dictionaries'
  * Geen PokerLeague-merk. Dit is de pagina van de club.
  */
 export function PublicShell({
-  club, locale, active, children,
+  club, locale, active, children, signedIn = true,
 }: {
   club: Club
   locale: Locale
   active: 'home' | 'calendar' | 'standings'
   children: React.ReactNode
+  /** Zonder account tonen we geen menu-items die op een muur uitkomen. */
+  signedIn?: boolean
 }) {
   const t = translator(locale)
+  // Kalender en klassement vragen een account. Ze in het menu laten staan voor
+  // wie er niet in kan, is een deur schilderen op een muur — dan klikt iemand
+  // drie keer voor hij begrijpt dat het aan hem ligt en niet aan de club.
   const items = [
     { key: 'home' as const, href: `/c/${club.slug}`, label: t('pub.now') },
-    { key: 'calendar' as const, href: `/c/${club.slug}/kalender`, label: t('pub.calendar') },
-    { key: 'standings' as const, href: `/c/${club.slug}/klassement`, label: t('pub.standings') },
+    ...(signedIn
+      ? [
+          { key: 'calendar' as const, href: `/c/${club.slug}/kalender`, label: t('pub.calendar') },
+          { key: 'standings' as const, href: `/c/${club.slug}/klassement`, label: t('pub.standings') },
+        ]
+      : []),
   ]
   const accent = club.primary_color ?? '#10b981'
 

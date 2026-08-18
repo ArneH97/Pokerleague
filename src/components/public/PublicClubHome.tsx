@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { AccountWall } from '@/components/public/AccountWall'
 import { DaysToGo } from '@/components/public/DaysToGo'
 import { ClubMasthead, PublicShell } from '@/components/public/PublicShell'
 import { YourNumbers } from '@/components/public/YourNumbers'
@@ -7,6 +8,7 @@ import { translator, type Locale } from '@/lib/i18n/dictionaries'
 import {
   getPublicClock, getPublicResult, getPublicStandings, getPublicTournaments,
 } from '@/lib/publicClub'
+import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
 /**
@@ -27,6 +29,24 @@ import { formatMoney } from '@/lib/types'
  */
 export async function PublicClubHome({ club, locale }: { club: Club; locale: Locale }) {
   const t = translator(locale)
+
+  // Het visitekaartje staat er voor iedereen; de cijfers vragen een account.
+  // Zie migratie 0034 voor waarom die grens daar ligt.
+  const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+  const signedIn = Boolean(claims?.claims)
+
+  if (!signedIn) {
+    return (
+      <PublicShell club={club} locale={locale} active="home" signedIn={false}>
+        <ClubMasthead club={club} locale={locale} />
+        <YourNumbers club={club} locale={locale} />
+        <div className="mt-4">
+          <AccountWall t={t} next={`/c/${club.slug}`} />
+        </div>
+      </PublicShell>
+    )
+  }
 
   const [all, standings] = await Promise.all([
     getPublicTournaments(club.id, 30),
@@ -58,7 +78,7 @@ export async function PublicClubHome({ club, locale }: { club: Club; locale: Loc
   // ------------------------------------------------------------- opening ---
   if (preOpening) {
     return (
-      <PublicShell club={club} locale={locale} active="home">
+      <PublicShell club={club} locale={locale} active="home" signedIn>
         <ClubMasthead club={club} locale={locale} />
         <YourNumbers club={club} locale={locale} />
 
@@ -88,7 +108,7 @@ export async function PublicClubHome({ club, locale }: { club: Club; locale: Loc
 
   // ---------------------------------------------------------- gewone dag ---
   return (
-    <PublicShell club={club} locale={locale} active="home">
+    <PublicShell club={club} locale={locale} active="home" signedIn>
       <ClubMasthead club={club} locale={locale} />
       <YourNumbers club={club} locale={locale} />
 

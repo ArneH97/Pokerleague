@@ -287,3 +287,77 @@ begin
   raise notice 'OK  zonder mailadres komt er geen uitnodiging';
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Je online aansluiten bij een club
+-- ---------------------------------------------------------------------------
+-- Sinds 0033 kan dat, en dan moet het ook precies doen wat er staat: je erbij
+-- zetten, niet twee keer, en niet bij een club die op uitnodiging werkt.
+
+begin;
+do $$
+declare
+  v_open uuid; v_dicht uuid; v_uid uuid; v_p uuid;
+  v_res text; v_n int; v_self boolean;
+begin
+  insert into clubs (slug, name, city, country, locale, timezone, open_signup)
+  values ('t34', 'Open club', 'Gent', 'BE', 'nl', 'Europe/Brussels', true)
+  returning id into v_open;
+  insert into clubs (slug, name, city, country, locale, timezone, open_signup)
+  values ('t34b', 'Besloten club', 'Aalst', 'BE', 'nl', 'Europe/Brussels', false)
+  returning id into v_dicht;
+
+  insert into auth.users (email) values ('nieuw@t34.be') returning id into v_uid;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'nieuw@t34.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  set local role authenticated;
+
+  -- 1 --- Aansluiten zonder ooit een spelersprofiel te hebben gehad. Dat is
+  --       het gewone geval: registreren en meteen doorklikken.
+  v_res := public.join_club('t34');
+  if v_res <> 'joined' then raise exception 'FOUT: verwacht joined, kreeg %', v_res; end if;
+
+  select p.id into v_p from players p where p.auth_user_id = v_uid;
+  if v_p is null then raise exception 'FOUT: er is geen spelersprofiel aangemaakt'; end if;
+
+  select cp.self_joined into v_self
+  from club_players cp where cp.club_id = v_open and cp.player_id = v_p;
+  if v_self is not true then
+    raise exception 'FOUT: self_joined staat niet aan; de floor ziet niet dat hij hier nooit was';
+  end if;
+  raise notice 'OK  aansluiten maakt het profiel aan en markeert hem als online aangesloten';
+
+  -- 2 --- Nog eens: niets dubbels.
+  v_res := public.join_club('t34');
+  if v_res <> 'already' then raise exception 'FOUT: verwacht already, kreeg %', v_res; end if;
+  select count(*) into v_n from club_players where club_id = v_open and player_id = v_p;
+  if v_n <> 1 then raise exception 'FOUT: hij staat % keer in het ledenbestand', v_n; end if;
+  raise notice 'OK  twee keer aansluiten levert één lidmaatschap op';
+
+  -- 3 --- Een club die op uitnodiging werkt laat dit niet toe.
+  v_res := public.join_club('t34b');
+  if v_res <> 'closed' then raise exception 'FOUT: verwacht closed, kreeg %', v_res; end if;
+  select count(*) into v_n from club_players where club_id = v_dicht;
+  if v_n <> 0 then raise exception 'FOUT: hij kwam toch in een besloten ledenbestand'; end if;
+  raise notice 'OK  een besloten club houdt de deur dicht';
+
+  -- 4 --- En een club die niet bestaat geeft geen fout maar een antwoord.
+  v_res := public.join_club('bestaat-niet');
+  if v_res <> 'unknown' then raise exception 'FOUT: verwacht unknown, kreeg %', v_res; end if;
+  raise notice 'OK  een onbekende club geeft netjes unknown terug';
+
+  -- 5 --- De lijst met suggesties laat niet zien waar hij al bij hoort, en ook
+  --       de besloten club niet.
+  select count(*) into v_n from public.clubs_open_to_join() where slug = 't34';
+  if v_n <> 0 then raise exception 'FOUT: zijn eigen club stond in de suggesties'; end if;
+  select count(*) into v_n from public.clubs_open_to_join() where slug = 't34b';
+  if v_n <> 0 then raise exception 'FOUT: een besloten club stond in de suggesties'; end if;
+  raise notice 'OK  de suggesties tonen alleen clubs waar hij zich echt kan aansluiten';
+
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end $$;
+rollback;

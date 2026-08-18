@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { LiveBoard } from '@/components/public/LiveBoard'
 import { PublicShell } from '@/components/public/PublicShell'
 import { getClub } from '@/lib/club'
+import { createClient } from '@/lib/supabase/server'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
 import { visitorLocale } from '@/lib/i18n/server'
 import {
@@ -28,6 +29,11 @@ export default async function Page_({ params }: PageProps<'/c/[club]/live/[id]'>
   const { club: slug, id } = await params
   const club = await getClub(slug)
   if (!club) notFound()
+
+  // Ook een lopende avond is een deelnemerslijst. Zie migratie 0034.
+  const gate = await createClient()
+  const { data: gateClaims } = await gate.auth.getClaims()
+  if (!gateClaims?.claims) redirect(`/login?next=/c/${slug}/live/${id}`)
 
   const locale = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
   const t = translator(locale)
