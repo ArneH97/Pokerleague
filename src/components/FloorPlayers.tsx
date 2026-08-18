@@ -10,6 +10,7 @@ import { useFloorPlayers } from '@/lib/useFloorPlayers'
 import { usePayouts, type PayoutRow } from '@/lib/usePayouts'
 import { useT } from '@/lib/i18n/context'
 import { LOCALES, type Locale } from '@/lib/i18n/dictionaries'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Spelersbeheer aan de floor.
@@ -180,11 +181,7 @@ export function FloorPlayers({
     setActionError(null)
     const { error: err } = await fn()
     if (err) {
-      setActionError(
-        err.message.includes('row-level security') || err.message.includes('Geen rechten')
-          ? t('floor.noRights')
-          : err.message,
-      )
+      setActionError(dbMessage(err, t))
     }
     await reload()
     setBusy(false)

@@ -88,7 +88,9 @@ export function Onboarding({
       })
       // Niet doorklikken als het niet lukte. Anders staat er straks "klaar"
       // terwijl zijn gebruikersnaam nooit opgeslagen is.
-      if (!res.ok) { setError(res.error ?? null); setBusy(false); return }
+      // De actie geeft een sleutel terug; vertalen doen we hier, waar de
+      // taal van de kijker bekend is.
+      if (!res.ok) { setError(res.error ? t(res.error) : t('common.error')); setBusy(false); return }
     }
     setError(null)
     setBusy(false)

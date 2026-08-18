@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button, ButtonLink, Card, Field, Notice, inputClass } from '@/components/ui'
 import { useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Tornooi aanmaken.
@@ -139,7 +140,7 @@ export function TournamentForm({
       setError(
         err.code === '42501' || err.message.includes('row-level security')
           ? t('tour.noRights')
-          : err.message,
+          : dbMessage(err, t),
       )
       setBusy(false)
       return

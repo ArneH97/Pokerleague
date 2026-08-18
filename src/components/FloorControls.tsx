@@ -13,6 +13,7 @@ import { expectedChipsInPlay, toClockState } from '@/lib/types'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
 import { useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Bedieningsscherm voor de floor.
@@ -75,11 +76,7 @@ export function FloorControls({
       .eq('id', tournamentId)
 
     if (err) {
-      setActionError(
-        err.message.includes('row-level security') || err.code === '42501'
-          ? t('floor.noRights')
-          : err.message,
-      )
+      setActionError(dbMessage(err, t))
     }
     setBusy(false)
   }

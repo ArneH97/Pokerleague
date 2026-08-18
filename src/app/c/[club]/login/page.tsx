@@ -1,12 +1,18 @@
 import { notFound } from 'next/navigation'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { LoginForm } from '@/components/LoginForm'
 import { getClub } from '@/lib/club'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { leagueUrl } from '@/lib/site'
 
 export default async function Page({ params }: PageProps<'/c/[club]/login'>) {
   const { club: slug } = await params
   const club = await getClub(slug)
   if (!club) notFound()
+
+  const locale = await clubLocale(club.locale)
+  const t = translator(locale)
 
   return (
     <LoginForm
@@ -19,6 +25,7 @@ export default async function Page({ params }: PageProps<'/c/[club]/login'>) {
       // account thuishoort.
       playerHref={leagueUrl(`/c/${club.slug}`)}
       playerLabel={club.name}
+      languageSwitch={<LanguageSwitch current={locale} label={t('common.language')} />}
     />
   )
 }

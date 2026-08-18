@@ -4,8 +4,8 @@ import { LiveBoard } from '@/components/public/LiveBoard'
 import { PublicShell } from '@/components/public/PublicShell'
 import { getClub } from '@/lib/club'
 import { createClient } from '@/lib/supabase/server'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
-import { visitorLocale } from '@/lib/i18n/server'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import {
   getPrizeLadder, getPublicClock, getPublicLevels, getPublicResult, getPublicSeats,
 } from '@/lib/publicClub'
@@ -35,7 +35,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/live/[id]'>
   const { data: gateClaims } = await gate.auth.getClaims()
   if (!gateClaims?.claims) redirect(`/login?next=/c/${slug}/live/${id}`)
 
-  const locale = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+  const locale = await clubLocale(club.locale)
   const t = translator(locale)
   const clock = await getPublicClock(id)
 

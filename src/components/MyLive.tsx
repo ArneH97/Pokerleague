@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/context'
 import { formatMoney } from '@/lib/types'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * De avonden waar je nu in zit, bovenaan je startpagina.
@@ -86,7 +87,7 @@ function Row({ r }: { r: LiveRow }) {
       .update({ chip_count: value })
       .eq('id', r.tournament_player_id)
     setBusy(false)
-    if (err) { setError(err.message); return }
+    if (err) { setError(dbMessage(err, t)); return }
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)
   }

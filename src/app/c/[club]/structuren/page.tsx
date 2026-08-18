@@ -3,7 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { NewStructureButton } from '@/components/NewStructureButton'
 import { ButtonLink, Card, EmptyState, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator, type T } from '@/lib/i18n/dictionaries'
+import { translator, type T } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 
@@ -27,7 +28,8 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
 
   const role = await getClubRole(club.id)
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  const locale = await clubLocale(club.locale)
+  const t = translator(locale)
 
   const { data } = await supabase
     .from('blind_structures')
@@ -47,7 +49,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
         subtitle={t('struct.subtitle')}
         actions={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
       />
-      <ClubNav slug={slug} active="structures" canManage t={t} account={accountEmail} />
+      <ClubNav slug={slug} active="structures" canManage t={t} locale={locale} account={accountEmail} />
 
       {own.length === 0 ? (
         <EmptyState

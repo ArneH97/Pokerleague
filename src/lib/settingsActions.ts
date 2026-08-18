@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { Key } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -19,7 +20,19 @@ import { createClient } from '@/lib/supabase/server'
  * en `custom_domain` niet, want daar hangt DNS aan die hier niet meeverhuist.
  */
 
-type Result = { ok: true } | { ok: false; error: string }
+/**
+ * Wat een formulier terugkrijgt.
+ *
+ * `error` is een **sleutel** uit het woordenboek en geen zin. Hier op de
+ * server weten we niet welke taal de kijker gekozen heeft — die keuze zit in
+ * een koekje dat het formulier al gelezen heeft — dus vertalen gebeurt aan de
+ * andere kant. Stonden hier zinnen, dan kreeg een Franstalige floor midden in
+ * een Frans scherm ineens Nederlands terug.
+ *
+ * `detail` is voor wat niet te vertalen valt: de regel die de gebruiker zelf
+ * intikte, of het getal dat niet klopt.
+ */
+type Result = { ok: true } | { ok: false; error: Key; detail?: string }
 
 /** Leest een tekstveld en maakt van leegte netjes null. */
 function text(fd: FormData, key: string): string | null {
@@ -34,10 +47,11 @@ function num(fd: FormData, key: string, fallback: number): number {
   return Number.isFinite(v) ? v : fallback
 }
 
-function human(message: string): string {
+/** Van een fout uit Postgres naar een sleutel. */
+function human(message: string): { error: Key; detail?: string } {
   return message.includes('row-level security') || message.includes('Geen rechten')
-    ? 'Je hebt geen rechten om dit te wijzigen.'
-    : message
+    ? { error: 'db.noRightsEdit' }
+    : { error: 'common.error', detail: message }
 }
 
 async function save(
@@ -48,7 +62,7 @@ async function save(
 ): Promise<Result> {
   const supabase = await createClient()
   const { error } = await supabase.from(table).update(patch).eq('id', id)
-  if (error) return { ok: false, error: human(error.message) }
+  if (error) return { ok: false, ...human(error.message) }
 
   // De publieke pagina's van de club lezen dit ook, dus die moeten mee.
   revalidatePath(`/c/${slug}`, 'layout')
@@ -63,7 +77,7 @@ export async function saveClubBasics(_prev: Result | null, fd: FormData): Promis
   const slug = String(fd.get('slug'))
   const id = String(fd.get('id'))
   const naam = text(fd, 'name')
-  if (!naam) return { ok: false, error: 'Een club zonder naam kan niet.' }
+  if (!naam) return { ok: false, error: 'set.errNoName' }
 
   return save(slug, 'clubs', id, {
     name: naam,
@@ -82,7 +96,7 @@ export async function saveClubLook(_prev: Result | null, fd: FormData): Promise<
   // Een halve kleurcode maakt de hele huisstijl stuk, en dat merk je pas op
   // de beamer. Hier weigeren is vriendelijker dan daar.
   if (kleur && !/^#[0-9a-f]{6}$/i.test(kleur)) {
-    return { ok: false, error: 'Een kleur ziet eruit als #c9a227 — een hekje en zes tekens.' }
+    return { ok: false, error: 'set.errColor' }
   }
 
   return save(slug, 'clubs', id, {
@@ -147,23 +161,23 @@ export async function savePayoutTemplate(_prev: Result | null, fd: FormData): Pr
     const percentages = (pct ?? '').split(',').map((x) => Number(x.trim())).filter((n) => n > 0)
 
     if (!Number.isFinite(min) || !Number.isFinite(max) || min < 1 || max < min) {
-      return { ok: false, error: `Deze regel klopt niet: "${regel}". Vorm: van;tot;percentages.` }
+      return { ok: false, error: 'set.errRowShape', detail: regel }
     }
     if (percentages.length === 0) {
-      return { ok: false, error: `Geen percentages op de regel "${regel}".` }
+      return { ok: false, error: 'set.errNoPercentages', detail: regel }
     }
     const som = percentages.reduce((a, b) => a + b, 0)
     // Niet exact 100 eisen: clubs rekenen met 33/21/14/… en dat is 99,x. Wat
     // overblijft gaat naar plaats 1, en dat is al zo geregeld. Ver ernaast is
     // wel een tikfout.
     if (som < 95 || som > 105) {
-      return { ok: false, error: `De percentages van "${regel}" tellen op tot ${som}. Dat hoort rond 100 te liggen.` }
+      return { ok: false, error: 'set.errSum', detail: `${regel} → ${som}` }
     }
     tiers.push({ min_entries: min, max_entries: max, percentages })
   }
 
   if (tiers.length === 0) {
-    return { ok: false, error: 'Er moet minstens één regel in staan.' }
+    return { ok: false, error: 'set.errEmpty' }
   }
 
   return save(slug, 'payout_templates', id, {
@@ -195,7 +209,7 @@ export async function saveRankingConfig(_prev: Result | null, fd: FormData): Pro
     const tabel = (text(fd, 'table') ?? '')
       .split(',').map((x) => Number(x.trim())).filter((n) => Number.isFinite(n))
     if (tabel.length === 0) {
-      return { ok: false, error: 'Vul de puntentabel in, bijvoorbeeld: 100, 80, 65, 50.' }
+      return { ok: false, error: 'set.errPointsTable' }
     }
     params = { table: tabel, tail: num(fd, 'tail', 0) }
   }
@@ -224,8 +238,8 @@ export async function saveSeason(_prev: Result | null, fd: FormData): Promise<Re
   const naam = text(fd, 'name')
   const start = text(fd, 'starts_on')
 
-  if (!naam) return { ok: false, error: 'Geef het seizoen een naam.' }
-  if (!start) return { ok: false, error: 'Een seizoen heeft een startdatum nodig.' }
+  if (!naam) return { ok: false, error: 'set.errSeasonName' }
+  if (!start) return { ok: false, error: 'set.errSeasonStart' }
 
   const patch = {
     name: naam,
@@ -240,7 +254,7 @@ export async function saveSeason(_prev: Result | null, fd: FormData): Promise<Re
     ? await supabase.from('seasons').update(patch).eq('id', id)
     : await supabase.from('seasons').insert({ ...patch, club_id: clubId })
 
-  if (error) return { ok: false, error: human(error.message) }
+  if (error) return { ok: false, ...human(error.message) }
   revalidatePath(`/c/${slug}`, 'layout')
   return { ok: true }
 }

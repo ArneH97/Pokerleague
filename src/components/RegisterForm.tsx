@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Card, Field, Notice, inputClass } from '@/components/ui'
 import { useLocale, useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Registreren als speler.
@@ -218,7 +219,7 @@ export function RegisterForm({
       },
     })
     setBusy(false)
-    if (err) { setError(err.message); return }
+    if (err) { setError(dbMessage(err, t)); return }
     setResent(true)
   }
 

@@ -9,6 +9,7 @@ import {
   generateLadder, makeLevel, nextBlinds, type EditorLevel,
 } from '@/lib/tournament/structure'
 import { isDefaultBreakLabel } from '@/lib/tournament/clock'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Blindstructuur bewerken.
@@ -98,7 +99,7 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
       .eq('id', structureId)
 
     if (nameErr) {
-      setError(nameErr.message)
+      setError(dbMessage(nameErr, t))
       setBusy(false)
       return
     }
@@ -118,7 +119,7 @@ export function StructureEditor({ structureId, clubSlug, initialName, initialLev
     })
 
     if (err) {
-      setError(err.message)
+      setError(dbMessage(err, t))
       setBusy(false)
       return
     }

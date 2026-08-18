@@ -5,7 +5,8 @@ import { MemberList, type Member } from '@/components/MemberList'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -43,7 +44,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/leden'>) {
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/leden`)
 
   const role = await getClubRole(club.id)
-  const locale = isLocale(club.locale) ? club.locale : 'nl'
+  const locale = await clubLocale(club.locale)
   const t = translator(locale)
   const canSee = role !== null && ['owner', 'admin', 'floor'].includes(role)
 
@@ -84,7 +85,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/leden'>) {
   return (
     <Page width="xl">
       <PageHeader overline={club.name} title={t('members.title')} logoUrl={club.logo_url} />
-      <ClubNav slug={slug} active="members" canManage t={t} account={accountEmail} />
+      <ClubNav slug={slug} active="members" canManage t={t} locale={locale} account={accountEmail} />
 
       {error && <Notice tone="error">{error.message}</Notice>}
 

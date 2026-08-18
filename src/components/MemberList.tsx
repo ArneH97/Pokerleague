@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/types'
 import { useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Het ledenbestand van een club.
@@ -76,7 +77,7 @@ export function MemberList({
     })
 
     if (err) {
-      setError(err.message)
+      setError(dbMessage(err, t))
       setBusy(false)
       return
     }

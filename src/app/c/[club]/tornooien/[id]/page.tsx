@@ -2,7 +2,8 @@ import { notFound, redirect } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
 import { ButtonLink, Card, Notice, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -54,7 +55,8 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
   }
 
   const role = await getClubRole(club.id)
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  const locale = await clubLocale(club.locale)
+  const t = translator(locale)
 
   const [tourRes, resultRes, potRes] = await Promise.all([
     supabase
@@ -95,7 +97,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
 
   return (
     <Page width="lg">
-      <ClubNav slug={slug} active="tournaments" canManage={canSeeMoney} t={t} account={accountEmail} />
+      <ClubNav slug={slug} active="tournaments" canManage={canSeeMoney} t={t} locale={locale} account={accountEmail} />
       <PageHeader
         backHref={`/c/${slug}`}
         backLabel={t('result.backToClub')}

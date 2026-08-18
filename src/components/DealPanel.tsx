@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { computeDeal, evenSplitCents } from '@/lib/tournament/deal'
 import { formatMoney } from '@/lib/types'
 import { useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * De deal aan de finaletafel.
@@ -76,11 +77,11 @@ export function DealPanel({
         .eq('tournament_id', tournamentId).eq('status', 'proposed')
         .maybeSingle<{ id: string }>(),
     ])
-    if (ladder.error) setError(ladder.error.message)
+    if (ladder.error) setError(dbMessage(ladder.error, t))
     const rows = (ladder.data ?? []) as unknown as { place: number; amount_cents: number }[]
     setPrizes(rows.sort((a, b) => a.place - b.place).map((r) => r.amount_cents))
     setOpenDeal(open.data != null)
-  }, [supabase, tournamentId])
+  }, [supabase, tournamentId, t])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -172,7 +173,7 @@ export function DealPanel({
         .from('tournament_players')
         .update({ chip_count: counts[s.id] ?? 0 })
         .eq('id', s.id)
-      if (err) { setError(err.message); setBusy(false); return }
+      if (err) { setError(dbMessage(err, t)); setBusy(false); return }
     }
     setCounted(true)
     setStep('propose')
@@ -218,7 +219,7 @@ export function DealPanel({
       p_method: method,
       p_shares: shares,
     })
-    if (err) { setError(err.message); return false }
+    if (err) { setError(dbMessage(err, t)); return false }
     setOpenDeal(true)
     return true
   }
@@ -232,7 +233,7 @@ export function DealPanel({
   async function cancel() {
     setBusy(true)
     const { error: err } = await supabase.rpc('deal_cancel', { p_tournament_id: tournamentId })
-    if (err) setError(err.message)
+    if (err) setError(dbMessage(err, t))
     else setOpenDeal(false)
     setBusy(false)
   }
@@ -242,7 +243,7 @@ export function DealPanel({
     // Eerst de gekozen bedragen vastleggen, dan pas afsluiten.
     if (!(await saveDeal())) { setBusy(false); return }
     const { error: err } = await supabase.rpc('deal_accept', { p_tournament_id: tournamentId })
-    if (err) { setError(err.message); setBusy(false); return }
+    if (err) { setError(dbMessage(err, t)); setBusy(false); return }
     setBusy(false)
     onClose()
   }

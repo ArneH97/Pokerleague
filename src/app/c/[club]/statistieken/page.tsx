@@ -4,7 +4,8 @@ import { BarChart } from '@/components/BarChart'
 import { ClubNav } from '@/components/ClubNav'
 import { Card, EmptyState, Notice, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -54,7 +55,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/statistieken`)
 
   const role = await getClubRole(club.id)
-  const locale = isLocale(club.locale) ? club.locale : 'nl'
+  const locale = await clubLocale(club.locale)
   const t = translator(locale)
 
   if (!role || !['owner', 'admin', 'floor'].includes(role)) {
@@ -135,7 +136,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   return (
     <Page width="xl">
       <PageHeader overline={`${club.name} · ${label}`} title={t('stats.title')} logoUrl={club.logo_url} />
-      <ClubNav slug={slug} active="stats" canManage t={t} account={accountEmail} />
+      <ClubNav slug={slug} active="stats" canManage t={t} locale={locale} account={accountEmail} />
 
       <div className="flex flex-wrap items-center gap-0.5 self-start rounded-[var(--radius)] border border-[var(--line)] p-0.5">
         {[

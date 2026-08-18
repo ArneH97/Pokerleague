@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getClub, themeVars } from '@/lib/club'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { isLocale } from '@/lib/i18n/dictionaries'
+import { visitorLocale } from '@/lib/i18n/server'
 import { onPlatform } from '@/lib/whereAmI'
 
 /**
@@ -23,9 +24,19 @@ export default async function ClubLayout({ children, params }: LayoutProps<'/c/[
 
   if (!club) notFound()
 
-  // De taal is een instelling van de club, niet iets wat de floor elke avond
-  // opnieuw kiest. Op de zaalklok wil je al helemaal geen keuzescherm.
-  const locale = isLocale(club.locale) ? club.locale : 'nl'
+  // De taal van de club is de **standaard**, niet de wet.
+  //
+  // Ze stond hier vast, en de redenering was: de floor van Cutoff hoort elke
+  // avond hetzelfde scherm te zien. Dat klopt voor de zaalklok, maar het brak
+  // op de eerste echte club die we erbij zetten — een Vlaamse club met een
+  // Franstalige floor. Die man kreeg een scherm vol Nederlandse knoppen en
+  // kon niets testen, terwijl de app in drie talen bestaat.
+  //
+  // Nu: wie een taal koos, krijgt die taal, ook hier. Wie niets koos, krijgt
+  // die van de club — dus de zaalklok in Baardegem staat vanzelf in het
+  // Nederlands en er verandert niets voor wie nooit op de taalknop drukt.
+  const chosen = await visitorLocale()
+  const locale = chosen ?? (isLocale(club.locale) ? club.locale : 'nl')
 
   // Twee huiden, en het adres bepaalt welke.
   //

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { Key } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -20,10 +21,10 @@ export async function saveOnboardingProfile(input: {
   /** null = niet gevraagd op dit scherm, dus niet aanraken. */
   birthdate?: string | null
   consent?: boolean | null
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; error?: Key; detail?: string }> {
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
-  if (!claims?.claims) return { ok: false, error: 'Niet aangemeld.' }
+  if (!claims?.claims) return { ok: false, error: 'me.errNotSignedIn' }
 
   const clean = (v: string) => {
     const s = v.trim()
@@ -32,7 +33,7 @@ export async function saveOnboardingProfile(input: {
 
   const username = clean(input.username)
   if (username && !/^[a-zA-Z0-9._-]{3,24}$/.test(username)) {
-    return { ok: false, error: 'Een gebruikersnaam is 3 tot 24 tekens.' }
+    return { ok: false, error: 'me.errUsernameShape' }
   }
 
   const first = clean(input.first)
@@ -47,7 +48,7 @@ export async function saveOnboardingProfile(input: {
     let age = now.getFullYear() - y
     const had = now.getMonth() + 1 > m || (now.getMonth() + 1 === m && now.getDate() >= d)
     if (!had) age -= 1
-    if (age < 18) return { ok: false, error: 'Je moet 18 jaar zijn om een account te maken.' }
+    if (age < 18) return { ok: false, error: 'db.under18' }
   }
 
   const { error } = await supabase
@@ -66,10 +67,9 @@ export async function saveOnboardingProfile(input: {
     .eq('auth_user_id', String(claims.claims.sub))
 
   if (error) {
-    return {
-      ok: false,
-      error: error.code === '23505' ? 'Die gebruikersnaam is al bezet.' : error.message,
-    }
+    return error.code === '23505'
+      ? { ok: false, error: 'me.errUsernameTaken' }
+      : { ok: false, error: 'common.error', detail: error.message }
   }
 
   revalidatePath('/ik')

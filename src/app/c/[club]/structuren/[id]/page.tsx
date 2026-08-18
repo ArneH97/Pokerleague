@@ -3,7 +3,8 @@ import { StructureEditor } from '@/components/StructureEditor'
 import { makeLevel, type EditorLevel } from '@/lib/tournament/structure'
 import { Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 
@@ -35,7 +36,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren/
 
   const role = await getClubRole(club.id)
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  const t = translator(await clubLocale(club.locale))
 
   const [structRes, levelRes] = await Promise.all([
     supabase.from('blind_structures').select('id,name,club_id').eq('id', id)

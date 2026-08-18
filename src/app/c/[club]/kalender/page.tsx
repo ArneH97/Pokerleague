@@ -4,7 +4,7 @@ import { AccountWall } from '@/components/public/AccountWall'
 import { PublicShell } from '@/components/public/PublicShell'
 import { getClub } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
-import { visitorLocale } from '@/lib/i18n/server'
+import { clubLocale } from '@/lib/i18n/server'
 import { getPublicTournaments, type PublicTournament } from '@/lib/publicClub'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
@@ -31,7 +31,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/kalender'>)
 
   // De taal van de bezoeker wint van die van de club; wie niets koos krijgt
   // de taal waarin de club zijn zaal bedient.
-  const locale = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+  const locale = await clubLocale(club.locale)
   const t = translator(locale)
 
   // De agenda hoort bij het platform, niet bij de etalage. Zie migratie 0034.

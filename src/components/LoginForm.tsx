@@ -43,10 +43,22 @@ interface Props {
    * zichzelf over het hele scherm uitrekt.
    */
   bare?: boolean
+  /**
+   * De taalkiezer, doorgegeven vanaf de pagina.
+   *
+   * Dit is een clientcomponent en de kiezer is er geen — hij hangt aan een
+   * serveractie die het koekje zet. Vandaar als node erin en niet als import.
+   *
+   * Waarom hij hier per se moet staan: dit scherm is voor veel mensen het
+   * eerste dat ze van ons zien, en wie het niet kan lezen komt er niet
+   * voorbij. Een Franstalige floor van een Vlaamse club stond hier tegen
+   * Nederlandse labels aan te kijken.
+   */
+  languageSwitch?: React.ReactNode
 }
 
 function Form({
-  brandName, logoUrl, fallbackNext, branded, playerHref, playerLabel, bare,
+  brandName, logoUrl, fallbackNext, branded, playerHref, playerLabel, bare, languageSwitch,
 }: Props) {
   const router = useRouter()
   const params = useSearchParams()
@@ -140,6 +152,10 @@ function Form({
             </Button>
           </form>
         </Card>
+
+        {languageSwitch && (
+          <div className="mt-5 flex justify-center">{languageSwitch}</div>
+        )}
 
         {playerHref && (
           <p className="mt-5 text-center text-sm leading-relaxed text-[var(--text-muted)]">

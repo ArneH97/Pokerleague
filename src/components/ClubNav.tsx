@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import type { T } from '@/lib/i18n/dictionaries'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
+import type { Locale, T } from '@/lib/i18n/dictionaries'
 
 /**
  * De navigatie van de clubomgeving.
@@ -15,12 +16,14 @@ import type { T } from '@/lib/i18n/dictionaries'
  * link.
  */
 export function ClubNav({
-  slug, active, canManage, t, account,
+  slug, active, canManage, t, locale, account,
 }: {
   slug: string
   active: 'tournaments' | 'standings' | 'members' | 'stats' | 'structures' | 'settings'
   canManage: boolean
   t: T
+  /** Welke taal nu aan staat, voor de keuzeknop rechts. */
+  locale: Locale
   /** Het mailadres waarmee je hier aangemeld bent. Zie de uitleg hieronder. */
   account?: string | null
 }) {
@@ -66,6 +69,15 @@ export function ClubNav({
           <span className="text-[var(--text-muted)]">{account}</span>
         </span>
       )}
+
+      {/* De taalknop hoort ook hier.
+          De clubomgeving stond vast in de taal van de club, en dat brak op de
+          eerste Vlaamse club met een Franstalige floor: die man kon zijn eigen
+          knoppen niet lezen. De keuze geldt voor het hele product en blijft in
+          een koekje staan, dus hij doet dit één keer. */}
+      <span className={account ? 'shrink-0 pl-2' : 'ml-auto shrink-0 pl-2'}>
+        <LanguageSwitch current={locale} label={t('common.language')} />
+      </span>
     </nav>
   )
 }

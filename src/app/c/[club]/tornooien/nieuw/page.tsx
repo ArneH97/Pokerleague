@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { TournamentForm, type Option } from '@/components/TournamentForm'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 
@@ -17,7 +18,7 @@ export default async function Page({ params }: PageProps<'/c/[club]/tornooien/ni
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/tornooien/nieuw`)
 
   const role = await getClubRole(club.id)
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  const t = translator(await clubLocale(club.locale))
   if (!role || !['owner', 'admin', 'floor'].includes(role)) {
     return (
       <main className="mx-auto min-h-dvh max-w-2xl p-6">

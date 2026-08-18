@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { LoginForm } from '@/components/LoginForm'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator } from '@/lib/i18n/dictionaries'
@@ -30,7 +31,11 @@ export default async function Page() {
         lang={locale}
         className="app-glow relative min-h-dvh overflow-x-clip bg-[var(--bg)] text-[var(--text)]"
       >
-        <LoginForm brandName="PokerLeague" fallbackNext="/ik" />
+        <LoginForm
+          brandName="PokerLeague"
+          fallbackNext="/ik"
+          languageSwitch={<LanguageSwitch current={locale} label={t('common.language')} />}
+        />
 
         {/* Wie hier staat zonder account had geen enkele uitweg: het scherm
             vroeg om een wachtwoord dat nog niet bestaat. Eén regel volstaat,

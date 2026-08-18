@@ -6,8 +6,8 @@ import {
   Badge, ButtonLink, Card, EmptyState, Notice, Page, SectionTitle,
 } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator, type Key, type T } from '@/lib/i18n/dictionaries'
-import { visitorLocale } from '@/lib/i18n/server'
+import { translator, type Key, type T } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 import { onPlatform } from '@/lib/whereAmI'
 import { formatMoney } from '@/lib/types'
@@ -39,7 +39,8 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
   const { data: claims } = await supabase.auth.getClaims()
   const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   const role = claims?.claims ? await getClubRole(club.id) : null
-  const t = translator(isLocale(club.locale) ? club.locale : 'nl')
+  const locale = await clubLocale(club.locale)
+  const t = translator(locale)
 
   const isStaff = role !== null && ['owner', 'admin', 'floor'].includes(role)
 
@@ -58,7 +59,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
   if (!isStaff) {
     if (!(await onPlatform())) redirect(`/c/${slug}/login`)
 
-    const visitor = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+    const visitor = locale
     return <PublicClubHome club={club} locale={visitor} />
   }
 
@@ -107,7 +108,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         }
       />
 
-      {role && <ClubNav slug={slug} active="tournaments" canManage={canManage} t={t} account={accountEmail} />}
+      {role && <ClubNav slug={slug} active="tournaments" canManage={canManage} t={t} locale={locale} account={accountEmail} />}
 
       {!role && (
         <Notice tone="warn">

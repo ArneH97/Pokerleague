@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatMoney } from '@/lib/types'
 import { useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * De prijzenverdeling vastleggen tijdens de avond.
@@ -85,7 +86,7 @@ export function PayoutPanel({
       p_places: nPlaces,
       p_bubble_cents: withBubble ? cents : 0,
     })
-    if (err) setError(err.message)
+    if (err) setError(dbMessage(err, t))
     else setRows(((data ?? []) as unknown as Row[]).sort((a, b) => a.place - b.place))
     setBusy(false)
   }
@@ -97,7 +98,7 @@ export function PayoutPanel({
       p_tournament_id: tournamentId,
       p_amounts: rows.sort((a, b) => a.place - b.place).map((r) => r.amount_cents),
     })
-    if (err) setError(err.message)
+    if (err) setError(dbMessage(err, t))
     else { setFixed(true); onChanged() }
     setBusy(false)
   }
@@ -105,7 +106,7 @@ export function PayoutPanel({
   async function reset() {
     setBusy(true)
     const { error: err } = await supabase.rpc('clear_payouts', { p_tournament_id: tournamentId })
-    if (err) setError(err.message)
+    if (err) setError(dbMessage(err, t))
     else { await loadCurrent(); setFixed(false); onChanged() }
     setBusy(false)
   }

@@ -4,7 +4,8 @@ import { SettingsForm } from '@/components/settings/SettingsForm'
 import { Field, Notice, Page, PageHeader, SectionTitle, inputClass } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { LocaleProvider } from '@/lib/i18n/context'
-import { isLocale, translator } from '@/lib/i18n/dictionaries'
+import { translator } from '@/lib/i18n/dictionaries'
+import { clubLocale } from '@/lib/i18n/server'
 import {
   saveClubBasics, saveClubLook, saveClubPublic, saveCompliance,
   savePayoutTemplate, saveRankingConfig, saveSeason,
@@ -66,7 +67,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/instellingen`)
 
   const role = await getClubRole(club.id)
-  const locale = isLocale(club.locale) ? club.locale : 'nl'
+  const locale = await clubLocale(club.locale)
   const t = translator(locale)
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
   const canEdit = role === 'owner' || role === 'admin'
@@ -131,7 +132,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
           subtitle={club.name}
           logoUrl={club.logo_url}
         />
-        <ClubNav slug={slug} active="settings" canManage={canManage} t={t} account={accountEmail} />
+        <ClubNav slug={slug} active="settings" canManage={canManage} t={t} locale={locale} account={accountEmail} />
 
         <div className="mt-2 space-y-4">
           {/* ------------------------------------------------------- club */}

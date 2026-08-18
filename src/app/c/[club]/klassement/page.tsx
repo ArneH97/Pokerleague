@@ -6,8 +6,8 @@ import { PublicShell } from '@/components/public/PublicShell'
 import { PublicStandings } from '@/components/public/PublicStandings'
 import { Card, EmptyState, Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
-import { isLocale, translator, type T } from '@/lib/i18n/dictionaries'
-import { visitorLocale } from '@/lib/i18n/server'
+import { translator, type T } from '@/lib/i18n/dictionaries'
+import { visitorLocale, clubLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -116,7 +116,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   // Een klassement is een lijst van wie wanneer speelde. Sinds 0034 hoort daar
   // een account bij; het visitekaartje van de club blijft wel open.
   if (!claims?.claims) {
-    const visitor = (await visitorLocale()) ?? (isLocale(club.locale) ? club.locale : 'nl')
+    const visitor = await clubLocale(club.locale)
     return (
       <PublicShell club={club} locale={visitor} active="standings" signedIn={false}>
         <AccountWall t={translator(visitor)} next={`/c/${club.slug}/klassement`} />
@@ -125,7 +125,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   }
   const role = claims?.claims ? await getClubRole(club.id) : null
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
-  const locale = isLocale(club.locale) ? club.locale : 'nl'
+  const locale = await clubLocale(club.locale)
   const t = translator(locale)
 
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -230,7 +230,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
         title={t('standings.title')}
         logoUrl={club.logo_url}
       />
-      <ClubNav slug={slug} active="standings" canManage={canManage} t={t} account={accountEmail} />
+      <ClubNav slug={slug} active="standings" canManage={canManage} t={t} locale={locale} account={accountEmail} />
 
       {/* -------------------------------------------------------------- filter */}
       <div className="flex flex-wrap items-center gap-2">

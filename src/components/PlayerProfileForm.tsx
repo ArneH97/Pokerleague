@@ -112,7 +112,12 @@ export function PlayerProfileForm({
           {pending ? t('common.saving') : t('common.save')}
         </button>
         {state?.ok === true && <span className="text-sm text-[var(--ok)]">{t('common.saved')}</span>}
-        {state?.ok === false && <span className="text-sm text-[var(--danger)]">{state.error}</span>}
+        {state?.ok === false && (
+          <span className="text-sm text-[var(--danger)]">
+            {t(state.error)}
+            {state.detail && <span className="opacity-80"> — {state.detail}</span>}
+          </span>
+        )}
       </div>
     </form>
   )

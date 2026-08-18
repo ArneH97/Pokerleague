@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui'
 import { useT } from '@/lib/i18n/context'
+import { dbMessage } from '@/lib/dbMessage'
 
 /**
  * Maakt een nieuwe blindstructuur aan en gaat er meteen naartoe.
@@ -37,7 +38,7 @@ export function NewStructureButton({
         p_club_id: clubId,
         p_name: suggestedName ?? t('struct.copySuffix'),
       })
-      if (err) { setError(err.message); setBusy(false); return }
+      if (err) { setError(dbMessage(err, t)); setBusy(false); return }
       router.push(`/c/${clubSlug}/structuren/${data as string}`)
       return
     }
@@ -52,7 +53,7 @@ export function NewStructureButton({
       setError(
         err.code === '42501' || err.message.includes('row-level security')
           ? t('struct.noRightsCreate')
-          : err.message,
+          : dbMessage(err, t),
       )
       setBusy(false)
       return

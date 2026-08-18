@@ -2,8 +2,10 @@
 
 import { useActionState } from 'react'
 import { useT } from '@/lib/i18n/context'
+import type { Key } from '@/lib/i18n/dictionaries'
 
-type Result = { ok: true } | { ok: false; error: string }
+/** Zie settingsActions: de actie geeft een sleutel terug, wij vertalen hem. */
+type Result = { ok: true } | { ok: false; error: Key; detail?: string }
 type Action = (prev: Result | null, fd: FormData) => Promise<Result>
 
 /**
@@ -63,7 +65,10 @@ export function SettingsForm({
           <span className="text-sm text-[var(--ok)]">{t('common.saved')}</span>
         )}
         {state?.ok === false && (
-          <span className="text-sm text-[var(--danger)]">{state.error}</span>
+          <span className="text-sm text-[var(--danger)]">
+            {t(state.error)}
+            {state.detail && <span className="opacity-80"> — {state.detail}</span>}
+          </span>
         )}
       </div>
     </form>
