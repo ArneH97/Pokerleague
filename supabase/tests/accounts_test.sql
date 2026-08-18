@@ -289,15 +289,23 @@ begin
     json_build_object('sub', v_uid2, 'role', 'authenticated', 'email', 'twee@t36.be')::text, true);
   perform set_config('request.jwt.claim.sub', v_uid2::text, true);
 
+  -- En het belangrijkste: een bezette naam mag het account niet kosten. Dit
+  -- ging in productie mis — iemand bevestigde zijn mailadres, kreeg
+  -- "we konden je profiel niet vinden of aanmaken", en had een account in
+  -- auth.users dat nergens anders bestond. Het profiel is het punt; de
+  -- gebruikersnaam is een voorkeur.
+  declare v_ander uuid;
   begin
-    perform public.claim_my_player('Iemand', 'Anders', 'TeJong', false, 'nl',
-                                   (current_date - interval '30 years')::date, true);
+    v_ander := public.claim_my_player('Iemand', 'Anders', 'TeJong', false, 'nl',
+                                      (current_date - interval '30 years')::date, true);
+    if v_ander is null then raise exception 'FOUT: een bezette naam kostte hem zijn profiel'; end if;
+    if v_ander = v_p then raise exception 'FOUT: hij kreeg het profiel van iemand anders'; end if;
+    if (select username from players where id = v_ander) is not null then
+      raise exception 'FOUT: de bezette naam werd toch toegekend';
+    end if;
     select count(*) into v_n from players where lower(username) = 'tejong' and merged_into_id is null;
-    if v_n > 1 then raise exception 'FOUT: twee spelers met dezelfde gebruikersnaam'; end if;
-    raise notice 'OK  de unieke index hield stand (de tweede kreeg de naam niet)';
-  exception
-    when unique_violation then
-      raise notice 'OK  de database weigert een dubbele gebruikersnaam';
+    if v_n <> 1 then raise exception 'FOUT: % spelers met dezelfde gebruikersnaam', v_n; end if;
+    raise notice 'OK  een bezette naam kost geen account; het profiel komt er zonder naam';
   end;
 
   perform set_config('request.jwt.claims', '', true);

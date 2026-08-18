@@ -58,8 +58,14 @@ export function RegisterForm({
   const [email, setEmail] = useState(invitedEmail ?? '')
   const [unlocked, setUnlocked] = useState(false)
   const [password, setPassword] = useState('')
+  const [password2, setPassword2] = useState('')
   const [birthdate, setBirthdate] = useState('')
-  const [consent, setConsent] = useState(false)
+  // Standaard aangevinkt. Dit is geen extraatje maar waar de dienst voor
+  // dient: zonder je resultaten mee te tellen valt er niets te tonen. Het
+  // vinkje eronder — je naam publiek in een ranglijst — blijft wél leeg, want
+  // dat is een echte keuze en een vooraf aangevinkt hokje is daar geen geldige
+  // toestemming voor.
+  const [consent, setConsent] = useState(true)
   const [listing, setListing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -104,6 +110,7 @@ export function RegisterForm({
   }
   const age = ageOf(birthdate)
   const tooYoung = age !== null && age < 18
+  const mismatch = password2 !== '' && password !== password2
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -248,6 +255,21 @@ export function RegisterForm({
               />
             </Field>
 
+            {/* Twee keer intikken. Een typfout in een wachtwoord merk je pas bij
+                het volgende bezoek, en dan sta je met een adres dat bevestigd
+                is en een sleutel die je nooit gekend hebt. */}
+            <Field label={t('register.password2')}>
+              <input
+                type="password" value={password2} onChange={(e) => setPassword2(e.target.value)}
+                autoComplete="new-password" minLength={8} required
+                aria-invalid={mismatch}
+                className={`${inputClass}${mismatch ? ' border-[var(--danger)]' : ''}`}
+              />
+              {mismatch && (
+                <p className="mt-1.5 text-xs text-[var(--danger)]">{t('register.password2Bad')}</p>
+              )}
+            </Field>
+
             <Field
               label={t('register.username')}
               hint={
@@ -310,7 +332,7 @@ export function RegisterForm({
 
             <Button
               type="submit"
-              disabled={busy || tooYoung || nameFree === false}
+              disabled={busy || tooYoung || mismatch || password2 === '' || nameFree === false}
               className="w-full"
             >
               {busy ? t('common.busy') : t('register.submit')}

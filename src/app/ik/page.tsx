@@ -99,7 +99,12 @@ export default async function Page() {
   const t = translator(locale)
 
   // Ophalen of aanmaken. Zie de uitleg hierboven.
-  await supabase.rpc('claim_my_player', {})
+  //
+  // De fout hiervan werd vroeger weggegooid, en dat kostte een avond zoeken:
+  // ging het opeisen mis, dan zag de speler alleen "we konden je profiel niet
+  // vinden of aanmaken" — een zin die klopt en niets zegt. Wat er misging
+  // stond in een variabele die niemand las.
+  const claim = await supabase.rpc('claim_my_player', {})
 
   const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes] = await Promise.all([
     supabase.rpc('my_player'),
@@ -139,7 +144,19 @@ export default async function Page() {
     return (
       <LocaleProvider locale={locale}>
         <main className="mx-auto max-w-2xl px-5 py-10">
-          <Notice tone="error">{meRes.error?.message ?? t('me.noProfile')}</Notice>
+          <Notice tone="error">
+            {t('me.noProfile')}
+            {(claim.error ?? meRes.error) && (
+              <span className="mt-2 block text-xs opacity-80">
+                {(claim.error ?? meRes.error)?.message}
+              </span>
+            )}
+          </Notice>
+          <p className="mt-4 text-center text-sm">
+            <Link href="/welkom" className="text-[var(--brand)] underline-offset-4 hover:underline">
+              {t('me.retry')} →
+            </Link>
+          </p>
         </main>
       </LocaleProvider>
     )

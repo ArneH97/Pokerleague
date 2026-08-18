@@ -56,7 +56,10 @@ export function Onboarding({
   const [user, setUser] = useState(username)
   const [listing, setListing] = useState(publicListing)
   const [birth, setBirth] = useState(birthdate)
-  const [consent, setConsent] = useState(hasConsent)
+  // Zie RegisterForm voor waarom dit er standaard in staat en het vinkje voor
+  // publieke naamsvermelding niet.
+  const [consent, setConsent] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Accounts van vóór 0036 hebben geen geboortedatum en geen toestemming. Die
   // vragen we hier alsnog — dit is het enige scherm dat iedereen doorloopt.
@@ -78,12 +81,16 @@ export function Onboarding({
     setBusy(true)
     if (i === 1 && picked.size > 0) await joinClubs([...picked])
     if (i === 2) {
-      await saveOnboardingProfile({
+      const res = await saveOnboardingProfile({
         first, last, username: user, listing,
         birthdate: askBirth ? birth : null,
         consent: askConsent ? consent : null,
       })
+      // Niet doorklikken als het niet lukte. Anders staat er straks "klaar"
+      // terwijl zijn gebruikersnaam nooit opgeslagen is.
+      if (!res.ok) { setError(res.error ?? null); setBusy(false); return }
     }
+    setError(null)
     setBusy(false)
     setStep(i + 1)
   }
@@ -281,6 +288,12 @@ export function Onboarding({
               </span>
             </label>
           </div>
+
+          {error && (
+            <p className="mt-4 rounded-[var(--radius)] border border-[color-mix(in_oklab,var(--danger)_35%,transparent)] bg-[color-mix(in_oklab,var(--danger)_10%,transparent)] p-3 text-sm text-[var(--danger)]">
+              {error}
+            </p>
+          )}
 
           <Buttons
             busy={busy}
