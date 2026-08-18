@@ -24,8 +24,9 @@ declare
   v_tp_a uuid; v_tp_b uuid; v_tp_c uuid;
   v_n int; v_rank int; v_van int; v_tor int;
 begin
-  insert into clubs (slug, name, city, country, locale, timezone)
-  values ('t32', 'Testclub 32', 'Aalst', 'BE', 'nl', 'Europe/Brussels') returning id into v_club;
+  insert into clubs (slug, name, city, country, locale, timezone, primary_color)
+  values ('t32', 'Testclub 32', 'Aalst', 'BE', 'nl', 'Europe/Brussels', '#c81e2d')
+  returning id into v_club;
 
   insert into blind_structures (club_id, name) values (v_club, 'S') returning id into v_struct;
   insert into blind_levels (structure_id, idx, is_break, small_blind, big_blind, ante, duration_s)
@@ -86,6 +87,16 @@ begin
   if v_rank <> 1 then raise exception 'FOUT: de winnaar staat % en niet eerste', v_rank; end if;
   if v_van <> 3 then raise exception 'FOUT: verwacht 3 spelers in het klassement, kreeg %', v_van; end if;
   raise notice 'OK  de winnaar staat eerste van drie';
+
+  -- De clubkaartjes op de spelerspagina krijgen hun kleur uit my_clubs. Zonder
+  -- die kolom vallen ze allemaal terug op het platformblauw en is de ene club
+  -- niet van de andere te onderscheiden. Zie migratie 0041.
+  if not exists (
+    select 1 from public.my_clubs() where slug = 't32' and primary_color = '#c81e2d'
+  ) then
+    raise exception 'FOUT: my_clubs gaf de clubkleur niet mee';
+  end if;
+  raise notice 'OK  my_clubs geeft de kleur van de club mee';
 
   -- --------------------------------------------------------------------- 2 ---
   -- De besloten avond telt niet mee. Zou hij dat wel doen, dan zou hier 2

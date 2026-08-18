@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { MyClubs, type MyClubRow } from '@/components/MyClubs'
 import { MyLive, type LiveRow } from '@/components/MyLive'
+import { PlayerNav } from '@/components/PlayerNav'
 import { PlayerCharts } from '@/components/PlayerCharts'
-import { PlayerProfileForm } from '@/components/PlayerProfileForm'
 import { Card, Notice } from '@/components/ui'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator } from '@/lib/i18n/dictionaries'
@@ -48,6 +48,7 @@ interface ClubRow {
   name: string
   city: string | null
   logo_url: string | null
+  primary_color: string | null
 }
 
 /** Wat deze speler bij één club heeft staan. Zie migratie 0031. */
@@ -117,13 +118,14 @@ export default async function Page() {
     redirect('/login?verlopen=1')
   }
 
-  const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes] = await Promise.all([
+  const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes, discoverRes] = await Promise.all([
     supabase.rpc('my_player'),
     supabase.rpc('my_results'),
     supabase.rpc('my_clubs'),
     supabase.rpc('my_staff_clubs'),
     supabase.rpc('my_club_stats', {}),
     supabase.rpc('my_live_tournaments'),
+    supabase.rpc('clubs_open_to_join'),
   ])
 
   const me = ((meRes.data ?? []) as unknown as Me[])[0] ?? null
@@ -132,6 +134,10 @@ export default async function Page() {
   const staff = (staffRes.data ?? []) as unknown as StaffRow[]
   const stats = (statsRes.data ?? []) as unknown as ClubStat[]
   const live = (liveRes.data ?? []) as unknown as LiveRow[]
+  const discover = (discoverRes.data ?? []) as unknown as {
+    slug: string; name: string; city: string | null; logo_url: string | null
+    intro: string | null; members: number
+  }[]
 
   // Lidmaatschap en resultaten zijn twee verschillende dingen, en ze lopen
   // niet gelijk. Je bent lid vanaf het moment dat de floor je toevoegt; je
@@ -139,15 +145,26 @@ export default async function Page() {
   // week voor het eerst was hoort dus in de lijst te staan, met een lege
   // regel — anders lijkt het alsof je er niet bij hoort.
   const byClub = new Map(stats.map((s) => [s.club_slug, s]))
-  const mijnClubs = [
-    ...clubs.map((c) => ({ club: c, stat: byClub.get(c.slug) ?? null })),
+  const mijnClubs: MyClubRow[] = [
+    ...clubs.map((c) => {
+      const st = byClub.get(c.slug)
+      return {
+        slug: c.slug, name: c.name, city: c.city, logo_url: c.logo_url,
+        primary_color: c.primary_color,
+        rank: st?.rank ?? null, of_players: st?.of_players ?? null,
+        tournaments: st?.tournaments ?? 0, points: Number(st?.points ?? 0),
+        prize_cents: Number(st?.prize_cents ?? 0),
+      }
+    }),
     // En omgekeerd: wie ergens speelde maar uit het ledenbestand verdween,
     // heeft daar wél een verleden. Dat hoor je niet stil te laten vallen.
     ...stats
       .filter((s) => !clubs.some((c) => c.slug === s.club_slug))
       .map((s) => ({
-        club: { slug: s.club_slug, name: s.club_name, city: s.club_city, logo_url: s.logo_url },
-        stat: s,
+        slug: s.club_slug, name: s.club_name, city: s.club_city, logo_url: s.logo_url,
+        primary_color: null as string | null,
+        rank: s.rank, of_players: s.of_players, tournaments: s.tournaments,
+        points: Number(s.points), prize_cents: Number(s.prize_cents),
       })),
   ]
 
@@ -194,22 +211,13 @@ export default async function Page() {
   return (
     <LocaleProvider locale={locale}>
       <div data-site lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
-        <header className="border-b border-[var(--line)]">
-          <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
-            <Link href="/" className="text-sm font-semibold tracking-[0.18em]">POKERLEAGUE</Link>
-            <span className="flex-1" />
-            <LanguageSwitch current={locale} label={t('common.language')} />
-            <form action="/auth/signout" method="post">
-              <button className="rounded-full px-3 py-1.5 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
-                {t('common.signOut')}
-              </button>
-            </form>
-          </div>
-        </header>
+        <PlayerNav locale={locale} t={t} active="home" />
 
-        <main className="mx-auto max-w-3xl space-y-5 px-5 py-7">
+        <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-5 sm:py-7">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">{me.display_name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {me.display_name}
+            </h1>
             <p className="mt-1 text-sm text-[var(--text-faint)]">
               {me.username && <span>@{me.username} · </span>}
               {t('nav.signedInAs')} {me.email}
@@ -227,102 +235,6 @@ export default async function Page() {
               pagina dat op dat moment telt. Speel je niet, dan staat er
               niets. */}
           <MyLive rows={live} />
-
-          {/* --------------------------------------------------- waar hoor ik
-              De vraag die deze pagina eerst onbeantwoord liet. Speler zijn bij
-              een club en medewerker zijn van een club zijn twee losse dingen,
-              en wie net een account maakte is meestal geen van beide. Dan is
-              "0 clubs" geen informatie maar een raadsel. */}
-          <section className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-5">
-            <h2 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
-              {t('me.where')}
-            </h2>
-
-            {mijnClubs.length === 0 ? (
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                {t('me.noClubs')}
-              </p>
-            ) : (
-              <>
-                {/* Deze zin blijft staan ook als er clubs zijn. Hij verdween
-                    vroeger zodra je er eentje had — net op het moment dat het
-                    onderscheid tussen account en lidmaatschap begint te tellen. */}
-                <p className="mt-2 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
-                  {t('me.clubsBody')}
-                </p>
-
-                <ul className="mt-4 space-y-2">
-                  {mijnClubs.map(({ club: c, stat }) => (
-                    <li key={c.slug}>
-                      <Link
-                        href={`/c/${c.slug}`}
-                        className="group flex items-center gap-3 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 transition hover:border-[var(--line-strong)]"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{c.name}</span>
-                          {stat ? (
-                            <span className="tnum mt-0.5 block text-xs text-[var(--text-faint)]">
-                              {stat.rank}{t('me.rankOf')}{stat.of_players} ·{' '}
-                              {stat.tournaments} {t('me.playedShort')} ·{' '}
-                              {Math.round(Number(stat.points))} {t('pub.pts')}
-                              {Number(stat.prize_cents) > 0
-                                ? ` · ${formatMoney(Number(stat.prize_cents), 'EUR')}`
-                                : ''}
-                            </span>
-                          ) : (
-                            <span className="mt-0.5 block text-xs text-[var(--text-faint)]">
-                              {c.city ? `${c.city} · ` : ''}{t('me.noneHereYet')}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          aria-hidden
-                          className="shrink-0 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"
-                        >
-                          ›
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            {/* Beheer je een club, dan hangt dat aan het account dat die club
-                als bestuur heeft opgegeven — en dat hoeft niet hetzelfde
-                account te zijn als waarmee je speelt. Zolang dat nergens staat
-                kan een scherm heel redelijk niets tonen zonder dat iemand
-                begrijpt waarom. Precies dat is misgelopen bij de
-                uitnodigingen. */}
-            {staff.length === 0 && (
-              <p className="mt-4 border-t border-[var(--line)] pt-3 text-xs leading-relaxed text-[var(--text-faint)]">
-                {t('me.staffElsewhere')}
-              </p>
-            )}
-
-            {staff.length > 0 && (
-              <div className="mt-5 border-t border-[var(--line)] pt-4">
-                <h3 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
-                  {t('me.staffAt')}
-                </h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
-                  {t('me.staffBody')}
-                </p>
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {staff.map((c) => (
-                    <li key={c.slug}>
-                      <Link
-                        href={`/c/${c.slug}`}
-                        className="inline-flex items-center gap-2 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
-                      >
-                        {t('me.manage')} {c.name} →
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
 
           {/* --------------------------------------------------- de cijfers
               Netto krijgt de volle breedte en een kleur. Dat is het enige
@@ -360,6 +272,47 @@ export default async function Page() {
                 />
               </div>
             </>
+          )}
+
+          {/* ----------------------------------------------------- mijn clubs
+              Speler zijn bij een club en medewerker zijn van een club zijn
+              twee losse dingen, en wie net een account maakte is meestal geen
+              van beide. Dan is "0 clubs" geen informatie maar een raadsel —
+              vandaar dat er ook zonder clubs iets staat, met de deur naar de
+              rest erbij. */}
+          <MyClubs mine={mijnClubs} discover={discover} />
+
+          {/* ------------------------------------------------------ personeel
+              Beheer je een club, dan hangt dat aan het account dat die club
+              als bestuur heeft opgegeven — en dat hoeft niet hetzelfde account
+              te zijn als waarmee je speelt. Zolang dat nergens staat kan een
+              scherm heel redelijk niets tonen zonder dat iemand begrijpt
+              waarom. Precies dat is misgelopen bij de uitnodigingen. */}
+          {staff.length > 0 ? (
+            <section className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+              <h2 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                {t('me.staffAt')}
+              </h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
+                {t('me.staffBody')}
+              </p>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {staff.map((c) => (
+                  <li key={c.slug}>
+                    <Link
+                      href={`/c/${c.slug}`}
+                      className="inline-flex items-center gap-2 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
+                    >
+                      {t('me.manage')} {c.name} →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <p className="text-xs leading-relaxed text-[var(--text-faint)]">
+              {t('me.staffElsewhere')}
+            </p>
           )}
 
           {/* ------------------------------------------------- de resultaten */}
@@ -421,18 +374,17 @@ export default async function Page() {
             )}
           </section>
 
-          {/* ---------------------------------------------------- instellingen */}
-          <PlayerProfileForm
-            me={{
-              first_name: me.first_name,
-              last_name: me.last_name,
-              username: me.username,
-              email: me.email,
-              locale: me.locale,
-              public_listing: me.public_listing,
-              public_profile: me.public_profile,
-            }}
-          />
+          {/* Gegevens staan niet meer onderaan deze pagina maar op /ik/gegevens.
+              Ze stonden hier onder de resultaten: je scrolt er bij elk bezoek
+              overheen terwijl je er hooguit twee keer per jaar iets wijzigt. */}
+          <p className="pt-1 text-center text-sm">
+            <Link
+              href="/ik/gegevens"
+              className="text-[var(--text-muted)] underline-offset-4 hover:text-[var(--text)] hover:underline"
+            >
+              {t('me.navSettings')} →
+            </Link>
+          </p>
         </main>
       </div>
     </LocaleProvider>
