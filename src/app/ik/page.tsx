@@ -290,7 +290,10 @@ export default async function Page() {
                 <Stat label={t('me.itm')} value={`${itm}%`} sub={`${cashes}×`} tone="ok" />
                 <Stat
                   label={t('me.bestPlace')}
-                  value={best ? `${best}e` : '—'}
+                  // Het getal alleen, zonder rangtelwoord: "1e" is Nederlands
+                  // en stond zo ook in het Franse en het Engelse scherm. Het
+                  // label erboven zegt al dat het om een plaats gaat.
+                  value={best ? String(best) : '—'}
                   sub={`${Math.round(points)} ${t('me.points').toLowerCase()}`}
                   tone="brand"
                 />
