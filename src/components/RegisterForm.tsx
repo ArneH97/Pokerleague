@@ -70,6 +70,9 @@ export function RegisterForm({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
+  /** Dit adres heeft al een account. Zie de uitleg bij onSubmit. */
+  const [exists, setExists] = useState(false)
+  const [resent, setResent] = useState(false)
 
   /** Vrij, bezet, of nog niet nagekeken. */
   const [nameFree, setNameFree] = useState<boolean | null>(null)
@@ -155,6 +158,28 @@ export function RegisterForm({
       return
     }
 
+    /**
+     * Bestaat dit adres al?
+     *
+     * Supabase antwoordt daar met opzet niet eerlijk op: een registratie met
+     * een bekend adres krijgt gewoon 200 terug, zonder fout en zonder mail.
+     * Dat is verstandig — anders is dit formulier een manier om uit te zoeken
+     * wie er een account heeft. In de logs heet het "User repeated signup".
+     *
+     * Maar het scherm toonde daardoor "kijk in je mailbox" voor een mail die
+     * nooit zou komen, en dat is precies één keer te vaak gebeurd vandaag. Het
+     * verschil is wél te zien: bij een bestaand adres komt de gebruiker terug
+     * met een lege lijst identiteiten. Dat verklapt niets aan een vreemde die
+     * de melding leest, want we zeggen niet "dit adres bestaat" maar geven de
+     * twee wegen die hoe dan ook kloppen: aanmelden, of de mail opnieuw laten
+     * sturen.
+     */
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setExists(true)
+      setBusy(false)
+      return
+    }
+
     // Staat bevestiging per mail aan, dan is er nog geen sessie en moet hij
     // eerst op de link klikken. Anders is hij meteen binnen.
     if (!data.session) {
@@ -178,6 +203,64 @@ export function RegisterForm({
   }
 
   const locked = Boolean(invitedEmail) && !unlocked
+
+  /** De bevestigingsmail nog eens laten sturen, voor wie hem kwijt is. */
+  async function resend() {
+    setBusy(true)
+    setError(null)
+    const { error: err } = await createClient().auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${
+          joinSlug ? `/aansluiten/${joinSlug}` : '/welkom'
+        }`,
+      },
+    })
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    setResent(true)
+  }
+
+  if (exists) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center px-5 py-10">
+        <div className="w-full max-w-sm">
+          <Card>
+            <h1 className="text-xl font-semibold">{t('register.existsTitle')}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+              {t('register.existsBody')} <span className="text-[var(--text)]">{email}</span>
+            </p>
+
+            <Link
+              href={`/login?next=${joinSlug ? `/aansluiten/${joinSlug}` : '/ik'}`}
+              className="mt-5 block rounded-full bg-[var(--brand)] px-5 py-3 text-center text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
+            >
+              {t('common.signIn')}
+            </Link>
+
+            <p className="mt-4 text-sm leading-relaxed text-[var(--text-muted)]">
+              {t('register.existsUnconfirmed')}
+            </p>
+            <button
+              type="button"
+              disabled={busy || resent}
+              onClick={() => void resend()}
+              className="mt-2 text-sm text-[var(--brand)] underline-offset-4 hover:underline disabled:opacity-50"
+            >
+              {resent ? t('register.resent') : busy ? t('common.busy') : t('register.resend')}
+            </button>
+
+            {error && <Notice tone="error">{error}</Notice>}
+
+            <p className="mt-5 border-t border-[var(--line)] pt-4 text-xs leading-relaxed text-[var(--text-faint)]">
+              {t('register.existsForgot')}
+            </p>
+          </Card>
+        </div>
+      </main>
+    )
+  }
 
   if (confirm) {
     return (
