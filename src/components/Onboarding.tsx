@@ -33,13 +33,16 @@ import type { JoinableClub } from '@/components/JoinClubs'
  */
 
 export function Onboarding({
-  clubs, firstName, lastName, username, publicListing,
+  clubs, firstName, lastName, username, publicListing, birthdate, hasConsent,
 }: {
   clubs: JoinableClub[]
   firstName: string
   lastName: string
   username: string
   publicListing: boolean
+  /** Leeg bij accounts van vóór deze regel. Dan vragen we het hier alsnog. */
+  birthdate: string
+  hasConsent: boolean
 }) {
   const t = useT()
   const router = useRouter()
@@ -52,6 +55,13 @@ export function Onboarding({
   const [last, setLast] = useState(lastName)
   const [user, setUser] = useState(username)
   const [listing, setListing] = useState(publicListing)
+  const [birth, setBirth] = useState(birthdate)
+  const [consent, setConsent] = useState(hasConsent)
+
+  // Accounts van vóór 0036 hebben geen geboortedatum en geen toestemming. Die
+  // vragen we hier alsnog — dit is het enige scherm dat iedereen doorloopt.
+  const askBirth = birthdate === ''
+  const askConsent = !hasConsent
 
   const steps = [t('ob.s1'), t('ob.s2'), t('ob.s3'), t('ob.s4')]
 
@@ -67,7 +77,13 @@ export function Onboarding({
   async function nextFrom(i: number) {
     setBusy(true)
     if (i === 1 && picked.size > 0) await joinClubs([...picked])
-    if (i === 2) await saveOnboardingProfile({ first, last, username: user, listing })
+    if (i === 2) {
+      await saveOnboardingProfile({
+        first, last, username: user, listing,
+        birthdate: askBirth ? birth : null,
+        consent: askConsent ? consent : null,
+      })
+    }
     setBusy(false)
     setStep(i + 1)
   }
@@ -222,6 +238,33 @@ export function Onboarding({
                 className={inputClass}
               />
             </Field>
+
+            {askBirth && (
+              <Field label={t('register.birthdate')} hint={t('register.birthdateHint')}>
+                <input
+                  type="date" value={birth} onChange={(e) => setBirth(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className={inputClass}
+                />
+              </Field>
+            )}
+
+            {askConsent && (
+              <label className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--line)] p-3.5">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 size-4 shrink-0"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{t('register.consent')}</span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-[var(--text-faint)]">
+                    {t('register.consentHint')}
+                  </span>
+                </span>
+              </label>
+            )}
 
             <label className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--line)] p-3.5">
               <input

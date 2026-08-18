@@ -17,6 +17,9 @@ export async function saveOnboardingProfile(input: {
   last: string
   username: string
   listing: boolean
+  /** null = niet gevraagd op dit scherm, dus niet aanraken. */
+  birthdate?: string | null
+  consent?: boolean | null
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
@@ -36,6 +39,17 @@ export async function saveOnboardingProfile(input: {
   const last = clean(input.last)
   const full = [first, last].filter(Boolean).join(' ')
 
+  // De leeftijd wordt door de database bewaakt (trigger uit 0036); hier
+  // vangen we hem alleen af om een leesbare melding te kunnen geven.
+  if (input.birthdate) {
+    const [y, m, d] = input.birthdate.split('-').map(Number)
+    const now = new Date()
+    let age = now.getFullYear() - y
+    const had = now.getMonth() + 1 > m || (now.getMonth() + 1 === m && now.getDate() >= d)
+    if (!had) age -= 1
+    if (age < 18) return { ok: false, error: 'Je moet 18 jaar zijn om een account te maken.' }
+  }
+
   const { error } = await supabase
     .from('players')
     .update({
@@ -43,6 +57,8 @@ export async function saveOnboardingProfile(input: {
       last_name: last,
       username,
       public_listing: input.listing,
+      ...(input.birthdate ? { birthdate: input.birthdate } : {}),
+      ...(input.consent ? { stats_consent_at: new Date().toISOString() } : {}),
       // De weergavenaam volgt de echte naam zolang de speler zelf aan het
       // invullen is. Later laat de trigger uit 0005 hem met rust.
       ...(full ? { display_name: full } : {}),

@@ -19,6 +19,8 @@ interface Me {
   last_name: string | null
   username: string | null
   public_listing: boolean
+  birthdate: string | null
+  stats_consent_at: string | null
   onboarded_at: string | null
 }
 
@@ -68,6 +70,8 @@ export default async function Page() {
             lastName={me?.last_name ?? ''}
             username={me?.username ?? ''}
             publicListing={me?.public_listing ?? false}
+            birthdate={me?.birthdate ?? ''}
+            hasConsent={Boolean(me?.stats_consent_at)}
           />
         </main>
       </div>

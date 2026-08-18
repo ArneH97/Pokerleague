@@ -53,12 +53,11 @@ export default async function Page() {
               Poker<span className="text-[var(--brand)]">League</span>
             </span>
             <span className="flex-1" />
-            <Link
-              href="/clubs"
-              className="hidden rounded-full px-3.5 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] sm:block"
-            >
-              {t('site.nav.clubsDir')}
-            </Link>
+            {/* Geen "Clubs" in de navigatie. Er valt voor wie niet aangemeld
+                is niets te bladeren: de agenda en het klassement van een club
+                vragen een account. Wat hij wél mag weten is welke clubs
+                meedoen, en dat staat als strook onderaan de eerste sectie —
+                als informatie, niet als een deur die op een muur uitkomt. */}
             <a
               href="#aanmelden"
               className="rounded-full px-3 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
@@ -103,6 +102,10 @@ export default async function Page() {
             </div>
 
             <ClockCard t={t} />
+          </div>
+
+          <div className="relative mx-auto max-w-6xl px-5 pb-12 sm:px-8 sm:pb-16">
+            <Clubs t={t} />
           </div>
         </section>
 
@@ -159,14 +162,44 @@ export default async function Page() {
 
         <footer className="border-t border-[var(--line)]">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-[var(--text-faint)] sm:px-8">
-            <Link href="/clubs" className="transition hover:text-[var(--text)]">
-              {t('site.nav.clubsDir')}
-            </Link>
+            <span>{t('home.clubsStrip')}</span>
             <span>{t('home.forClubs')}</span>
           </div>
         </footer>
       </div>
     </LocaleProvider>
+  )
+}
+
+/**
+ * Welke clubs meedoen.
+ *
+ * Geen links. Achter een clubpagina zit de agenda en het klassement, en die
+ * vragen een account — een naam die je kan aanklikken en die dan op een muur
+ * uitkomt, is erger dan een naam die gewoon een naam is. Wat hier staat is het
+ * antwoord op één vraag: speelt mijn club hier mee?
+ */
+async function Clubs({ t }: { t: T }) {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_cards')
+  const clubs = (data ?? []) as unknown as { slug: string; name: string; city: string | null }[]
+  if (clubs.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--line)] pt-6">
+      <span className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">
+        {t('home.clubsStrip')}
+      </span>
+      {clubs.map((c) => (
+        <span
+          key={c.slug}
+          className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-1.5 text-sm"
+        >
+          {c.name}
+          {c.city && <span className="text-[var(--text-faint)]"> · {c.city}</span>}
+        </span>
+      ))}
+    </div>
   )
 }
 

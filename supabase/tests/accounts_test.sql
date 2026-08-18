@@ -226,3 +226,81 @@ begin
   perform set_config('request.jwt.claim.role', '', true);
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Wat er bij registratie afgedwongen wordt
+-- ---------------------------------------------------------------------------
+-- Een formulier is een suggestie. Deze drie regels moeten in de database
+-- staan, want anders houden ze alleen stand zolang iedereen het formulier
+-- gebruikt.
+
+begin;
+do $$
+declare
+  v_uid uuid; v_uid2 uuid; v_p uuid; v_n int; v_toen timestamptz;
+begin
+  -- 1 --- Achttien. Zelf ingetikt bewijst niets, maar wie zegt dat hij vijftien
+  --       is, hoort geen account te krijgen.
+  insert into auth.users (email) values ('kind@t36.be') returning id into v_uid;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'kind@t36.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  begin
+    perform public.claim_my_player('Te', 'Jong', 'tejong', false, 'nl',
+                                   (current_date - interval '15 years')::date, true);
+    raise exception 'FOUT: een vijftienjarige kreeg een account';
+  exception
+    when check_violation then raise notice 'OK  onder de achttien komt er geen account';
+  end;
+
+  -- En ook niet via de achterdeur, met een rechtstreekse update.
+  v_p := public.claim_my_player('Te', 'Jong', 'tejong', false, 'nl', null, true);
+  begin
+    update players set birthdate = (current_date - interval '15 years')::date where id = v_p;
+    raise exception 'FOUT: de geboortedatum was alsnog naar minderjarig te zetten';
+  exception
+    when check_violation then raise notice 'OK  ook een rechtstreekse update wordt geweigerd';
+  end;
+
+  -- 2 --- Toestemming wordt vastgelegd met het moment erbij, en een tweede
+  --       argumentloze aanroep wist ze niet.
+  select stats_consent_at into v_toen from players where id = v_p;
+  if v_toen is null then raise exception 'FOUT: de toestemming is niet vastgelegd'; end if;
+
+  perform public.claim_my_player();
+  if (select stats_consent_at from players where id = v_p) is distinct from v_toen then
+    raise exception 'FOUT: een bezoek aan /ik veranderde het toestemmingsmoment';
+  end if;
+  raise notice 'OK  toestemming wordt met tijdstip bewaard en blijft staan';
+
+  -- 3 --- Gebruikersnamen zijn uniek, ongeacht hoofdletters.
+  if public.username_available('tejong')  then raise exception 'FOUT: bezette naam gold als vrij'; end if;
+  if public.username_available('TeJong')  then raise exception 'FOUT: hoofdletters omzeilden de controle'; end if;
+  if not public.username_available('vrij') then raise exception 'FOUT: een vrije naam gold als bezet'; end if;
+  if public.username_available('ab')      then raise exception 'FOUT: te kort werd toegelaten'; end if;
+  if public.username_available('met spatie') then raise exception 'FOUT: een spatie werd toegelaten'; end if;
+  raise notice 'OK  gebruikersnamen zijn uniek en de vorm wordt bewaakt';
+
+  -- En de database weigert het dubbel ook echt, niet alleen de controlefunctie.
+  insert into auth.users (email) values ('twee@t36.be') returning id into v_uid2;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid2, 'role', 'authenticated', 'email', 'twee@t36.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid2::text, true);
+
+  begin
+    perform public.claim_my_player('Iemand', 'Anders', 'TeJong', false, 'nl',
+                                   (current_date - interval '30 years')::date, true);
+    select count(*) into v_n from players where lower(username) = 'tejong' and merged_into_id is null;
+    if v_n > 1 then raise exception 'FOUT: twee spelers met dezelfde gebruikersnaam'; end if;
+    raise notice 'OK  de unieke index hield stand (de tweede kreeg de naam niet)';
+  exception
+    when unique_violation then
+      raise notice 'OK  de database weigert een dubbele gebruikersnaam';
+  end;
+
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end $$;
+rollback;

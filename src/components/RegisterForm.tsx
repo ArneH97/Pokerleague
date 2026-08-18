@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -58,10 +58,52 @@ export function RegisterForm({
   const [email, setEmail] = useState(invitedEmail ?? '')
   const [unlocked, setUnlocked] = useState(false)
   const [password, setPassword] = useState('')
+  const [birthdate, setBirthdate] = useState('')
+  const [consent, setConsent] = useState(false)
   const [listing, setListing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
+
+  /** Vrij, bezet, of nog niet nagekeken. */
+  const [nameFree, setNameFree] = useState<boolean | null>(null)
+
+  // Meteen zeggen of de naam bezet is, niet pas nadat hij het hele formulier
+  // invulde en zijn wachtwoord kwijt is.
+  const clean = username.trim()
+  useEffect(() => {
+    if (!/^[a-zA-Z0-9._-]{3,24}$/.test(clean)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNameFree(null)
+      return
+    }
+    let cancelled = false
+    const id = setTimeout(async () => {
+      const { data } = await createClient().rpc('username_available', { p_username: clean })
+      if (!cancelled) setNameFree(data === true)
+    }, 350)
+    return () => { cancelled = true; clearTimeout(id) }
+  }, [clean])
+
+  /**
+   * De leeftijd op basis van wat hij intikte.
+   *
+   * Dit bewijst niets — een zelf ingetikte datum is geen identiteitskaart, en
+   * de club controleert er aan de deur nog altijd een. Wat het wel doet is
+   * meteen zeggen waarom het niet lukt, in plaats van hem het formulier te
+   * laten versturen voor een databasefout die hetzelfde zegt.
+   */
+  function ageOf(iso: string): number | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null
+    const [y, m, d] = iso.split('-').map(Number)
+    const today = new Date()
+    let age = today.getFullYear() - y
+    const had = today.getMonth() + 1 > m || (today.getMonth() + 1 === m && today.getDate() >= d)
+    if (!had) age -= 1
+    return age
+  }
+  const age = ageOf(birthdate)
+  const tooYoung = age !== null && age < 18
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -77,9 +119,12 @@ export function RegisterForm({
         // het profiel opgeeist wordt. Zo hoeven ze nergens tussentijds in een
         // tabel te blijven hangen — en overleven ze de omweg langs de mailbox,
         // want op dat moment is het formulier allang weg.
+        // Reist mee in het token tot het profiel opgeeist wordt — ná de
+        // bevestigingsmail, wanneer dit formulier allang weg is.
         data: {
           first_name: firstName, last_name: lastName, username,
           public_listing: listing, locale,
+          birthdate, stats_consent: consent,
         },
         // Zonder dit landt de bevestigingslink op de voorpagina en mag hij
         // zelf zoeken waar zijn profiel staat.
@@ -117,6 +162,8 @@ export function RegisterForm({
       p_username: username || null,
       p_listing: listing,
       p_locale: locale,
+      p_birthdate: birthdate,
+      p_consent: consent,
     })
 
     router.push(joinSlug ? `/aansluiten/${joinSlug}` : '/welkom')
@@ -201,12 +248,49 @@ export function RegisterForm({
               />
             </Field>
 
-            <Field label={t('register.username')} hint={t('register.usernameHint')}>
+            <Field
+              label={t('register.username')}
+              hint={
+                nameFree === false ? t('register.nameTaken')
+                : nameFree === true ? t('register.nameFree')
+                : t('register.usernameHint')
+              }
+            >
               <input
                 value={username} onChange={(e) => setUsername(e.target.value)}
-                pattern="[a-zA-Z0-9._-]{3,24}" autoComplete="off" className={inputClass}
+                pattern="[a-zA-Z0-9._-]{3,24}" autoComplete="off" required
+                aria-invalid={nameFree === false}
+                className={`${inputClass}${
+                  nameFree === false ? ' border-[var(--danger)]' : ''
+                }`}
               />
             </Field>
+
+            <Field label={t('register.birthdate')} hint={t('register.birthdateHint')}>
+              <input
+                type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)}
+                required autoComplete="bday"
+                max={new Date().toISOString().slice(0, 10)}
+                className={`${inputClass}${tooYoung ? ' border-[var(--danger)]' : ''}`}
+              />
+              {tooYoung && (
+                <p className="mt-1.5 text-xs text-[var(--danger)]">{t('register.tooYoung')}</p>
+              )}
+            </Field>
+
+            <label className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--line)] p-3.5">
+              <input
+                type="checkbox" checked={consent} required
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0"
+              />
+              <span>
+                <span className="block text-sm font-medium">{t('register.consent')}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-[var(--text-faint)]">
+                  {t('register.consentHint')}
+                </span>
+              </span>
+            </label>
 
             <label className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--line)] p-3.5">
               <input
@@ -224,7 +308,11 @@ export function RegisterForm({
 
             {error && <Notice tone="error">{error}</Notice>}
 
-            <Button type="submit" disabled={busy} className="w-full">
+            <Button
+              type="submit"
+              disabled={busy || tooYoung || nameFree === false}
+              className="w-full"
+            >
               {busy ? t('common.busy') : t('register.submit')}
             </Button>
           </form>
