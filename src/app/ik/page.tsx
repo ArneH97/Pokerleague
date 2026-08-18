@@ -106,6 +106,15 @@ export default async function Page() {
   // stond in een variabele die niemand las.
   const claim = await supabase.rpc('claim_my_player', {})
 
+  // 28000: het token is geldig, maar het account erachter bestaat niet meer —
+  // verwijderd terwijl deze browser nog aangemeld was. Zonder dit blijft
+  // dezelfde fout bij elke verversing terugkomen en komt niemand er nog uit
+  // zonder zijn koekjes te wissen. Zie migratie 0039.
+  if (claim.error?.code === '28000') {
+    await supabase.auth.signOut()
+    redirect('/login?verlopen=1')
+  }
+
   const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes] = await Promise.all([
     supabase.rpc('my_player'),
     supabase.rpc('my_results'),

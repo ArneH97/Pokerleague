@@ -42,6 +42,7 @@ const nl = {
   // Aanmelden
   'login.badCredentials': 'E-mailadres of wachtwoord klopt niet.',
   'login.playerHere': 'Dit scherm is voor medewerkers van de club. Ben je speler?',
+  'login.stale': 'Je vorige sessie hoorde bij een account dat niet meer bestaat. Meld je opnieuw aan.',
 
   // Clubdashboard
   'club.subtitle': 'Tornooibeheer',
@@ -889,6 +890,7 @@ const fr: Record<Key, string> = {
 
   'login.badCredentials': "L'adresse e-mail ou le mot de passe est incorrect.",
   'login.playerHere': 'Cet écran est réservé au staff du club. Vous êtes joueur ?',
+  'login.stale': 'Votre session précédente était liée à un compte qui n’existe plus. Reconnectez-vous.',
 
   'club.subtitle': 'Gestion des tournois',
   'club.newTournament': 'Nouveau tournoi',
@@ -1720,6 +1722,7 @@ const en: Record<Key, string> = {
 
   'login.badCredentials': 'That email address or password is not correct.',
   'login.playerHere': 'This screen is for club staff. Are you a player?',
+  'login.stale': 'Your previous session belonged to an account that no longer exists. Please sign in again.',
 
   'club.subtitle': 'Tournament management',
   'club.newTournament': 'New tournament',

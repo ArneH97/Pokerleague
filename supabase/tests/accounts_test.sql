@@ -409,3 +409,37 @@ begin
   perform set_config('request.jwt.claim.role', '', true);
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Een sessie van een account dat niet meer bestaat
+-- ---------------------------------------------------------------------------
+-- Overkwam ons meteen na het opruimen van de testaccounts, en je komt er zelf
+-- niet meer uit: het token blijft geldig, dus elke verversing gaf dezelfde
+-- onbegrijpelijke fout over een vreemde sleutel.
+
+begin;
+do $$
+declare v_uid uuid;
+begin
+  insert into auth.users (email) values ('spook@t39.be') returning id into v_uid;
+  delete from auth.users where id = v_uid;
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_uid, 'role', 'authenticated', 'email', 'spook@t39.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  begin
+    perform public.claim_my_player();
+    raise exception 'FOUT: een sessie zonder account werd gewoon doorgelaten';
+  exception
+    when sqlstate '28000' then
+      raise notice 'OK  een sessie van een verwijderd account geeft 28000 terug';
+    when foreign_key_violation then
+      raise exception 'FOUT: nog altijd de ruwe fout over de vreemde sleutel';
+  end;
+
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end $$;
+rollback;

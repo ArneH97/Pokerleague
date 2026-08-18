@@ -52,6 +52,10 @@ function Form({
   const params = useSearchParams()
   const t = useT()
   const next = params.get('next') ?? fallbackNext
+  // Hij is hier niet uit zichzelf: zijn vorige sessie hoorde bij een account
+  // dat niet meer bestaat. Dat hoort er te staan, anders lijkt het alsof hij
+  // zomaar uitgelogd werd.
+  const stale = params.get('verlopen') === '1'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -122,6 +126,7 @@ function Form({
               />
             </Field>
 
+            {stale && !error && <Notice tone="warn">{t('login.stale')}</Notice>}
             {error && <Notice tone="error">{error}</Notice>}
 
             <Button

@@ -35,7 +35,11 @@ export default async function Page() {
 
   // Het profiel bestaat mogelijk nog niet: iemand kan hier binnenkomen zonder
   // ooit op zijn eigen pagina geweest te zijn.
-  await supabase.rpc('claim_my_player', {})
+  const claim = await supabase.rpc('claim_my_player', {})
+  if (claim.error?.code === '28000') {
+    await supabase.auth.signOut()
+    redirect('/login?verlopen=1')
+  }
 
   const [meRes, clubsRes] = await Promise.all([
     supabase.rpc('my_player'),
