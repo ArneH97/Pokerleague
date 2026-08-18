@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type BlindLevel } from '@/lib/tournament/clock'
 import { useLocale } from '@/lib/i18n/context'
 
@@ -155,10 +155,25 @@ export function useClockSound() {
     }
   }, [])
 
-  return {
-    enabled, supported, enable, disable,
-    playOneMinute, playLevelUp, playAttention, announce, say,
-  }
+  /**
+   * Eén object, en alleen een nieuw exemplaar als er echt iets verandert.
+   *
+   * Zonder dit gaf de hook bij elke render een vers object terug. Elk effect
+   * dat `sound` in zijn afhankelijkheden heeft — en dat zijn ze allemaal —
+   * draaide dan opnieuw bij elke tekening. Op de zaalklok, die elke seconde
+   * hertekent, leverde dat een piep plus "tournament paused" in een lus op
+   * zolang de pauze duurde.
+   *
+   * De losse functies hangen al aan `useCallback`; alleen het omhulsel
+   * ontbrak.
+   */
+  return useMemo(
+    () => ({
+      enabled, supported, enable, disable,
+      playOneMinute, playLevelUp, playAttention, announce, say,
+    }),
+    [enabled, supported, enable, disable, playOneMinute, playLevelUp, playAttention, announce, say],
+  )
 }
 
 /**

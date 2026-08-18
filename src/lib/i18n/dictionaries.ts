@@ -2590,7 +2590,26 @@ export const dictionaries: Record<Locale, Record<Key, string>> = { nl, fr, en }
 /** Vertaalfunctie voor één taal. */
 export type T = (key: Key) => string
 
+/**
+ * Eén exemplaar per taal, en niet per aanroep.
+ *
+ * Dit zag eruit als een detail en was het niet. `useT()` roept dit bij elke
+ * render aan; gaf het telkens een nieuwe functie terug, dan veranderde `t` van
+ * identiteit bij elke tekening. Een effect met `t` in zijn afhankelijkheden
+ * draait dan óók bij elke tekening — en op de zaalklok, die elke seconde
+ * hertekent, betekende dat een piep en een gesproken mededeling in een lus.
+ *
+ * De functie is puur en de woordenboeken zijn constant, dus er is geen enkele
+ * reden om er meer dan drie te maken.
+ */
+const translators = new Map<Locale, T>()
+
 export function translator(locale: Locale): T {
+  const known = translators.get(locale)
+  if (known) return known
+
   const dict = dictionaries[locale] ?? dictionaries.nl
-  return (key) => dict[key] ?? dictionaries.nl[key] ?? key
+  const fn: T = (key) => dict[key] ?? dictionaries.nl[key] ?? key
+  translators.set(locale, fn)
+  return fn
 }

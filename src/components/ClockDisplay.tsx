@@ -75,8 +75,20 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
     }
   }
 
+  // Een tweede slot, los van de afhankelijkheden hierboven. Die twee fixes
+  // hangen aan het geheugen van React; deze ref hangt aan de gebeurtenis zelf.
+  // Voor iets dat hoorbaar is in een volle zaal is één slot te weinig — een
+  // stille bug merk je niet, maar een piepende bug hoort iedereen.
+  const spokenNoteRef = useRef<string | null>(null)
+
   useEffect(() => {
-    if (statusNote === null) return
+    if (statusNote === null) {
+      spokenNoteRef.current = null
+      return
+    }
+    if (spokenNoteRef.current === statusNote) return
+    spokenNoteRef.current = statusNote
+
     sound.playAttention()
     sound.say(statusNote === 'paused' ? t('clock.pausedSpoken') : t('clock.resumedSpoken'))
     // De melding bij hervatten gaat vanzelf weg: de klok loopt weer en dat
