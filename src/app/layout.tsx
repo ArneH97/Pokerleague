@@ -21,8 +21,20 @@ export const metadata: Metadata = {
   description: "Tornooibeheer en klok voor pokerclubs",
 };
 
+// `viewportFit: 'cover'` staat hier en niet alleen op de spelersapp.
+//
+// Het stond eerst alleen op `/ik`, en dat gaf precies wat het moest oplossen:
+// wie in de geïnstalleerde app van zijn overzicht naar de clubgids tikte,
+// wisselde van een pagina die tot achter de statusbalk loopt naar een die dat
+// niet doet. Het hele scherm verspringt dan een centimeter. Dat is het
+// haperen tussen de tabbladen.
+//
+// Alles wat de inkeping raakt houdt zijn eigen ruimte vrij met `pt-safe` /
+// `pb-safe`; in een gewoon browservenster is die inset nul en verandert er
+// niets.
 export const viewport = {
   themeColor: "#0a0a0a",
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

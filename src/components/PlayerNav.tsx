@@ -37,8 +37,14 @@ export function PlayerNav({
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bg)_82%,transparent)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-5">
+      {/* Geen `backdrop-blur` meer op deze twee balken.
+          Een doorschijnende, vervaagde balk die vastgeplakt bovenaan staat,
+          dwingt Safari om bij elke pixel scrollen het vlak eronder opnieuw te
+          vervagen. Op een telefoon zie je dat: de balk loopt achter, hij
+          schokt, en dat is precies wat er misging. Een effen achtergrond is
+          hier geen compromis — hij is scherper te lezen én hij haakt niet. */}
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--bg)]">
+        <div className="pt-safe mx-auto flex max-w-3xl items-center gap-2 px-4 pb-3 sm:px-5">
           <Link href="/ik" className="text-sm font-semibold uppercase tracking-[0.2em]">
             Poker<span className="text-[var(--brand)]">League</span>
           </Link>
@@ -80,7 +86,7 @@ export function PlayerNav({
         </div>
       </header>
 
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur-xl sm:hidden">
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--bg)] sm:hidden">
         <ul className="flex">
           {items.map((i) => {
             const on = active === i.key

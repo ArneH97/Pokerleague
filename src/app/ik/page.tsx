@@ -222,51 +222,54 @@ export default async function Page() {
               een eigen grijze kaart onder de titel; dat is het belangrijkste
               getal van de pagina en dan hoort het niet in het derde vlak van
               boven te staan, maar hier — groot, gekleurd, meteen. */}
-          <section className="app-glow">
-            <div className="flex items-center gap-3.5">
-              <span
-                aria-hidden
-                className="flex size-12 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold text-[var(--on-brand)] sm:size-14 sm:text-xl"
-                style={{
-                  background: 'linear-gradient(140deg, var(--gold), var(--brand) 60%, #d97706)',
-                  boxShadow: '0 8px 26px -12px color-mix(in oklab, var(--brand) 90%, transparent)',
-                }}
-              >
-                {initials(me.display_name)}
-              </span>
-              <span className="min-w-0">
-                <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-                  {me.display_name}
-                </h1>
-                <p className="truncate text-sm text-[var(--text-faint)]">
-                  {me.username ? `@${me.username}` : me.email}
-                </p>
-              </span>
-            </div>
+          {/* Gecentreerd, en dat is geen smaakkwestie.
+              Links uitgelijnd stond het rondje met je initialen in de
+              linkerbovenhoek en het saldo eronder tegen dezelfde kant: twee
+              zware dingen op één rand, met rechts een leeg vlak dat de gloed
+              alleen maar leger maakte. In het midden dragen ze elkaar, en het
+              saldo staat waar je het zoekt — recht onder je naam. */}
+          <section className="app-glow pt-2 text-center">
+            <span
+              aria-hidden
+              className="mx-auto flex size-16 items-center justify-center rounded-[1.25rem] text-2xl font-semibold text-[var(--on-brand)] sm:size-[4.5rem] sm:text-[1.7rem]"
+              style={{
+                background: 'linear-gradient(140deg, var(--gold), var(--brand) 60%, #d97706)',
+                boxShadow: '0 12px 34px -14px color-mix(in oklab, var(--brand) 95%, transparent)',
+              }}
+            >
+              {initials(me.display_name)}
+            </span>
+
+            <h1 className="mt-3.5 truncate text-xl font-semibold tracking-tight sm:text-2xl">
+              {me.display_name}
+            </h1>
+            <p className="truncate text-sm text-[var(--text-faint)]">
+              {me.username ? `@${me.username}` : me.email}
+            </p>
 
             {results.length > 0 ? (
-              <div className="mt-5">
+              <div className="mt-6">
                 <p className="text-[0.65rem] uppercase tracking-[0.24em] text-[var(--text-faint)]">
                   {t('me.net')}
                 </p>
                 <p
-                  className={`tnum mt-0.5 text-[2.75rem] font-semibold leading-none tracking-tight sm:text-6xl ${
+                  className={`tnum mt-1 text-[2.75rem] font-semibold leading-none tracking-tight sm:text-6xl ${
                     net > 0 ? 'text-[var(--ok)]' : net < 0 ? 'text-[var(--danger)]' : ''
                   }`}
                 >
                   {net > 0 ? '+' : ''}{formatMoney(net, 'EUR')}
                 </p>
-                <p className="tnum mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--text-muted)]">
-                  <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs">
+                <p className="tnum mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
+                  <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs">
                     {formatMoney(totalPrize, 'EUR')} {t('me.won').toLowerCase()}
                   </span>
-                  <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs">
+                  <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs">
                     {formatMoney(totalSpent, 'EUR')} {t('me.spent').toLowerCase()}
                   </span>
                 </p>
               </div>
             ) : (
-              <p className="mt-4 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
+              <p className="mx-auto mt-4 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
                 {t('me.lede')}
               </p>
             )}

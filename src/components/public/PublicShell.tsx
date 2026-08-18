@@ -88,8 +88,12 @@ export async function PublicShell({
           style={{ background: `radial-gradient(90vw 45vh at 50% -15%, ${accent}1c 0%, transparent 70%)` }}
         />
 
-        <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6 lg:py-4">
+        {/* Effen en niet vervaagd: een doorschijnende balk die vastgeplakt
+            bovenaan staat laat Safari bij elke pixel scrollen opnieuw
+            vervagen, en dat schokt op een telefoon. `pt-safe` houdt de klok
+            en de batterij vrij in een geïnstalleerde app. */}
+        <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--bg)]">
+          <div className="pt-safe mx-auto flex max-w-6xl items-center gap-4 px-4 pb-3 sm:px-6 lg:pb-4">
             <Link href={`/c/${club.slug}`} className="flex min-w-0 items-center gap-3">
               {club.logo_url && (
                 <Image

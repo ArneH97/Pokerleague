@@ -14,9 +14,9 @@ import type { Metadata, Viewport } from 'next'
  * achtergrond van de app: staat daar een andere kleur, dan zie je bovenaan een
  * streep die niet bij het scherm hoort.
  *
- * `viewportFit: 'cover'` laat de inhoud tot achter de inkeping lopen; de
- * tabbalk vangt dat op met `pb-safe`. Zonder dit staan er zwarte balken boven
- * en onder en ziet het eruit als een website in een venster.
+ * Het tot achter de inkeping lopen (`viewportFit: 'cover'`) staat bewust in de
+ * hoofdlayout en niet hier: stond het alleen op deze schermen, dan verspringt
+ * de hele pagina zodra je in de app naar een tabblad buiten `/ik` tikt.
  */
 
 export const metadata: Metadata = {
@@ -33,10 +33,11 @@ export const metadata: Metadata = {
   },
 }
 
+// `viewportFit` staat in de hoofdlayout, zodat elk scherm van de app dezelfde
+// randen heeft en er niets verspringt als je van tabblad wisselt.
 export const viewport: Viewport = {
   themeColor: '#0a1120',
   colorScheme: 'dark',
-  viewportFit: 'cover',
 }
 
 export default function Layout({ children }: LayoutProps<'/ik'>) {

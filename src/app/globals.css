@@ -156,12 +156,20 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(42% 52% at 22% 32%, color-mix(in oklab, var(--brand) 26%, transparent), transparent 70%),
-    radial-gradient(40% 46% at 82% 12%, color-mix(in oklab, var(--accent) 26%, transparent), transparent 72%);
+    radial-gradient(44% 54% at 50% 28%, color-mix(in oklab, var(--brand) 24%, transparent), transparent 70%),
+    radial-gradient(40% 46% at 88% 8%, color-mix(in oklab, var(--accent) 24%, transparent), transparent 72%),
+    radial-gradient(36% 42% at 8% 12%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 72%);
 }
 
-/* Onderaan een geïnstalleerde app zit de streep van de telefoon. Zonder deze
-   marge staat de balk eronder en tik je hem niet aan. */
+/* Boven en onder zit in een geïnstalleerde app het scherm van de telefoon zelf
+   in de weg: bovenaan de klok en de batterij, onderaan de streep. De app loopt
+   met `viewport-fit: cover` bewust tot achter allebei — dat is wat het rand
+   tot rand laat ogen — maar dan moet de inhoud die ruimte zelf vrijhouden.
+   Zonder de bovenste marge stond het woordmerk dwars door het uur.
+
+   max() en geen kale env(): in een gewoon browservenster is de inset nul, en
+   dan wil je nog steeds de normale marge van de balk. */
+.pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
 .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 .mb-safe { margin-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 
