@@ -118,15 +118,22 @@ export default async function Page() {
     redirect('/login?verlopen=1')
   }
 
-  const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes, discoverRes] = await Promise.all([
-    supabase.rpc('my_player'),
-    supabase.rpc('my_results'),
-    supabase.rpc('my_clubs'),
-    supabase.rpc('my_staff_clubs'),
-    supabase.rpc('my_club_stats', {}),
-    supabase.rpc('my_live_tournaments'),
-    supabase.rpc('clubs_open_to_join'),
-  ])
+  const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes, discoverRes, admRes] =
+    await Promise.all([
+      supabase.rpc('my_player'),
+      supabase.rpc('my_results'),
+      supabase.rpc('my_clubs'),
+      supabase.rpc('my_staff_clubs'),
+      supabase.rpc('my_club_stats', {}),
+      supabase.rpc('my_live_tournaments'),
+      supabase.rpc('clubs_open_to_join'),
+      // Het knopje naar het platformbeheer staat op de voorpagina, en die
+      // krijgt een aangemelde gebruiker nooit te zien — die wordt hierheen
+      // gestuurd. Zonder deze regel is het beheerscherm dus alleen bereikbaar
+      // door de URL uit het hoofd te typen. Voor iedereen behalve een handvol
+      // beheerders komt er `false` terug en verandert er niets.
+      supabase.rpc('is_platform_admin'),
+    ])
 
   const me = ((meRes.data ?? []) as unknown as Me[])[0] ?? null
   const results = (resultsRes.data ?? []) as unknown as ResultRow[]
@@ -406,6 +413,24 @@ export default async function Page() {
               </ul>
             )}
           </section>
+
+          {/* Onderaan en klein. Wie het nodig heeft weet wat het is; voor de
+              rest van de pagina — die over pokeravonden gaat — is het geen
+              onderwerp. */}
+          {admRes.data === true && (
+            <p className="pt-2 text-center">
+              <Link
+                href="/beheer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] px-3.5 py-2 text-xs text-[var(--text-faint)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--text-muted)]"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <rect x="4" y="10.5" width="16" height="10" rx="2.5" />
+                  <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+                </svg>
+                {t('adm.link')}
+              </Link>
+            </p>
+          )}
         </main>
       </div>
     </LocaleProvider>

@@ -31,6 +31,8 @@ const ZELFDE = new Set([
   'deal.even',
   'points.bonusKo',
   'site.pick.metaTitle',
+  // "3 clubs" is in drie talen "3 clubs". Er valt niets aan te vertalen.
+  'adm.clubsCount',
 ])
 
 test('elke taal kent elke sleutel', () => {

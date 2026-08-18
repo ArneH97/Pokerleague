@@ -52,7 +52,12 @@ export default async function Page() {
       <div data-site lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
         {/* ------------------------------------------------------------ kop */}
         <header className="border-b border-[var(--line)]">
-          <div className="mx-auto flex max-w-6xl items-center gap-2 px-5 py-3.5 sm:gap-3 sm:px-8">
+          {/* `flex-wrap`: op een smalle telefoon, of wanneer de systeemletter
+              breder uitvalt dan Inter, past "Aanmelden" naast de taalkeuze net
+              niet meer. Zonder deze regel schoof de taalkeuze dan half buiten
+              beeld; nu zakt ze naar een tweede regel. Past het wel, dan
+              verandert er niets. */}
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 gap-y-2 px-5 py-3.5 sm:gap-x-3 sm:px-8">
             <span className="text-sm font-semibold uppercase tracking-[0.2em]">
               Poker<span className="text-[var(--brand)]">League</span>
             </span>
@@ -141,8 +146,38 @@ export default async function Page() {
             <span>{t('home.forClubs')}</span>
           </div>
         </footer>
+
+        <AdminLink label={t('adm.link')} />
       </div>
     </LocaleProvider>
+  )
+}
+
+/**
+ * De ingang naar het platformbeheer.
+ *
+ * Rechtsonder en klein, want het gaat niemand aan behalve ons. Geen slotje in
+ * de kop en geen regel in de voettekst: een bezoeker die hierop klikt komt op
+ * een aanmeldscherm uit, en dat is voor hem een doodlopende straat. Wie het
+ * nodig heeft, weet dat het er staat.
+ *
+ * `fixed` en niet in de voettekst, zodat het ook bereikbaar is zonder eerst
+ * de hele pagina door te scrollen. Op een telefoon staat het net boven de
+ * onderrand — `mb-safe` houdt het weg van de streep van de browser, want een
+ * knop die half onder de systeembalk zit is geen knop.
+ */
+function AdminLink({ label }: { label: string }) {
+  return (
+    <Link
+      href="/beheer"
+      className="mb-safe fixed bottom-4 right-4 z-20 inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)]/90 px-3 py-2 text-xs text-[var(--text-faint)] backdrop-blur-sm transition-colors hover:border-[var(--line-strong)] hover:text-[var(--text-muted)]"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="4" y="10.5" width="16" height="10" rx="2.5" />
+        <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+      </svg>
+      {label}
+    </Link>
   )
 }
 
