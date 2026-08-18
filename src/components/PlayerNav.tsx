@@ -22,9 +22,16 @@ import type { Locale, T } from '@/lib/i18n/dictionaries'
  * Op een breed scherm verdwijnt de tabbalk en staan dezelfde drie links wél
  * bovenaan — daar is plaats zat en een balk onderaan zou daar zwevend
  * aanvoelen.
+ *
+ * **"Gegevens" hoort niet in de tabbalk.** Drie plaatsen onder je duim, en
+ * eentje daarvan ging naar een formulier dat je twee keer per jaar opent. Dat
+ * is de duurste plek van het scherm aan de zeldzaamste handeling geven. Het
+ * staat nu als tandwiel rechtsboven, waar instellingen in elke app staan, en
+ * de vrijgekomen tab gaat naar de kalender — de vraag die een speler wél elke
+ * week heeft: waar wordt er gespeeld.
  */
 
-type Tab = 'home' | 'clubs' | 'settings'
+type Tab = 'home' | 'clubs' | 'calendar' | 'settings'
 
 export function PlayerNav({
   locale, t, active,
@@ -32,7 +39,7 @@ export function PlayerNav({
   const items = [
     { key: 'home' as const, href: '/ik' as const, label: t('me.navHome'), icon: <IconChart /> },
     { key: 'clubs' as const, href: '/clubs' as const, label: t('me.navClubs'), icon: <IconClubs /> },
-    { key: 'settings' as const, href: '/ik/gegevens' as const, label: t('me.navSettings'), icon: <IconUser /> },
+    { key: 'calendar' as const, href: '/ik/kalender' as const, label: t('me.navCalendar'), icon: <IconCalendar /> },
   ]
 
   return (
@@ -73,6 +80,24 @@ export function PlayerNav({
           <span className="hidden sm:block">
             <LanguageSwitch current={locale} label={t('common.language')} />
           </span>
+
+          {/* Het tandwiel. Rechtsboven, waar niemand het hoeft te zoeken omdat
+              het in elke app op die plek staat. Actief krijgt het een vlakje
+              in plaats van alleen een kleur: op een scherm dat schuin in je
+              hand ligt is kleur alleen te weinig verschil. */}
+          <Link
+            href="/ik/gegevens"
+            aria-label={t('me.navSettings')}
+            title={t('me.navSettings')}
+            aria-current={active === 'settings' ? 'page' : undefined}
+            className={`flex size-9 items-center justify-center rounded-full transition ${
+              active === 'settings'
+                ? 'bg-[var(--surface-2)] text-[var(--text)]'
+                : 'text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]'
+            }`}
+          >
+            <IconGear />
+          </Link>
 
           <form action="/auth/signout" method="post">
             <button
@@ -152,11 +177,40 @@ function IconClubs() {
   )
 }
 
-function IconUser() {
+function IconCalendar() {
   return (
     <svg viewBox="0 0 24 24" className="size-[22px]" aria-hidden {...stroke}>
-      <circle cx="12" cy="8.5" r="3.6" />
-      <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+      <rect x="3.6" y="5.4" width="16.8" height="15" rx="2.6" />
+      <path d="M3.6 10h16.8M8.4 3.6v3.4M15.6 3.6v3.4" />
+      {/* Eén gevuld dagvakje. Zonder dat is het een leeg raster en leest het
+          op 22 pixels als een venster in plaats van als een kalender. */}
+      <rect x="7" y="13" width="3.2" height="3" rx="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+/**
+ * Het tandwiel.
+ *
+ * Twee keer overgetekend. Eerst als cirkel met acht dunne spaken: dat werd op
+ * twintig pixels een zonnetje — het pictogram voor helderheid, niet voor
+ * instellingen. Daarna als één omtreklijn met tanden erin, en dat werd een
+ * vlek: op deze grootte lopen de tanden van een omtrek in elkaar.
+ *
+ * Wat wél werkt is de eenvoudigste vorm: een ring met acht korte, dikke
+ * tanden erop. Kort en dik is precies het verschil met een zon, en de ring
+ * blijft rond in plaats van gekarteld.
+ */
+function IconGear() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden {...stroke}>
+      <circle cx="12" cy="12" r="6.3" />
+      <circle cx="12" cy="12" r="2.4" />
+      <path
+        strokeWidth={2.4}
+        strokeLinecap="butt"
+        d="M17.8 14.4L20.2 15.4M14.4 17.8L15.4 20.2M9.6 17.8L8.6 20.2M6.2 14.4L3.8 15.4M6.2 9.6L3.8 8.6M9.6 6.2L8.6 3.8M14.4 6.2L15.4 3.8M17.8 9.6L20.2 8.6"
+      />
     </svg>
   )
 }

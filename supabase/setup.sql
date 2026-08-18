@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -8794,4 +8794,105 @@ begin
     execute format('revoke all on function %s from public', fn);
     execute format('grant execute on function %s to authenticated, service_role', fn);
   end loop;
+end $$;
+
+-- =========================================================================
+-- 0043_my_calendar.sql
+-- =========================================================================
+
+-- Pokerleague — de agenda van een speler, over al zijn clubs heen
+--
+-- Een speler kon tot nu alleen zien wanneer er gespeeld werd door per club de
+-- kalender te openen. Bij één club valt dat mee. Bij twee is het al vervelend,
+-- en precies die tweede club is het hele punt van dit platform: als je bij
+-- Cutoff én bij Aalst speelt, is de vraag niet "wat doet Aalst donderdag" maar
+-- "waar kan ik deze week terecht".
+--
+-- Vandaar één lijst. Wat komt er aan, bij welke club, wat kost het, en zit ik
+-- er al in.
+--
+-- **Wat hij mag zien is niet nieuw.** Dezelfde regel als `can_view_tournament`:
+-- een avond die op `public` staat, of op `members` bij een club waar hij lid
+-- van is. Een besloten avond blijft besloten. Deze functie brengt dus niets
+-- naar boven wat een speler niet al op de clubpagina te zien kreeg; ze spaart
+-- hem alleen het rondklikken.
+--
+-- **Ook wat nú bezig is.** Een tornooi dat om acht uur begon en waar het al
+-- half tien is, is geen verleden tijd — daar kan je nog binnenlopen als de
+-- late registratie openstaat. Het staat dus bovenaan en niet nergens.
+
+drop function if exists public.my_calendar(int);
+
+create or replace function public.my_calendar(p_days int default 120)
+returns table (
+  tournament_id  uuid,
+  name           text,
+  scheduled_at   timestamptz,
+  status         text,
+  club_slug      text,
+  club_name      text,
+  logo_url       text,
+  primary_color  text,
+  currency       char(3),
+  timezone       text,
+  buyin_cents    int,
+  fee_cents      int,
+  entries        int,
+  i_play         boolean
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with me as (
+    select id from players
+    where auth_user_id = auth.uid() and merged_into_id is null
+  ),
+  mijn_clubs as (
+    select cp.club_id from club_players cp where cp.player_id = (select id from me)
+  )
+  select
+    t.id,
+    t.name,
+    t.scheduled_at,
+    t.status::text,
+    c.slug,
+    c.name,
+    c.logo_url,
+    c.primary_color,
+    c.currency,
+    c.timezone,
+    t.buyin_cents,
+    t.fee_cents,
+    (select count(*)::int from tournament_players x where x.tournament_id = t.id),
+    exists (
+      select 1 from tournament_players x
+      where x.tournament_id = t.id and x.player_id = (select id from me)
+    )
+  from tournaments t
+  join clubs c on c.id = t.club_id
+  where t.club_id in (select club_id from mijn_clubs)
+    and t.status in ('scheduled', 'running', 'paused')
+    -- Dezelfde zichtbaarheidsregel als overal elders.
+    and (t.player_visibility = 'public'
+         or (t.player_visibility = 'members' and public.is_club_player(t.club_id))
+         or public.is_club_member(t.club_id))
+    -- Een avond van gisteren die nooit afgesloten werd, hoort hier niet meer
+    -- te blijven staan. Twaalf uur speling: wie 's nachts kijkt ziet de avond
+    -- van vanavond nog gewoon staan.
+    and t.scheduled_at >= now() - interval '12 hours'
+    and t.scheduled_at <= now() + (greatest(p_days, 1) || ' days')::interval
+  order by t.scheduled_at
+$$;
+
+comment on function public.my_calendar(int) is
+  'De komende avonden bij alle clubs van de aangemelde speler, met de prijs en of hij al ingeschreven staat. Volgt dezelfde zichtbaarheidsregel als can_view_tournament.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on function public.my_calendar(int) from public;
+    grant execute on function public.my_calendar(int) to authenticated, service_role;
+  end if;
 end $$;
