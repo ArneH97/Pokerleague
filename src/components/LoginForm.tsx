@@ -35,10 +35,18 @@ interface Props {
    */
   playerHref?: string
   playerLabel?: string
+  /**
+   * Alleen de kaart, zonder eigen paginahoogte en zonder kop.
+   *
+   * De voorpagina van het platform is nu een aanmeldscherm met de uitleg
+   * ernaast. Daar hoort dit formulier ín te staan en niet als losse pagina die
+   * zichzelf over het hele scherm uitrekt.
+   */
+  bare?: boolean
 }
 
 function Form({
-  brandName, logoUrl, fallbackNext, branded, playerHref, playerLabel,
+  brandName, logoUrl, fallbackNext, branded, playerHref, playerLabel, bare,
 }: Props) {
   const router = useRouter()
   const params = useSearchParams()
@@ -73,9 +81,9 @@ function Form({
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-5 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-7 flex flex-col items-center gap-4 text-center">
+    <main className={bare ? '' : 'flex min-h-dvh items-center justify-center px-5 py-10'}>
+      <div className={bare ? 'w-full' : 'w-full max-w-sm'}>
+        <div className={`mb-7 flex flex-col items-center gap-4 text-center${bare ? ' hidden' : ''}`}>
           {logoUrl ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}

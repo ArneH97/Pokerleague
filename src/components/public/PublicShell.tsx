@@ -2,8 +2,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
 import type { Club } from '@/lib/club'
+import { leagueUrl } from '@/lib/site'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * Het omhulsel van de publieke clubpagina's.
@@ -24,7 +26,7 @@ import { translator, type Locale } from '@/lib/i18n/dictionaries'
  *
  * Geen PokerLeague-merk. Dit is de pagina van de club.
  */
-export function PublicShell({
+export async function PublicShell({
   club, locale, active, children, signedIn = true,
 }: {
   club: Club
@@ -35,6 +37,18 @@ export function PublicShell({
   signedIn?: boolean
 }) {
   const t = translator(locale)
+
+  // Met welk account je hier kijkt.
+  //
+  // Deze pagina draagt de kleuren van de club, en dat is precies waarom het
+  // erbij moet: je bent van uiterlijk veranderd maar niet van account. Zonder
+  // die regel is het op een clubpagina niet meer te zien of je aangemeld bent
+  // en met wie — en dan verklaart niets waarom de agenda er bij de ene wel
+  // staat en bij de andere niet.
+  const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+  const account = (claims?.claims?.email as string | undefined) ?? null
+
   // Kalender en klassement vragen een account. Ze in het menu laten staan voor
   // wie er niet in kan, is een deur schilderen op een muur — dan klikt iemand
   // drie keer voor hij begrijpt dat het aan hem ligt en niet aan de club.
@@ -95,11 +109,29 @@ export function PublicShell({
             <nav className="ml-4 hidden gap-1 md:flex">{items.map(pill)}</nav>
 
             <span className="flex-1" />
+
+            {account && (
+              <span className="hidden text-xs text-[var(--text-faint)] sm:block">
+                {t('nav.signedInAs')}{' '}
+                <a
+                  href={leagueUrl('/ik')}
+                  className="text-[var(--text-muted)] underline-offset-4 hover:underline"
+                >
+                  {account}
+                </a>
+              </span>
+            )}
+
             <LanguageSwitch current={locale} label={t('common.language')} />
           </div>
 
-          <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2 sm:px-6 md:hidden">
+          <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-2 sm:px-6 md:hidden">
             {items.map(pill)}
+            {account && (
+              <span className="ml-auto shrink-0 pl-2 text-[0.65rem] text-[var(--text-faint)]">
+                {account}
+              </span>
+            )}
           </nav>
         </header>
 

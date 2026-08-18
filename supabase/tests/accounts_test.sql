@@ -184,3 +184,45 @@ begin
   perform set_config('request.jwt.claim.role', '', true);
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Het welkomstscherm wordt één keer doorlopen
+-- ---------------------------------------------------------------------------
+-- De spelerspagina stuurt door zolang `onboarded_at` leeg is. Zou dat veld bij
+-- elk bezoek opnieuw gezet worden, dan komt iemand er nooit meer uit — of hij
+-- krijgt het scherm elke keer opnieuw.
+
+begin;
+do $$
+declare
+  v_uid uuid; v_eerst timestamptz; v_daarna timestamptz;
+begin
+  insert into auth.users (email) values ('welkom@t35.be') returning id into v_uid;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'welkom@t35.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  perform public.claim_my_player('Nieuwe', 'Speler', null, false);
+
+  if (select onboarded_at from public.my_player()) is not null then
+    raise exception 'FOUT: een verse speler staat al als afgerond gemarkeerd';
+  end if;
+  raise notice 'OK  een verse speler moet nog door het welkomstscherm';
+
+  perform public.finish_onboarding();
+  select onboarded_at into v_eerst from public.my_player();
+  if v_eerst is null then raise exception 'FOUT: afvinken deed niets'; end if;
+
+  perform pg_sleep(0.01);
+  perform public.finish_onboarding();
+  select onboarded_at into v_daarna from public.my_player();
+  if v_daarna <> v_eerst then
+    raise exception 'FOUT: nog eens afvinken verzette de datum van % naar %', v_eerst, v_daarna;
+  end if;
+  raise notice 'OK  nog eens afvinken laat het oorspronkelijke moment staan';
+
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end $$;
+rollback;

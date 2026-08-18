@@ -36,6 +36,7 @@ interface Me {
   locale: string
   public_listing: boolean
   public_profile: boolean
+  onboarded_at: string | null
   clubs_count: number
   results_count: number
 }
@@ -140,6 +141,11 @@ export default async function Page() {
       </LocaleProvider>
     )
   }
+
+  // Nog nooit door het welkomstscherm geweest? Dan eerst daarheen. Zonder
+  // clubs en zonder resultaten is deze pagina een rij nullen, en dat is geen
+  // begin maar een foutmelding zonder tekst.
+  if (!me.onboarded_at) redirect('/welkom')
 
   const totalPrize = results.reduce((s, r) => s + (r.prize_cents ?? 0), 0)
   const wins = results.filter((r) => r.place === 1).length

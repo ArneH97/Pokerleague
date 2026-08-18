@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -7202,4 +7202,93 @@ begin
       execute format('grant execute on function public.club_cards()    to %I', r);
     end if;
   end loop;
+end $$;
+
+-- =========================================================================
+-- 0035_onboarding.sql
+-- =========================================================================
+
+-- Pokerleague — de eerste vijf minuten van een speler
+--
+-- Wie zijn mailadres bevestigt, komt binnen op een platform dat hij niet kent
+-- en waar nog niets van hem staat. Tot nu belandde hij op zijn profielpagina:
+-- nul avonden, nul clubs, nul prijzengeld. Technisch juist en menselijk
+-- waardeloos — het ziet eruit alsof er iets misging.
+--
+-- Er zijn precies twee dingen die op dat moment nodig zijn, en ze zijn allebei
+-- iets wat alleen híj kan invullen:
+--
+--   * **bij welke clubs hoort hij.** Zonder dat is het platform leeg, en het
+--     is de enige vraag waarvan het antwoord meteen iets oplevert.
+--   * **wat mag er van hem te zien zijn.** Dat is een toestemming, en die vraag
+--     hoort gesteld te worden voordat er iets te tonen valt — niet weggestopt
+--     in een instellingenscherm dat hij nooit opent.
+--
+-- Eén veld volstaat om te weten of dat gebeurd is.
+
+alter table players
+  add column if not exists onboarded_at timestamptz;
+
+comment on column players.onboarded_at is
+  'Wanneer deze speler het welkomstscherm doorlopen heeft. Leeg betekent: stuur hem daar eerst naartoe. Bewust een tijdstip en geen boolean — zo weet je later ook wanneer iemand binnenkwam, en kan je zien of een wijziging aan dat scherm iets veranderde.';
+
+create or replace function public.finish_onboarding()
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update players
+  set onboarded_at = coalesce(onboarded_at, now())
+  where auth_user_id = auth.uid() and merged_into_id is null
+$$;
+
+comment on function public.finish_onboarding() is
+  'Vinkt het welkomstscherm af. Coalesce en geen simpele toewijzing: wie het scherm later nog eens opent, hoort niet plots een nieuwe begindatum te krijgen.';
+
+-- `my_player` geeft dit veld nog niet terug, en de startpagina moet het weten
+-- zonder een tweede query. Dezelfde kolommen als in 0026, met één erbij.
+--
+-- Eerst weggooien, niet vervangen: `create or replace` weigert zodra het
+-- rijtype verandert, en een kolom toevoegen aan een `returns table` is precies
+-- dat. Zonder deze regel loopt de migratie stuk op een fout die niets zegt
+-- over wat er aan de hand is.
+
+drop function if exists public.my_player();
+
+create or replace function public.my_player()
+returns table (
+  id             uuid,
+  display_name   text,
+  first_name     text,
+  last_name      text,
+  username       text,
+  email          text,
+  locale         text,
+  public_listing boolean,
+  public_profile boolean,
+  onboarded_at   timestamptz,
+  clubs_count    int,
+  results_count  int
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    p.id, p.display_name, p.first_name, p.last_name, p.username, p.email,
+    p.locale, p.public_listing, p.public_profile, p.onboarded_at,
+    (select count(*)::int from club_players cp where cp.player_id = p.id),
+    (select count(*)::int from tournament_results r where r.player_id = p.id)
+  from players p
+  where p.auth_user_id = auth.uid() and p.merged_into_id is null
+$$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.finish_onboarding() to authenticated;
+    grant execute on function public.my_player()         to authenticated;
+  end if;
 end $$;

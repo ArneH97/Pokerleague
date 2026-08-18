@@ -10,12 +10,13 @@ import { createClient } from '@/lib/supabase/server'
  * Dit was een personeelsscherm — "Aanmelden als club", met een knop naar de
  * beheeromgeving. Dat is de verkeerde voordeur: wie op een spelersplatform op
  * "Clubs" klikt, zoekt een club om bij te spelen, geen inlogpagina voor
- * medewerkers. Die staat nu op /clubs/beheer, onderaan, als zijdeur.
+ * medewerkers, en die hoort hier helemaal niet meer thuis.
  *
  * Elke kaart wijst naar de clubpagina op het platform en niet naar het
  * werkdomein van de club. Ook dat is met opzet: app.cutoff.be is sinds de
  * scheiding gereedschap voor de floor, en daar heeft een bezoeker niets te
- * zoeken.
+ * zoeken. Om dezelfde reden staat er nergens nog een link naar het
+ * clubbeheer — een club krijgt zijn adres van ons, niet via een knop hier.
  *
  * Dezelfde banden en dezelfde twee kleuren als de landingspagina: dit is nog
  * altijd PokerLeague, geen los inlogschermpje. Met één club in de lijst is
@@ -202,14 +203,11 @@ export default async function Page() {
           <Link href="/" className="text-[var(--text-faint)] transition-colors hover:text-[var(--text)]">
             ← {t('site.pick.backHome')}
           </Link>
-          {/* De zijdeur. Wie bij een club werkt weet dat hij hem zoekt; wie
-              hier als speler is, hoeft er niet over te struikelen. */}
-          <Link
-            href="/clubs/beheer"
-            className="text-[var(--text-faint)] transition-colors hover:text-[var(--text)]"
-          >
-            {t('site.pick.staffDoor')} →
-          </Link>
+          {/* Geen deur naar het clubbeheer meer. Een club komt hier niet
+              binnen: die heeft zijn eigen adres en zijn eigen aanmeldscherm.
+              Een knop ernaar toe op het spelersplatform leidde alleen maar
+              spelers naar een scherm waar ze niets te zoeken hadden. */}
+          <p className="text-[var(--text-faint)]">{t('home.forClubs')}</p>
         </div>
       </footer>
     </div>

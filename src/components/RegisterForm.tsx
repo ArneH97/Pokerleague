@@ -83,8 +83,12 @@ export function RegisterForm({
         },
         // Zonder dit landt de bevestigingslink op de voorpagina en mag hij
         // zelf zoeken waar zijn profiel staat.
+        // Naar het welkomstscherm en niet naar zijn profiel: daar staat op dat
+        // moment nog niets, en dat leest als een fout in plaats van als een
+        // begin. Kwam hij via een club binnen, dan gaat hij daar eerst langs
+        // en komt het welkomstscherm daarna.
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${
-          joinSlug ? `/aansluiten/${joinSlug}` : '/ik'
+          joinSlug ? `/aansluiten/${joinSlug}` : '/welkom'
         }`,
       },
     })
@@ -115,7 +119,7 @@ export function RegisterForm({
       p_locale: locale,
     })
 
-    router.push(joinSlug ? `/aansluiten/${joinSlug}` : '/ik')
+    router.push(joinSlug ? `/aansluiten/${joinSlug}` : '/welkom')
     router.refresh()
   }
 

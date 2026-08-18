@@ -131,7 +131,7 @@ export default async function Page({ params }: PageProps<'/aansluiten/[club]'>) 
                     {t('join.toClub')} →
                   </Link>
                   <Link
-                    href="/ik"
+                    href="/welkom"
                     className="text-[var(--text-muted)] underline-offset-4 hover:underline"
                   >
                     {t('join.toProfile')} →
