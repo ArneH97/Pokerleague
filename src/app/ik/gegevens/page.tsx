@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { PlayerNav } from '@/components/PlayerNav'
 import { PlayerProfileForm } from '@/components/PlayerProfileForm'
 import { Notice } from '@/components/ui'
@@ -14,6 +15,11 @@ import { createClient } from '@/lib/supabase/server'
  * om twee redenen: je scrolt eroverheen bij elk bezoek terwijl je er hooguit
  * twee keer per jaar iets wijzigt, en het duwt precies wat je wél komt halen —
  * je cijfers — naar boven weg tot een aanhangsel.
+ *
+ * Hier staat ook de uitleg over clubbeheer. Die stond op het overzicht, waar
+ * ze bij elke speler in beeld kwam terwijl ze voor bijna niemand geldt. Weg
+ * kan ze niet: dat clubbeheer aan een ánder account kan hangen dan waarmee je
+ * speelt, is precies het misverstand waar we een avond aan verloren hebben.
  */
 
 interface Me {
@@ -43,11 +49,12 @@ export default async function Page() {
 
   return (
     <LocaleProvider locale={locale}>
-      <div data-site lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+      <div data-app lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
         <PlayerNav locale={locale} t={t} active="settings" />
 
-        <main className="mx-auto max-w-3xl px-5 py-7">
-          <h1 className="mb-5 text-2xl font-semibold tracking-tight">{t('me.navSettings')}</h1>
+        <main className="mx-auto max-w-3xl space-y-6 px-4 pb-28 pt-5 sm:px-5 sm:pb-12 sm:pt-7">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('me.navSettings')}</h1>
+
           {me ? (
             <PlayerProfileForm
               me={{
@@ -63,6 +70,20 @@ export default async function Page() {
           ) : (
             <Notice tone="error">{t('me.noProfile')}</Notice>
           )}
+
+          {/* De taalkiezer staat op een telefoon niet in de balk bovenaan —
+              daar paste hij niet naast de rest. Hier wel, want dit is de plek
+              waar je je instellingen komt zoeken. */}
+          <section className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-4 sm:hidden">
+            <h2 className="mb-2 text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
+              {t('common.language')}
+            </h2>
+            <LanguageSwitch current={locale} label={t('common.language')} />
+          </section>
+
+          <p className="text-xs leading-relaxed text-[var(--text-faint)]">
+            {t('me.staffElsewhere')}
+          </p>
         </main>
       </div>
     </LocaleProvider>

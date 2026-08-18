@@ -254,7 +254,12 @@ function Card({
   )
 }
 
-/** Nauwelijks zichtbaar: amber rechtsboven, blauw linksonder. Geeft de witte pagina diepte. */
+/**
+ * Amber rechtsboven, blauw linksonder — de diepte van de hero.
+ *
+ * De waarden gingen omhoog toen de pagina van wit naar nachtblauw ging: op wit
+ * is 16% amber al een waas, op donker verdwijnt hetzelfde verloop volledig.
+ */
 function Glow() {
   return (
     <div
@@ -262,8 +267,8 @@ function Glow() {
       className="pointer-events-none absolute inset-0"
       style={{
         backgroundImage:
-          'radial-gradient(38rem 20rem at 92% -6rem, rgba(245,158,11,0.16) 0%, transparent 70%),' +
-          'radial-gradient(34rem 22rem at -4% 110%, rgba(29,78,216,0.10) 0%, transparent 70%)',
+          'radial-gradient(40rem 22rem at 92% -6rem, rgba(245,158,11,0.22) 0%, transparent 70%),' +
+          'radial-gradient(36rem 24rem at -4% 110%, rgba(91,147,255,0.18) 0%, transparent 70%)',
       }}
     />
   )

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getClub, themeVars } from '@/lib/club'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { isLocale } from '@/lib/i18n/dictionaries'
+import { onPlatform } from '@/lib/whereAmI'
 
 /**
  * Omhulsel van de clubomgeving.
@@ -26,9 +27,27 @@ export default async function ClubLayout({ children, params }: LayoutProps<'/c/[
   // opnieuw kiest. Op de zaalklok wil je al helemaal geen keuzescherm.
   const locale = isLocale(club.locale) ? club.locale : 'nl'
 
+  // Twee huiden, en het adres bepaalt welke.
+  //
+  // Op `app.cutoff.be` is dit de clubomgeving: het werkgereedschap van de
+  // club, met hun kleuren en verder niets van ons. Die schermen blijven exact
+  // zoals ze zijn — daar is niets mis mee en het is niet van ons om te
+  // veranderen.
+  //
+  // Op `pokerleague.be/c/cutoff` is dit het platform dat een club laat zien.
+  // Daar hoort de huid van het platform onder te liggen — nachtblauw, zoals
+  // elk ander scherm waar een speler aangemeld is — met de kleur van de club
+  // erbovenop uit themeVars. Zonder dat springt een speler van zijn eigen
+  // pagina naar een clubpagina en verandert de vloer onder zijn voeten.
+  const platform = await onPlatform()
+
   return (
     <LocaleProvider locale={locale}>
-      <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]" style={themeVars(club)}>
+      <div
+        {...(platform ? { 'data-site': '' } : {})}
+        className="min-h-dvh bg-[var(--bg)] text-[var(--text)]"
+        style={themeVars(club)}
+      >
         {children}
       </div>
     </LocaleProvider>

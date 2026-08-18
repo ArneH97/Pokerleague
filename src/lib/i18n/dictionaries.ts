@@ -43,6 +43,7 @@ const nl = {
   'login.badCredentials': 'E-mailadres of wachtwoord klopt niet.',
   'login.playerHere': 'Dit scherm is voor medewerkers van de club. Ben je speler?',
   'login.stale': 'Je vorige sessie hoorde bij een account dat niet meer bestaat. Meld je opnieuw aan.',
+  'login.noAccount': 'Nog geen account?',
 
   // Clubdashboard
   'club.subtitle': 'Tornooibeheer',
@@ -374,7 +375,7 @@ const nl = {
   'site.players.f6t': 'Niets te installeren',
   'site.players.f6b': 'Werkt in je browser, op je telefoon. Geen app store, geen updates.',
 
-  'site.clubs.eyebrow': 'Voor clubs',
+  'site.clubs.eyebrow': 'Aangesloten clubs',
   'site.clubs.title': 'Meer dan een tornooiklok',
   'site.clubs.body':
     'Je eigen omgeving, met je eigen logo en kleuren, op je eigen adres. Nergens staat de naam van het platform.',
@@ -421,15 +422,15 @@ const nl = {
   'site.footer.tagline': 'PokerLeague · België',
 
   'site.pick.metaTitle': 'Clubs — PokerLeague',
-  'site.pick.title': 'Aanmelden als club',
+  'site.pick.title': 'De clubs van PokerLeague',
   'site.pick.body':
-    'Kies je club om naar de beheeromgeving te gaan. Heeft je club een eigen adres, dan kan je daar rechtstreeks naartoe.',
+    'Elke club houdt hier zijn agenda, zijn uitslagen en zijn klassement bij. Klik op een club om te zien wanneer er gespeeld wordt en wie er bovenaan staat.',
   'site.pick.none': 'Nog geen clubs aangesloten.',
   'site.pick.beFirst': 'Wil je de eerste zijn?',
   'site.pick.manageEnv': 'Beheeromgeving',
 
   'site.pick.joinTitle': 'Staat jouw club er nog niet bij?',
-  'site.pick.enter': 'Naar de beheeromgeving',
+  'site.pick.enter': 'Bekijk de club',
   'site.pick.ownAddress': 'Eigen adres',
   'site.pick.backHome': 'Terug naar de startpagina',
   'site.lang.change': 'Taal wijzigen',
@@ -791,6 +792,7 @@ const nl = {
   'chart.netTitle': 'Netto over de tijd',
   'chart.finishTitle': 'Waar je eindigt',
   'chart.finishHint': 'Je eindplaats als deel van het veld. Links is de top.',
+  'chart.soon': 'Je curve verschijnt hier vanaf je tweede sessie. Eén avond zegt in poker niets — het gaat om de lijn eronder.',
   'chart.top20': 'top',
   'chart.bottom20': 'laag',
   'me.net': 'Netto',
@@ -800,7 +802,8 @@ const nl = {
   'me.points': 'Punten',
   'me.lede': 'Dit is je PokerLeague-profiel: elke sessie die je speelt, bij elke club, op één plek.',
   'me.navHome': 'Overzicht',
-  'me.navSettings': 'Mijn gegevens',
+  'me.navClubs': 'Clubs',
+  'me.navSettings': 'Gegevens',
   'me.myClubs': 'Mijn clubs',
   'me.discover': 'Ontdek meer clubs',
   'me.discoverClose': 'Sluiten',
@@ -912,6 +915,7 @@ const fr: Record<Key, string> = {
   'login.badCredentials': "L'adresse e-mail ou le mot de passe est incorrect.",
   'login.playerHere': 'Cet écran est réservé au staff du club. Vous êtes joueur ?',
   'login.stale': 'Votre session précédente était liée à un compte qui n’existe plus. Reconnectez-vous.',
+  'login.noAccount': 'Pas encore de compte ?',
 
   'club.subtitle': 'Gestion des tournois',
   'club.newTournament': 'Nouveau tournoi',
@@ -1232,7 +1236,7 @@ const fr: Record<Key, string> = {
   'site.players.f6t': 'Rien à installer',
   'site.players.f6b': 'Ça fonctionne dans votre navigateur, sur votre téléphone. Pas d’app store, pas de mises à jour.',
 
-  'site.clubs.eyebrow': 'Pour les clubs',
+  'site.clubs.eyebrow': 'Clubs affiliés',
   'site.clubs.title': 'Plus qu’une horloge de tournoi',
   'site.clubs.body':
     'Votre propre espace, avec votre logo et vos couleurs, à votre propre adresse. Le nom de la plateforme n’apparaît nulle part.',
@@ -1279,15 +1283,15 @@ const fr: Record<Key, string> = {
   'site.footer.tagline': 'PokerLeague · Belgique',
 
   'site.pick.metaTitle': 'Clubs — PokerLeague',
-  'site.pick.title': 'Connexion club',
+  'site.pick.title': 'Les clubs de PokerLeague',
   'site.pick.body':
-    'Choisissez votre club pour accéder à son espace de gestion. Si votre club a sa propre adresse, vous pouvez y aller directement.',
+    'Chaque club y tient son calendrier, ses résultats et son classement. Cliquez sur un club pour voir quand on joue et qui est en tête.',
   'site.pick.none': 'Aucun club affilié pour l’instant.',
   'site.pick.beFirst': 'Vous voulez être le premier ?',
   'site.pick.manageEnv': 'Espace de gestion',
 
   'site.pick.joinTitle': 'Votre club n’y figure pas encore ?',
-  'site.pick.enter': 'Vers l’espace de gestion',
+  'site.pick.enter': 'Voir le club',
   'site.pick.ownAddress': 'Adresse propre',
   'site.pick.backHome': 'Retour à l’accueil',
   'site.lang.change': 'Changer de langue',
@@ -1646,6 +1650,7 @@ const fr: Record<Key, string> = {
   'chart.netTitle': 'Net au fil du temps',
   'chart.finishTitle': 'Où vous terminez',
   'chart.finishHint': 'Votre place en proportion du field. À gauche, le haut.',
+  'chart.soon': 'Votre courbe apparaîtra ici dès votre deuxième session. Une soirée ne dit rien au poker — c’est la ligne qui compte.',
   'chart.top20': 'haut',
   'chart.bottom20': 'bas',
   'me.net': 'Net',
@@ -1655,7 +1660,8 @@ const fr: Record<Key, string> = {
   'me.points': 'Points',
   'me.lede': 'Ceci est votre profil PokerLeague : chaque session que vous jouez, dans chaque club, au même endroit.',
   'me.navHome': 'Aperçu',
-  'me.navSettings': 'Mes données',
+  'me.navClubs': 'Clubs',
+  'me.navSettings': 'Données',
   'me.myClubs': 'Mes clubs',
   'me.discover': 'Découvrir d’autres clubs',
   'me.discoverClose': 'Fermer',
@@ -1765,6 +1771,7 @@ const en: Record<Key, string> = {
   'login.badCredentials': 'That email address or password is not correct.',
   'login.playerHere': 'This screen is for club staff. Are you a player?',
   'login.stale': 'Your previous session belonged to an account that no longer exists. Please sign in again.',
+  'login.noAccount': 'No account yet?',
 
   'club.subtitle': 'Tournament management',
   'club.newTournament': 'New tournament',
@@ -2085,7 +2092,7 @@ const en: Record<Key, string> = {
   'site.players.f6t': 'Nothing to install',
   'site.players.f6b': 'Runs in your browser, on your phone. No app store, no updates.',
 
-  'site.clubs.eyebrow': 'For clubs',
+  'site.clubs.eyebrow': 'Member clubs',
   'site.clubs.title': 'More than a tournament clock',
   'site.clubs.body':
     'Your own environment, with your own logo and colours, at your own address. The platform’s name appears nowhere.',
@@ -2132,15 +2139,15 @@ const en: Record<Key, string> = {
   'site.footer.tagline': 'PokerLeague · Belgium',
 
   'site.pick.metaTitle': 'Clubs — PokerLeague',
-  'site.pick.title': 'Club sign-in',
+  'site.pick.title': 'The clubs on PokerLeague',
   'site.pick.body':
-    'Pick your club to go to its management area. If your club has its own address, you can go there directly.',
+    'Every club keeps its calendar, its results and its standings here. Pick a club to see when they play and who is on top.',
   'site.pick.none': 'No clubs on board yet.',
   'site.pick.beFirst': 'Want to be the first?',
   'site.pick.manageEnv': 'Management area',
 
   'site.pick.joinTitle': 'Your club not listed yet?',
-  'site.pick.enter': 'To the management area',
+  'site.pick.enter': 'View the club',
   'site.pick.ownAddress': 'Own address',
   'site.pick.backHome': 'Back to the home page',
   'site.lang.change': 'Change language',
@@ -2499,6 +2506,7 @@ const en: Record<Key, string> = {
   'chart.netTitle': 'Net over time',
   'chart.finishTitle': 'Where you finish',
   'chart.finishHint': 'Your finish as a share of the field. Left is the top.',
+  'chart.soon': 'Your curve appears here from your second session. One night says nothing in poker — the line underneath does.',
   'chart.top20': 'top',
   'chart.bottom20': 'low',
   'me.net': 'Net',
@@ -2508,7 +2516,8 @@ const en: Record<Key, string> = {
   'me.points': 'Points',
   'me.lede': 'This is your PokerLeague profile: every session you play, at every club, in one place.',
   'me.navHome': 'Overview',
-  'me.navSettings': 'My details',
+  'me.navClubs': 'Clubs',
+  'me.navSettings': 'Details',
   'me.myClubs': 'My clubs',
   'me.discover': 'Discover more clubs',
   'me.discoverClose': 'Close',

@@ -55,7 +55,7 @@ export function MyClubs({
 
   return (
     <section>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
           {t('me.myClubs')}
         </h2>
@@ -63,9 +63,10 @@ export function MyClubs({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="text-sm font-medium text-[var(--brand)] underline-offset-4 hover:underline"
+            aria-expanded={open}
+            className="rounded-full border border-[color-mix(in_oklab,var(--brand)_45%,transparent)] bg-[color-mix(in_oklab,var(--brand)_12%,transparent)] px-3.5 py-1.5 text-sm font-medium text-[var(--brand)] transition hover:bg-[color-mix(in_oklab,var(--brand)_22%,transparent)]"
           >
-            {open ? t('me.discoverClose') : `${t('me.discover')} →`}
+            {open ? t('me.discoverClose') : `${t('me.discover')} +`}
           </button>
         )}
       </div>
@@ -82,7 +83,11 @@ export function MyClubs({
               <li key={c.slug}>
                 <Link
                   href={`/c/${c.slug}`}
-                  className="group block h-full overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] transition hover:border-[var(--line-strong)]"
+                  className="group block h-full overflow-hidden rounded-[var(--radius)] border transition hover:brightness-110"
+                  style={{
+                    borderColor: `color-mix(in oklab, ${accent} 32%, var(--line))`,
+                    background: `linear-gradient(165deg, color-mix(in oklab, ${accent} 13%, var(--surface)), var(--surface) 58%)`,
+                  }}
                 >
                   {/* Een streep in de kleur van de club. Genoeg om de kaarten
                       uit elkaar te houden zonder dat het platform van kleur
@@ -120,7 +125,7 @@ export function MyClubs({
                   </span>
 
                   {c.rank !== null ? (
-                    <span className="mt-3 grid grid-cols-3 gap-px border-t border-[var(--line)] bg-[var(--line)]">
+                    <span className="mt-3 grid grid-cols-3 border-t border-[var(--line)]">
                       <Cell
                         label={t('pub.standings')}
                         value={String(c.rank)}
@@ -148,10 +153,6 @@ export function MyClubs({
           })}
         </ul>
       )}
-
-      <p className="mt-3 text-xs leading-relaxed text-[var(--text-faint)]">
-        {t('me.clubsBody')}
-      </p>
 
       {/* ------------------------------------------------------ ontdekken */}
       {open && (
@@ -226,7 +227,7 @@ function Cell({
   label, value, sub, accent,
 }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
-    <span className="block bg-[var(--surface)] px-2 py-2.5 text-center">
+    <span className="block px-2 py-2.5 text-center [&+&]:border-l [&+&]:border-[var(--line)]">
       <span className="block text-[0.55rem] uppercase tracking-[0.12em] text-[var(--text-faint)]">
         {label}
       </span>

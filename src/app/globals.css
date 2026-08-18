@@ -8,8 +8,12 @@
  * met een lichte blauwzweem, zodat kaarten zich van de achtergrond lossnijden
  * zonder dat er een rand omheen hoeft te schreeuwen.
  *
- * --brand is de kleur van de club en wordt per clubomgeving overschreven.
- * Alles wat je hier aanpast slaat dus door naar elk scherm.
+ * Dit is de huid van de **clubomgeving**: het werkgereedschap op het eigen
+ * domein van de club — de vloer, de klok, het ledenbestand, de instellingen.
+ * Die blijft zoals ze is. Ze is af, ze is van de club, en `--brand` wordt daar
+ * per club overschreven met de eigen huisstijl.
+ *
+ * Het platform heeft een eigen huid, één laag hieronder: zie `[data-site]`.
  */
 
 :root {
@@ -26,6 +30,12 @@
 
   --brand:         #10b981;
   --on-brand:      #04120c;
+  /* Een tweede accent voor grafieken en cijfers. Bestaat ook hier, zodat een
+     component die het gebruikt niet kleurloos wordt als hij ooit in de
+     clubomgeving belandt. */
+  --accent:        #5b93ff;
+  --gold:          #fbbf24;
+  --gold-soft:     #f3d18a;
 
   --danger:        #fca5a5;
   --warn:          #fcd34d;
@@ -49,65 +59,111 @@
 }
 
 /**
- * Lichte variant, voor de publieke kant van PokerLeague.
+ * De platformkant van PokerLeague: nachtblauw met amber.
  *
- * De app zelf is donker omdat hij 's avonds in een zaal gebruikt wordt. Maar
- * een landingspagina die iemand overdag op zijn telefoon opent, hoort niet
- * aan te voelen als een bedieningspaneel.
+ * Was wit. Dat werkte zolang het platform vooral een folder was, maar het is
+ * inmiddels een app: je meldt je aan, je ziet je cijfers, je opent het in een
+ * zaal op een telefoon. Een wit vel met grijze kaders leest daar slecht en
+ * voelt aan als een formulier in plaats van als iets waar je bij hoort. En het
+ * gaf een sprong: wit bij het aanmelden, donker zodra je binnen was.
+ *
+ * Nachtblauw dus, van de voorpagina tot je profiel, met amber als accent.
+ * Blauw draagt, amber wijst — wat amber is, is aanklikbaar of is van jou.
+ * Groen en rood blijven overal wat ze zijn: winst en verlies.
+ *
+ * Amber en geen oranje-als-drager: één luide kleur op een pagina is genoeg.
+ * En amber overleeft de sprong naar een clubpagina, want elke club brengt zijn
+ * eigen kleur mee (Cutoff is goud op zwart) en twee luide dragers botsen.
+ *
+ * **De clubomgeving hoort hier niet bij.** Op het eigen domein van een club
+ * staat geen PokerLeague-huid maar die van de club; die pagina's dragen dit
+ * kenmerk niet en houden de basis hierboven. Zie de layout van `/c/[club]`.
  */
-/**
- * De publieke kant van PokerLeague: diep blauw met amber.
- *
- * Was diepgroen — pokervilt. Dat las als braaf en als een cliché, en het deed
- * nog iets vervelends: elke club brengt zijn eigen kleuren mee (Cutoff is goud
- * op zwart), en spring je van het platform naar een clubpagina, dan botsen
- * twee sterke kleuren op elkaar. Blauw is neutraal genoeg om die overgang te
- * overleven, en amber geeft de energie die groen niet had.
- *
- * Amber en niet oranje-als-drager: één luide kleur op een pagina is genoeg.
- * Blauw draagt, amber wijst — en wat amber is, is aanklikbaar of belangrijk.
- */
-[data-site] {
-  --bg:            #ffffff;
-  --surface:       #ffffff;
-  --surface-2:     #f4f6fb;
-  --surface-hover: #e8edf7;
-  --line:          #dfe4ef;
-  --line-strong:   #c5cee0;
+[data-site], [data-app] {
+  --bg:            #0a1120;
+  --bg-2:          #0e1729;
+  --surface:       #141f36;
+  --surface-2:     #1b2843;
+  --surface-hover: #243252;
+  --line:          #22304f;
+  --line-strong:   #35476f;
 
-  --text:          #0e1729;
-  --text-muted:    #4a5670;
-  --text-faint:    #7b869e;
+  --text:          #eef2fb;
+  --text-muted:    #a6b3cf;
+  --text-faint:    #7a88a8;
 
-  --brand:         #1d4ed8;
-  --on-brand:      #ffffff;
-  --gold:          #f59e0b;
-  --gold-soft:     #fde8c0;
+  --brand:         #f59e0b;
+  --on-brand:      #0a1120;
+  --accent:        #5b93ff;
+  --gold:          #fbbf24;
+  --gold-soft:     #f3d18a;
 
-  --danger:        #b3261e;
-  --warn:          #8a5a00;
-  --ok:            #15803d;
+  --danger:        #f87171;
+  --warn:          #fbbf24;
+  --ok:            #34d399;
+
+  color-scheme: dark;
 }
 
 /**
- * Donkere band binnen de publieke pagina.
+ * Een opgetild vlak binnen een pagina.
  *
- * Hier keert de rolverdeling om: op nachtblauw is blauw als accent onzichtbaar,
- * dus amber neemt het over. Daarom is `--brand` hier de amber en niet de
- * blauwe — componenten die op `--brand` leunen blijven zo vanzelf leesbaar.
+ * Heette "donkere band" toen de pagina eromheen nog wit was; toen was dit het
+ * contrast. Nu alles donker is, doet het het omgekeerde: een tikje lichter dan
+ * de achtergrond, zodat een kaart die iets nábootst — de klok op de
+ * voorpagina — leest als een scherm in een scherm en niet als nog een vlak.
  */
 [data-band="dark"] {
-  --bg:            #0e1729;
-  --surface:       #18233a99;
-  --surface-2:     #1b2740;
-  --line:          #26334f;
-  --line-strong:   #37456a;
-  --text:          #eef2fb;
-  --text-muted:    #a8b4cc;
-  --text-faint:    #7b89a6;
+  --bg:            #101c33;
+  --surface:       #1b2843;
+  --surface-2:     #223052;
+  --line:          #2b3b5f;
+  --line-strong:   #3d4f78;
   --brand:         #f59e0b;
-  --on-brand:      #0e1729;
+  --on-brand:      #0a1120;
 }
+
+/**
+ * De spelersapp: `/ik` en alles eronder.
+ *
+ * De kleuren komen uit de basis en uit `[data-site]`; wat hier overblijft is
+ * het gedrag dat alleen geldt als dit scherm als app op een beginscherm staat.
+ */
+[data-app] {
+  /* Geen wit doorschemerend elastiek als je in een geïnstalleerde app
+     doorschiet aan de onderkant van de lijst. */
+  overscroll-behavior-y: none;
+}
+
+/**
+ * De gloed achter de kop.
+ *
+ * Twee zachte lichtvlekken in plaats van een verloop over het hele vlak: een
+ * verloop maakt een scherm donkerder naarmate je zakt en dat leest als "hier
+ * is het gedaan". Twee vlekken bovenaan doen het omgekeerde — ze maken van de
+ * bovenkant een plek. Ze zitten in een pseudo-element zodat er geen extra div
+ * voor nodig is en de inhoud er gewoon bovenop staat.
+ */
+.app-glow { position: relative; isolation: isolate; }
+.app-glow::before {
+  content: '';
+  position: absolute;
+  /* Precies tot de rand van het scherm en geen millimeter verder: liep de
+     gloed buiten de pagina, dan kon je op een telefoon zijwaarts scrollen
+     naar een lege strook. */
+  inset: -7rem -1rem auto -1rem;
+  height: 26rem;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 52% at 22% 32%, color-mix(in oklab, var(--brand) 26%, transparent), transparent 70%),
+    radial-gradient(40% 46% at 82% 12%, color-mix(in oklab, var(--accent) 26%, transparent), transparent 72%);
+}
+
+/* Onderaan een geïnstalleerde app zit de streep van de telefoon. Zonder deze
+   marge staat de balk eronder en tik je hem niet aan. */
+.pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+.mb-safe { margin-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 
 @theme inline {
   --color-bg:            var(--bg);

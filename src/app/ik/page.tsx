@@ -204,31 +204,73 @@ export default async function Page() {
   const best = results.length > 0 ? Math.min(...results.map((r) => r.place)) : null
   const points = results.reduce((s, r) => s + Number(r.points ?? 0), 0)
 
+  // Jaartal in twee cijfers: "18 aug 26" past naast de bedragen op een
+  // telefoon, "18 augustus 2026" duwt ze eraf.
   const fmt = new Intl.DateTimeFormat(`${locale}-BE`, {
-    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Brussels',
+    day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Europe/Brussels',
   })
 
   return (
     <LocaleProvider locale={locale}>
-      <div data-site lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+      <div data-app lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
         <PlayerNav locale={locale} t={t} active="home" />
 
-        <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-5 sm:py-7">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {me.display_name}
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-faint)]">
-              {me.username && <span>@{me.username} · </span>}
-              {t('nav.signedInAs')} {me.email}
-            </p>
-            {/* Eén regel die zegt wat deze pagina is. Zonder die regel is dit
-                gewoon "een tweede site met ook iets van mij erop" — en dat is
-                precies de verwarring die dit platform veroorzaakte. */}
-            <p className="mt-2 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
-              {t('me.lede')}
-            </p>
-          </div>
+        {/* pb-28 op de telefoon: daar staat de tabbalk overheen. */}
+        <main className="mx-auto max-w-3xl space-y-7 px-4 pb-28 pt-5 sm:px-5 sm:pb-12 sm:pt-7">
+          {/* ---------------------------------------------------------- kop
+              Naam, netto en de kern in één blok. Het netto stond vroeger in
+              een eigen grijze kaart onder de titel; dat is het belangrijkste
+              getal van de pagina en dan hoort het niet in het derde vlak van
+              boven te staan, maar hier — groot, gekleurd, meteen. */}
+          <section className="app-glow">
+            <div className="flex items-center gap-3.5">
+              <span
+                aria-hidden
+                className="flex size-12 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold text-[var(--on-brand)] sm:size-14 sm:text-xl"
+                style={{
+                  background: 'linear-gradient(140deg, var(--gold), var(--brand) 60%, #d97706)',
+                  boxShadow: '0 8px 26px -12px color-mix(in oklab, var(--brand) 90%, transparent)',
+                }}
+              >
+                {initials(me.display_name)}
+              </span>
+              <span className="min-w-0">
+                <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
+                  {me.display_name}
+                </h1>
+                <p className="truncate text-sm text-[var(--text-faint)]">
+                  {me.username ? `@${me.username}` : me.email}
+                </p>
+              </span>
+            </div>
+
+            {results.length > 0 ? (
+              <div className="mt-5">
+                <p className="text-[0.65rem] uppercase tracking-[0.24em] text-[var(--text-faint)]">
+                  {t('me.net')}
+                </p>
+                <p
+                  className={`tnum mt-0.5 text-[2.75rem] font-semibold leading-none tracking-tight sm:text-6xl ${
+                    net > 0 ? 'text-[var(--ok)]' : net < 0 ? 'text-[var(--danger)]' : ''
+                  }`}
+                >
+                  {net > 0 ? '+' : ''}{formatMoney(net, 'EUR')}
+                </p>
+                <p className="tnum mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--text-muted)]">
+                  <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs">
+                    {formatMoney(totalPrize, 'EUR')} {t('me.won').toLowerCase()}
+                  </span>
+                  <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs">
+                    {formatMoney(totalSpent, 'EUR')} {t('me.spent').toLowerCase()}
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <p className="mt-4 max-w-prose text-sm leading-relaxed text-[var(--text-muted)]">
+                {t('me.lede')}
+              </p>
+            )}
+          </section>
 
           {/* ------------------------------------------------ nu aan tafel
               Boven alles, want zolang je speelt is dit het enige op deze
@@ -236,41 +278,22 @@ export default async function Page() {
               niets. */}
           <MyLive rows={live} />
 
-          {/* --------------------------------------------------- de cijfers
-              Netto krijgt de volle breedte en een kleur. Dat is het enige
-              getal waar een pokerspeler op terugkomt; prijzengeld zonder
-              inleg ernaast is structureel te mooi. */}
+          {/* --------------------------------------------------- de cijfers */}
           {results.length > 0 && (
             <>
-              <section className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-5">
-                <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
-                  {t('me.net')}
-                </p>
-                <p
-                  className={`tnum mt-1 text-4xl font-semibold tracking-tight sm:text-5xl ${
-                    net > 0 ? 'text-[var(--ok)]' : net < 0 ? 'text-[var(--danger)]' : ''
-                  }`}
-                >
-                  {net > 0 ? '+' : ''}{formatMoney(net, 'EUR')}
-                </p>
-                <p className="tnum mt-1 text-sm text-[var(--text-faint)]">
-                  {formatMoney(totalPrize, 'EUR')} {t('me.won').toLowerCase()} ·{' '}
-                  {formatMoney(totalSpent, 'EUR')} {t('me.spent').toLowerCase()}
-                </p>
-              </section>
-
-              <PlayerCharts rows={results} t={t} locale={locale} />
-
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label={t('me.played')} value={String(results.length)} />
-                <Stat label={t('me.wins')} value={String(wins)} />
-                <Stat label={t('me.itm')} value={`${itm}%`} sub={`${cashes}×`} />
+                <Stat label={t('me.played')} value={String(results.length)} tone="accent" />
+                <Stat label={t('me.wins')} value={String(wins)} tone="brand" />
+                <Stat label={t('me.itm')} value={`${itm}%`} sub={`${cashes}×`} tone="ok" />
                 <Stat
                   label={t('me.bestPlace')}
                   value={best ? `${best}e` : '—'}
                   sub={`${Math.round(points)} ${t('me.points').toLowerCase()}`}
+                  tone="brand"
                 />
               </div>
+
+              <PlayerCharts rows={results} t={t} locale={locale} />
             </>
           )}
 
@@ -309,15 +332,17 @@ export default async function Page() {
                 ))}
               </ul>
             </section>
-          ) : (
-            <p className="text-xs leading-relaxed text-[var(--text-faint)]">
-              {t('me.staffElsewhere')}
-            </p>
-          )}
+          ) : null}
 
-          {/* ------------------------------------------------- de resultaten */}
+          {/* ------------------------------------------------- de resultaten
+              Geen tabel meer. Een tabel met vier kolommen wordt op een
+              telefoon één kolom met alles eronder geplakt, en dan lees je een
+              regel getallen zonder te weten waar ze bij horen. Dit zijn rijen:
+              links waar je eindigde, in het midden wélke avond, rechts wat de
+              avond netto deed. Dat laatste stond hier nergens, terwijl het het
+              enige is waarop je terugkijkt. */}
           <section>
-            <h2 className="mb-2 text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
+            <h2 className="mb-2.5 text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
               {t('me.results')}
             </h2>
 
@@ -332,71 +357,125 @@ export default async function Page() {
                 </Link>
               </Card>
             ) : (
-              <div className="overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)]">
-                <table className="w-full text-left">
-                  <thead className="hidden sm:table-header-group">
-                    <tr className="border-b border-[var(--line)] text-[0.65rem] uppercase tracking-[0.2em] text-[var(--text-faint)]">
-                      <th className="px-4 py-3 font-medium">{t('me.tournament')}</th>
-                      <th className="w-20 px-2 py-3 text-right font-medium">{t('me.place')}</th>
-                      <th className="w-24 px-2 py-3 text-right font-medium">{t('me.prize')}</th>
-                      <th className="w-20 px-4 py-3 text-right font-medium">{t('pub.pts')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((r) => (
-                      <tr key={r.tournament_id} className="border-b border-[var(--line)] last:border-0">
-                        <td className="px-4 py-3 align-baseline">
-                          <span className="block truncate font-medium">{r.tournament}</span>
-                          <span className="block text-xs text-[var(--text-faint)]">
-                            {r.club_name} · {fmt.format(new Date(r.played_on))}
+              <ul className="overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)]">
+                {results.map((r) => {
+                  const rNet = Number(r.prize_cents ?? 0) - Number(r.spent_cents ?? 0)
+                  return (
+                    <li
+                      key={r.tournament_id}
+                      className="flex items-center gap-3 border-b border-[var(--line)] px-3 py-3 last:border-0 sm:px-4"
+                    >
+                      <Place place={r.place} entries={r.entries} />
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{r.tournament}</span>
+                        <span className="block truncate text-xs text-[var(--text-faint)]">
+                          {r.club_name} · {fmt.format(new Date(r.played_on))}
+                          {/* De punten erbij zodra er plaats is. Op een smal
+                              scherm knippen ze de datum af, en de datum weet
+                              je nodig hebt om een avond terug te vinden. */}
+                          <span className="hidden sm:inline">
+                            {' '}· {Math.round(Number(r.points))} {t('pub.pts')}
                           </span>
-                          <span className="tnum block text-xs text-[var(--text-faint)] sm:hidden">
-                            {r.place} / {r.entries}
-                            {r.prize_cents > 0 ? ` · ${formatMoney(r.prize_cents, 'EUR')}` : ''}
-                            {` · ${Math.round(Number(r.points))} ${t('pub.pts')}`}
+                        </span>
+                      </span>
+
+                      <span className="shrink-0 text-right">
+                        <span
+                          className={`tnum block text-sm font-semibold ${
+                            rNet > 0 ? 'text-[var(--ok)]' : rNet < 0 ? 'text-[var(--danger)]' : ''
+                          }`}
+                        >
+                          {rNet > 0 ? '+' : ''}{formatMoney(rNet, 'EUR')}
+                        </span>
+                        {Number(r.prize_cents) > 0 && (
+                          <span className="tnum hidden text-[0.65rem] text-[var(--text-faint)] sm:block">
+                            {formatMoney(Number(r.prize_cents), 'EUR')} {t('me.won').toLowerCase()}
                           </span>
-                        </td>
-                        <td className="tnum hidden px-2 py-3 text-right align-baseline text-sm sm:table-cell">
-                          {r.place}
-                          <span className="text-[var(--text-faint)]"> / {r.entries}</span>
-                        </td>
-                        <td className="tnum hidden px-2 py-3 text-right align-baseline text-sm sm:table-cell">
-                          {r.prize_cents > 0 ? formatMoney(r.prize_cents, 'EUR') : '—'}
-                        </td>
-                        <td className="tnum hidden px-4 py-3 text-right align-baseline font-semibold sm:table-cell">
-                          {Math.round(Number(r.points))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </section>
-
-          {/* Gegevens staan niet meer onderaan deze pagina maar op /ik/gegevens.
-              Ze stonden hier onder de resultaten: je scrolt er bij elk bezoek
-              overheen terwijl je er hooguit twee keer per jaar iets wijzigt. */}
-          <p className="pt-1 text-center text-sm">
-            <Link
-              href="/ik/gegevens"
-              className="text-[var(--text-muted)] underline-offset-4 hover:text-[var(--text)] hover:underline"
-            >
-              {t('me.navSettings')} →
-            </Link>
-          </p>
         </main>
       </div>
     </LocaleProvider>
   )
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/** De eerste letters van je naam, voor het rondje in de kop. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+const tones = {
+  brand: 'var(--brand)',
+  accent: 'var(--accent)',
+  ok: 'var(--ok)',
+} as const
+
+/**
+ * Eén cijfer op een kaart.
+ *
+ * Met een gekleurd streepje links in plaats van vier keer hetzelfde grijze
+ * blok. Kleur is hier geen versiering: het maakt van vier gelijke vakjes vier
+ * herkenbare plekken, zodat je bij het tweede bezoek niet meer leest maar
+ * kijkt.
+ */
+function Stat({
+  label, value, sub, tone = 'brand',
+}: { label: string; value: string; sub?: string; tone?: keyof typeof tones }) {
+  const c = tones[tone]
   return (
-    <div className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-4">
+    <div
+      className="relative overflow-hidden rounded-[var(--radius)] border border-[var(--line)] p-4"
+      style={{
+        background: `linear-gradient(150deg, color-mix(in oklab, ${c} 9%, var(--surface)), var(--surface) 62%)`,
+      }}
+    >
+      <span aria-hidden className="absolute inset-y-3 left-0 w-0.5 rounded-r-full" style={{ background: c }} />
       <p className="text-[0.6rem] uppercase tracking-[0.18em] text-[var(--text-faint)]">{label}</p>
-      <p className="tnum mt-1 text-2xl font-semibold leading-tight">{value}</p>
+      <p className="tnum mt-1 text-2xl font-semibold leading-tight" style={{ color: c }}>
+        {value}
+      </p>
       {sub && <p className="tnum mt-0.5 text-xs text-[var(--text-faint)]">{sub}</p>}
     </div>
+  )
+}
+
+/**
+ * Waar je eindigde, als penning.
+ *
+ * Goud voor de winst, zilver en brons daarna, en daarboven gewoon een cijfer.
+ * Dat is niet louter mooi: in een lijst van twintig avonden zie je zo in één
+ * blik welke de goede waren, zonder één regel te lezen.
+ */
+function Place({ place, entries }: { place: number; entries: number }) {
+  const medal =
+    place === 1 ? { ring: 'var(--gold)', tint: 22 }
+    : place === 2 ? { ring: '#cbd5e1', tint: 16 }
+    : place === 3 ? { ring: '#c9885a', tint: 16 }
+    : null
+
+  return (
+    <span
+      className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl border text-center"
+      style={{
+        borderColor: medal ? `color-mix(in oklab, ${medal.ring} 55%, transparent)` : 'var(--line)',
+        background: medal
+          ? `color-mix(in oklab, ${medal.ring} ${medal.tint}%, transparent)`
+          : 'var(--surface-2)',
+        color: medal ? medal.ring : 'var(--text-muted)',
+      }}
+    >
+      <span className="tnum text-base font-semibold leading-none">{place}</span>
+      <span className="tnum mt-0.5 text-[0.6rem] leading-none opacity-70">/{entries}</span>
+    </span>
   )
 }

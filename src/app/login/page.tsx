@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { LoginForm } from '@/components/LoginForm'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator } from '@/lib/i18n/dictionaries'
@@ -21,10 +22,29 @@ export async function generateMetadata() {
 
 export default async function Page() {
   const locale = await publicLocale()
+  const t = translator(locale)
   return (
     <LocaleProvider locale={locale}>
-      <div data-site lang={locale} className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+      <div
+        data-site
+        lang={locale}
+        className="app-glow relative min-h-dvh overflow-x-clip bg-[var(--bg)] text-[var(--text)]"
+      >
         <LoginForm brandName="PokerLeague" fallbackNext="/ik" />
+
+        {/* Wie hier staat zonder account had geen enkele uitweg: het scherm
+            vroeg om een wachtwoord dat nog niet bestaat. Eén regel volstaat,
+            en ze hoort onder de kaart — niet erboven, want negen van de tien
+            komen hier om aan te melden. */}
+        <p className="-mt-6 pb-12 text-center text-sm text-[var(--text-muted)]">
+          {t('login.noAccount')}{' '}
+          <Link
+            href="/registreren"
+            className="font-medium text-[var(--brand)] underline-offset-4 hover:underline"
+          >
+            {t('home.ctaMake')} →
+          </Link>
+        </p>
       </div>
     </LocaleProvider>
   )

@@ -203,7 +203,19 @@ export function ClubMasthead({ club, locale }: { club: Club; locale: Locale }) {
   ].filter((x): x is { k: string; v: string; href: string | null } => x !== null)
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--surface)]">
+    <section
+      className="relative overflow-hidden rounded-3xl border"
+      style={{
+        // De kleur van de club in de kop, en alleen daar. Een clubpagina op
+        // het platform hoort naar de club te ruiken zonder dat het platform
+        // van kleur verandert: één getinte band bovenaan doet dat, een
+        // volledig gekleurde pagina maakt van elke club een ander product.
+        borderColor: 'color-mix(in oklab, var(--brand) 30%, var(--line))',
+        background:
+          'radial-gradient(70% 120% at 8% 0%, color-mix(in oklab, var(--brand) 20%, transparent), transparent 70%),' +
+          'linear-gradient(160deg, color-mix(in oklab, var(--brand) 8%, var(--surface)), var(--surface) 55%)',
+      }}
+    >
       {mark && (
         <Image
           src={mark}

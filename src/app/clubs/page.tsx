@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { PlayerNav } from '@/components/PlayerNav'
 import { translator } from '@/lib/i18n/dictionaries'
 import { publicLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
@@ -55,26 +56,38 @@ export default async function Page() {
   const signedIn = Boolean(claims?.claims)
 
   return (
-    <div data-site lang={locale} className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
-      {/* ------------------------------------------------------------- nav */}
-      <header className="border-b border-[var(--line)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-3.5 sm:px-8">
-          <Link href="/" className="text-sm font-semibold uppercase tracking-[0.22em]">
-            Poker<span className="text-[var(--brand)]">League</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <LanguageSwitch current={locale} label={t('common.language')} />
-            <Link
-              href="/login"
-              className="rounded-full px-3.5 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-            >
-              {t('site.nav.playerLogin')}
+    <div
+      data-app
+      lang={locale}
+      className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]"
+    >
+      {/* ------------------------------------------------------------- nav
+          Aangemeld krijg je de balk van de app, met de tabbalk onderaan:
+          "Clubs" is een van de drie tabbladen, en dan hoort dit scherm bij de
+          app en niet bij de folder. Wie hier zonder account rondkijkt krijgt
+          de gewone kop met een deur naar het aanmelden. */}
+      {signedIn ? (
+        <PlayerNav locale={locale} t={t} active="clubs" />
+      ) : (
+        <header className="border-b border-[var(--line)]">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-3.5 sm:px-8">
+            <Link href="/" className="text-sm font-semibold uppercase tracking-[0.22em]">
+              Poker<span className="text-[var(--brand)]">League</span>
             </Link>
+            <div className="flex items-center gap-2">
+              <LanguageSwitch current={locale} label={t('common.language')} />
+              <Link
+                href="/login"
+                className="rounded-full px-3.5 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+              >
+                {t('site.nav.playerLogin')}
+              </Link>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="flex-1">
+      <main className={`flex-1 ${signedIn ? 'pb-24 sm:pb-0' : ''}`}>
         {/* ------------------------------------------------------------ kop */}
         <section className="relative overflow-hidden border-b border-[var(--line)] bg-[var(--surface-2)]">
           <Felt />
@@ -111,10 +124,14 @@ export default async function Page() {
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
               {clubs.map((c) => (
-                <li key={c.slug}>
+                // Flexkolom, en de kaart erin met flex-1. Stond er `h-full` op
+                // de kaart, dan werd die even hoog als de hele cel en schoof
+                // de knop eronder buiten het vakje — bovenop de kaart van de
+                // rij eronder.
+                <li key={c.slug} className="flex flex-col">
                   <Link
                     href={`/c/${c.slug}`}
-                    className="group flex h-full flex-col rounded-[1.5rem] border border-[var(--line)] bg-[var(--surface-2)] p-6 transition hover:-translate-y-0.5 hover:border-[var(--gold-soft)] hover:shadow-lg"
+                    className="group flex flex-1 flex-col rounded-[1.5rem] border border-[var(--line)] bg-[var(--surface-2)] p-6 transition hover:-translate-y-0.5 hover:border-[var(--gold-soft)] hover:shadow-lg"
                   >
                     <div className="flex items-center gap-4">
                       {/* Het logo van een club draagt meestal zijn eigen
@@ -160,7 +177,7 @@ export default async function Page() {
                       </span>
                     </div>
 
-                    <span className="mt-5 inline-flex items-center gap-1.5 font-medium text-[var(--brand)]">
+                    <span className="mt-auto inline-flex items-center gap-1.5 pt-5 font-medium text-[var(--brand)]">
                       {t('site.pick.enter')}
                       <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                     </span>
@@ -198,6 +215,10 @@ export default async function Page() {
         </section>
       </main>
 
+      {/* Zonder account is dit een pagina met een weg terug; aangemeld is het
+          een tabblad, en dan is een voet met "terug naar de startpagina"
+          alleen maar een uitgang naar buiten. */}
+      {!signedIn && (
       <footer className="border-t border-[var(--line)]">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-sm sm:px-8">
           <Link href="/" className="text-[var(--text-faint)] transition-colors hover:text-[var(--text)]">
@@ -210,6 +231,7 @@ export default async function Page() {
           <p className="text-[var(--text-faint)]">{t('home.forClubs')}</p>
         </div>
       </footer>
+      )}
     </div>
   )
 }
