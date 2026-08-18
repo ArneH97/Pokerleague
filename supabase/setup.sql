@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -7989,5 +7989,73 @@ begin
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     grant execute on function public.claim_my_player(text, text, text, boolean, text, date, boolean)
       to authenticated;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0040_my_results_spend.sql
+-- =========================================================================
+
+-- Pokerleague — wat een sessie je kostte, niet alleen wat ze opbracht
+--
+-- `my_results` gaf prijzengeld terug en verder niets over geld. Dat is precies
+-- de helft van het enige getal dat een pokerspeler echt bijhoudt: **netto**.
+-- Veertig euro winnen op een avond die zestig kostte is geen goede avond, en
+-- een profielpagina die alleen het prijzengeld optelt vertelt een verhaal dat
+-- structureel te mooi is.
+--
+-- Wat er meekomt is alles wat hij die avond in de pot stak: inkoop, rebuys,
+-- add-ons, fee en bounty. Dat staat allemaal in `buyins`, per speler per
+-- tornooi — de floor boekt het daar bij elke handeling.
+--
+-- Bewust de volledige som en niet alleen de inkoop. Wie drie keer herkoopt
+-- heeft drie keer betaald, en een netto dat die rebuys negeert is geen netto.
+
+drop function if exists public.my_results();
+
+create or replace function public.my_results()
+returns table (
+  tournament_id uuid,
+  tournament    text,
+  club_name     text,
+  club_slug     text,
+  played_on     timestamptz,
+  place         int,
+  entries       int,
+  prize_cents   int,
+  spent_cents   int,
+  points        numeric,
+  knockouts     int
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    r.tournament_id, t.name, c.name, c.slug,
+    r.finished_at, r.position, r.entries_total,
+    r.prize_cents,
+    coalesce((
+      select sum(b.amount_cents + b.fee_cents + coalesce(b.bounty_cents, 0))::int
+      from buyins b
+      where b.tournament_id = r.tournament_id and b.player_id = r.player_id
+    ), 0),
+    r.points, r.knockouts
+  from tournament_results r
+  join players p     on p.id = r.player_id
+  join tournaments t on t.id = r.tournament_id
+  join clubs c       on c.id = t.club_id
+  where p.auth_user_id = auth.uid()
+  order by r.finished_at desc;
+$$;
+
+comment on function public.my_results() is
+  'Alle afgesloten sessies van de aangemelde speler, met wat ze opbrachten én wat ze kostten. De inleg is de volledige som uit buyins — inkoop, rebuys, add-ons, fee en bounty — want een netto dat rebuys negeert is geen netto.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.my_results() to authenticated;
   end if;
 end $$;

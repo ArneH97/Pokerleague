@@ -1,7 +1,7 @@
 
 import type { Club } from '@/lib/club'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
-import { leagueUrl } from '@/lib/site'
+import { playerUrl } from '@/lib/site'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
@@ -49,6 +49,12 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
   const t = translator(locale)
   const supabase = await createClient()
 
+  // Relatief zolang we op het platform staan, absoluut vanaf een clubdomein.
+  // Zie playerUrl: een sprong naar een ander domein kost je je sessie.
+  const mineHref = await playerUrl('/ik')
+  const joinHref = await playerUrl(`/registreren?club=${club.slug}`)
+  const signInHref = await playerUrl(`/aansluiten/${club.slug}`)
+
   const { data: claims } = await supabase.auth.getClaims()
 
   // ------------------------------------------------------------ bezoeker ---
@@ -65,13 +71,13 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
               /c/cutoff/registreren — een pagina die niet bestaat — en /login
               naar het personeelsscherm. Zie de uitleg in lib/site.ts. */}
           <a
-            href={leagueUrl(`/registreren?club=${club.slug}`)}
+            href={joinHref}
             className="rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110"
           >
             {t('pub.joinCta')}
           </a>
           <a
-            href={leagueUrl(`/aansluiten/${club.slug}`)}
+            href={signInHref}
             className="text-sm text-[var(--text-muted)] underline-offset-4 hover:underline"
           >
             {t('common.signIn')}
@@ -92,7 +98,7 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
           {t('pub.yoursNone').replace('{club}', club.name)}
         </p>
         <a
-          href={leagueUrl('/ik')}
+          href={mineHref}
           className="shrink-0 text-sm text-[var(--brand)] underline-offset-4 hover:underline"
         >
           {t('pub.yoursAll')} →
@@ -109,7 +115,7 @@ export async function YourNumbers({ club, locale }: { club: Club; locale: Locale
           {t('pub.yours')}
         </h2>
         <a
-          href={leagueUrl('/ik')}
+          href={mineHref}
           className="text-sm text-[var(--brand)] underline-offset-4 hover:underline"
         >
           {t('pub.yoursAll')} →

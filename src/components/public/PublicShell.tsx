@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
 import type { Club } from '@/lib/club'
-import { leagueUrl } from '@/lib/site'
+import { playerUrl } from '@/lib/site'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
 import { createClient } from '@/lib/supabase/server'
@@ -48,6 +48,7 @@ export async function PublicShell({
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
   const account = (claims?.claims?.email as string | undefined) ?? null
+  const mineHref = await playerUrl('/ik')
 
   // Kalender en klassement vragen een account. Ze in het menu laten staan voor
   // wie er niet in kan, is een deur schilderen op een muur — dan klikt iemand
@@ -114,7 +115,7 @@ export async function PublicShell({
               <span className="hidden text-xs text-[var(--text-faint)] sm:block">
                 {t('nav.signedInAs')}{' '}
                 <a
-                  href={leagueUrl('/ik')}
+                  href={mineHref}
                   className="text-[var(--text-muted)] underline-offset-4 hover:underline"
                 >
                   {account}

@@ -32,3 +32,20 @@ export function leagueUrl(path = '/'): string {
   if (!domain || domain.includes('localhost')) return path
   return `https://www.${domain}${path}`
 }
+
+/**
+ * Hetzelfde, maar relatief zodra we al op het platform staan.
+ *
+ * Een absoluut adres naar `www.pokerleague.be` is juist vanaf een clubdomein
+ * en fout vanaf het platform zelf. Sta je op `pokerleague.be/c/cutoff` — of op
+ * een preview-adres van Vercel — en de link springt naar het productieadres,
+ * dan wissel je van host en dus van koekje: je bent daar niet aangemeld en
+ * krijgt het aanmeldscherm van iemand die net nog binnen was.
+ *
+ * Vandaar deze variant. Op het platform een gewoon pad, en alleen vanaf een
+ * clubdomein het volledige adres.
+ */
+export async function playerUrl(path = '/'): Promise<string> {
+  const { onPlatform } = await import('@/lib/whereAmI')
+  return (await onPlatform()) ? path : leagueUrl(path)
+}

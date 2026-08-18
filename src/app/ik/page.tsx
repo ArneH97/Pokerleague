@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { MyLive, type LiveRow } from '@/components/MyLive'
+import { PlayerCharts } from '@/components/PlayerCharts'
 import { PlayerProfileForm } from '@/components/PlayerProfileForm'
 import { Card, Notice } from '@/components/ui'
 import { LocaleProvider } from '@/lib/i18n/context'
@@ -82,6 +83,7 @@ interface ResultRow {
   place: number
   entries: number
   prize_cents: number
+  spent_cents: number
   points: number
   knockouts: number
 }
@@ -176,9 +178,14 @@ export default async function Page() {
   // begin maar een foutmelding zonder tekst.
   if (!me.onboarded_at) redirect('/welkom')
 
-  const totalPrize = results.reduce((s, r) => s + (r.prize_cents ?? 0), 0)
+  const totalPrize = results.reduce((s, r) => s + Number(r.prize_cents ?? 0), 0)
+  const totalSpent = results.reduce((s, r) => s + Number(r.spent_cents ?? 0), 0)
+  const net = totalPrize - totalSpent
   const wins = results.filter((r) => r.place === 1).length
-  const cashes = results.filter((r) => (r.prize_cents ?? 0) > 0).length
+  const cashes = results.filter((r) => Number(r.prize_cents ?? 0) > 0).length
+  const itm = results.length > 0 ? Math.round((cashes / results.length) * 100) : 0
+  const best = results.length > 0 ? Math.min(...results.map((r) => r.place)) : null
+  const points = results.reduce((s, r) => s + Number(r.points ?? 0), 0)
 
   const fmt = new Intl.DateTimeFormat(`${locale}-BE`, {
     day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Brussels',
@@ -317,13 +324,43 @@ export default async function Page() {
             )}
           </section>
 
-          {/* --------------------------------------------------- de cijfers */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label={t('me.played')} value={String(results.length)} />
-            <Stat label={t('me.wins')} value={String(wins)} />
-            <Stat label={t('me.cashes')} value={String(cashes)} />
-            <Stat label={t('me.won')} value={formatMoney(totalPrize, 'EUR')} />
-          </div>
+          {/* --------------------------------------------------- de cijfers
+              Netto krijgt de volle breedte en een kleur. Dat is het enige
+              getal waar een pokerspeler op terugkomt; prijzengeld zonder
+              inleg ernaast is structureel te mooi. */}
+          {results.length > 0 && (
+            <>
+              <section className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-5">
+                <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                  {t('me.net')}
+                </p>
+                <p
+                  className={`tnum mt-1 text-4xl font-semibold tracking-tight sm:text-5xl ${
+                    net > 0 ? 'text-[var(--ok)]' : net < 0 ? 'text-[var(--danger)]' : ''
+                  }`}
+                >
+                  {net > 0 ? '+' : ''}{formatMoney(net, 'EUR')}
+                </p>
+                <p className="tnum mt-1 text-sm text-[var(--text-faint)]">
+                  {formatMoney(totalPrize, 'EUR')} {t('me.won').toLowerCase()} ·{' '}
+                  {formatMoney(totalSpent, 'EUR')} {t('me.spent').toLowerCase()}
+                </p>
+              </section>
+
+              <PlayerCharts rows={results} t={t} locale={locale} />
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label={t('me.played')} value={String(results.length)} />
+                <Stat label={t('me.wins')} value={String(wins)} />
+                <Stat label={t('me.itm')} value={`${itm}%`} sub={`${cashes}×`} />
+                <Stat
+                  label={t('me.bestPlace')}
+                  value={best ? `${best}e` : '—'}
+                  sub={`${Math.round(points)} ${t('me.points').toLowerCase()}`}
+                />
+              </div>
+            </>
+          )}
 
           {/* ------------------------------------------------- de resultaten */}
           <section>
@@ -402,11 +439,12 @@ export default async function Page() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-4">
       <p className="text-[0.6rem] uppercase tracking-[0.18em] text-[var(--text-faint)]">{label}</p>
       <p className="tnum mt-1 text-2xl font-semibold leading-tight">{value}</p>
+      {sub && <p className="tnum mt-0.5 text-xs text-[var(--text-faint)]">{sub}</p>}
     </div>
   )
 }
