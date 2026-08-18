@@ -56,47 +56,57 @@
  * aan te voelen als een bedieningspaneel.
  */
 /**
- * De publieke kant van PokerLeague: twee kleuren.
+ * De publieke kant van PokerLeague: diep blauw met amber.
  *
- * Diepgroen als drager — pokervilt, en donker genoeg om er volle banden mee
- * te maken zonder dat het somber wordt. Goud als accent, naar de fiches.
- * Verder warm gebroken wit in plaats van steriel wit, want een pagina die
- * volledig #ffffff is voelt onaf.
+ * Was diepgroen — pokervilt. Dat las als braaf en als een cliché, en het deed
+ * nog iets vervelends: elke club brengt zijn eigen kleuren mee (Cutoff is goud
+ * op zwart), en spring je van het platform naar een clubpagina, dan botsen
+ * twee sterke kleuren op elkaar. Blauw is neutraal genoeg om die overgang te
+ * overleven, en amber geeft de energie die groen niet had.
+ *
+ * Amber en niet oranje-als-drager: één luide kleur op een pagina is genoeg.
+ * Blauw draagt, amber wijst — en wat amber is, is aanklikbaar of belangrijk.
  */
 [data-site] {
   --bg:            #ffffff;
   --surface:       #ffffff;
-  --surface-2:     #f4f6f3;
-  --surface-hover: #e9ede8;
-  --line:          #e2e7e1;
-  --line-strong:   #cbd3c9;
+  --surface-2:     #f4f6fb;
+  --surface-hover: #e8edf7;
+  --line:          #dfe4ef;
+  --line-strong:   #c5cee0;
 
-  --text:          #10231a;
-  --text-muted:    #4d6157;
-  --text-faint:    #82938a;
+  --text:          #0e1729;
+  --text-muted:    #4a5670;
+  --text-faint:    #7b869e;
 
-  --brand:         #0d5238;
+  --brand:         #1d4ed8;
   --on-brand:      #ffffff;
-  --gold:          #c98f2e;
-  --gold-soft:     #f2e3c6;
+  --gold:          #f59e0b;
+  --gold-soft:     #fde8c0;
 
   --danger:        #b3261e;
   --warn:          #8a5a00;
-  --ok:            #0d5238;
+  --ok:            #15803d;
 }
 
-/** Donkere band binnen de publieke pagina. */
+/**
+ * Donkere band binnen de publieke pagina.
+ *
+ * Hier keert de rolverdeling om: op nachtblauw is blauw als accent onzichtbaar,
+ * dus amber neemt het over. Daarom is `--brand` hier de amber en niet de
+ * blauwe — componenten die op `--brand` leunen blijven zo vanzelf leesbaar.
+ */
 [data-band="dark"] {
-  --bg:            #0b2a1e;
-  --surface:       #10362654;
-  --surface-2:     #123a29;
-  --line:          #1d4a37;
-  --line-strong:   #2a5f48;
-  --text:          #f2f7f4;
-  --text-muted:    #a9c4b7;
-  --text-faint:    #7fa393;
-  --brand:         #e0b563;
-  --on-brand:      #0b2a1e;
+  --bg:            #0e1729;
+  --surface:       #18233a99;
+  --surface-2:     #1b2740;
+  --line:          #26334f;
+  --line-strong:   #37456a;
+  --text:          #eef2fb;
+  --text-muted:    #a8b4cc;
+  --text-faint:    #7b89a6;
+  --brand:         #f59e0b;
+  --on-brand:      #0e1729;
 }
 
 @theme inline {

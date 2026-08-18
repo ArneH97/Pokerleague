@@ -214,7 +214,7 @@ export default async function Page() {
   )
 }
 
-/** Hetzelfde nauwelijks zichtbare viltpatroon als op de landingspagina. */
+/** Dezelfde nauwelijks zichtbare gloed als op de voorpagina: amber rechtsboven, blauw linksonder. */
 function Felt() {
   return (
     <div
@@ -222,8 +222,8 @@ function Felt() {
       className="pointer-events-none absolute inset-0 opacity-[0.5]"
       style={{
         backgroundImage:
-          'radial-gradient(40rem 22rem at 88% -8rem, rgba(201,143,46,0.13) 0%, transparent 70%),' +
-          'radial-gradient(36rem 24rem at 0% 115%, rgba(13,82,56,0.12) 0%, transparent 70%)',
+          'radial-gradient(40rem 22rem at 88% -8rem, rgba(245,158,11,0.14) 0%, transparent 70%),' +
+          'radial-gradient(36rem 24rem at 0% 115%, rgba(29,78,216,0.10) 0%, transparent 70%)',
       }}
     />
   )
