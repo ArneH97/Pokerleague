@@ -62,6 +62,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/instellingen`)
 
   const role = await getClubRole(club.id)
@@ -130,7 +131,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
           subtitle={club.name}
           logoUrl={club.logo_url}
         />
-        <ClubNav slug={slug} active="settings" canManage={canManage} t={t} />
+        <ClubNav slug={slug} active="settings" canManage={canManage} t={t} account={accountEmail} />
 
         <div className="mt-2 space-y-4">
           {/* ------------------------------------------------------- club */}

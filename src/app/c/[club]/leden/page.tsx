@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { InvitePanel } from '@/components/InvitePanel'
 import { MemberList, type Member } from '@/components/MemberList'
+import { LocaleProvider } from '@/lib/i18n/context'
 import { Notice, Page, PageHeader } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { isLocale, translator } from '@/lib/i18n/dictionaries'
@@ -37,6 +39,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/leden'>) {
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/leden`)
 
   const role = await getClubRole(club.id)
@@ -81,9 +84,15 @@ export default async function Page_({ params }: PageProps<'/c/[club]/leden'>) {
   return (
     <Page width="xl">
       <PageHeader overline={club.name} title={t('members.title')} logoUrl={club.logo_url} />
-      <ClubNav slug={slug} active="members" canManage t={t} />
+      <ClubNav slug={slug} active="members" canManage t={t} account={accountEmail} />
 
       {error && <Notice tone="error">{error.message}</Notice>}
+
+      {/* Boven het ledenbestand, want dit is wat je wil weten nádat je iemand
+          hebt toegevoegd: is zijn uitnodiging effectief buiten? */}
+      <LocaleProvider locale={locale}>
+        <InvitePanel clubId={club.id} locale={locale} />
+      </LocaleProvider>
 
       <MemberList
         clubId={club.id}

@@ -155,6 +155,24 @@ export function FloorPlayers({
     (m) => m.name.toLowerCase() === needle || (m.email ?? '').toLowerCase() === needle,
   )
 
+  /**
+   * De wachtrij met uitnodigingen aanstoten.
+   *
+   * Bewust zonder erop te wachten en zonder foutafhandeling. Inschrijven aan
+   * de deur mag nooit trager worden of mislukken omdat er ergens een mail
+   * vertrekt — dat was de reden om er een wachtrij van te maken. Maar wachten
+   * tot de cronjob langskomt is voor iemand die nu aan tafel gaat zitten geen
+   * antwoord. Dus duwen we er hier tegen: lukt het, dan ligt zijn uitnodiging
+   * binnen de minuut in zijn bus; lukt het niet, dan pikt de cronjob het op en
+   * heeft niemand iets gemerkt.
+   *
+   * Dit werkt hier omdat de floor als staf aangemeld is. Precies daarom staat
+   * de knop hier en niet op de spelerskant.
+   */
+  function nudgeInvites() {
+    void fetch('/api/invites/send', { method: 'POST', keepalive: true }).catch(() => {})
+  }
+
   // PromiseLike en niet Promise: de bouwers van supabase-js zijn "thenables"
   // die pas een echt verzoek doen zodra je erop wacht.
   async function run(fn: () => PromiseLike<{ error: { message: string } | null }>) {
@@ -183,6 +201,7 @@ export function FloorPlayers({
     await run(() => supabase.rpc('floor_add_entry', {
       p_tournament_id: tournamentId, p_player_id: playerId,
     }))
+    nudgeInvites()
   }
 
   async function addNew(
@@ -196,6 +215,7 @@ export function FloorPlayers({
       p_no_email_reason: reason,
       p_locale: locale,
     }))
+    nudgeInvites()
   }
 
   async function eliminate(tpId: string, byId: string | null) {

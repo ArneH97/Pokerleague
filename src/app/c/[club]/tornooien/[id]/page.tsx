@@ -48,6 +48,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   if (!claims?.claims) {
     redirect(`/c/${slug}/login?next=${encodeURIComponent(`/c/${slug}/tornooien/${id}`)}`)
   }
@@ -94,7 +95,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
 
   return (
     <Page width="lg">
-      <ClubNav slug={slug} active="tournaments" canManage={canSeeMoney} t={t} />
+      <ClubNav slug={slug} active="tournaments" canManage={canSeeMoney} t={t} account={accountEmail} />
       <PageHeader
         backHref={`/c/${slug}`}
         backLabel={t('result.backToClub')}

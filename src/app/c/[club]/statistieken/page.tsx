@@ -50,6 +50,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/statistieken`)
 
   const role = await getClubRole(club.id)
@@ -134,7 +135,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   return (
     <Page width="xl">
       <PageHeader overline={`${club.name} · ${label}`} title={t('stats.title')} logoUrl={club.logo_url} />
-      <ClubNav slug={slug} active="stats" canManage t={t} />
+      <ClubNav slug={slug} active="stats" canManage t={t} account={accountEmail} />
 
       <div className="flex flex-wrap items-center gap-0.5 self-start rounded-[var(--radius)] border border-[var(--line)] p-0.5">
         {[

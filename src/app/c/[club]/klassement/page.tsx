@@ -109,6 +109,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   const role = claims?.claims ? await getClubRole(club.id) : null
   const canManage = role !== null && ['owner', 'admin', 'floor'].includes(role)
   const locale = isLocale(club.locale) ? club.locale : 'nl'
@@ -216,7 +217,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
         title={t('standings.title')}
         logoUrl={club.logo_url}
       />
-      <ClubNav slug={slug} active="standings" canManage={canManage} t={t} />
+      <ClubNav slug={slug} active="standings" canManage={canManage} t={t} account={accountEmail} />
 
       {/* -------------------------------------------------------------- filter */}
       <div className="flex flex-wrap items-center gap-2">

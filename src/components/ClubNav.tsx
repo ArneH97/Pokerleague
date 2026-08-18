@@ -15,12 +15,14 @@ import type { T } from '@/lib/i18n/dictionaries'
  * link.
  */
 export function ClubNav({
-  slug, active, canManage, t,
+  slug, active, canManage, t, account,
 }: {
   slug: string
   active: 'tournaments' | 'standings' | 'members' | 'stats' | 'structures' | 'settings'
   canManage: boolean
   t: T
+  /** Het mailadres waarmee je hier aangemeld bent. Zie de uitleg hieronder. */
+  account?: string | null
 }) {
   const items: { key: typeof active; href: string; label: string; staff?: boolean }[] = [
     { key: 'tournaments', href: `/c/${slug}`, label: t('club.tournaments') },
@@ -49,6 +51,21 @@ export function ClubNav({
             {i.label}
           </Link>
         ))}
+
+      {/* Met welk account je hier bezig bent.
+          Dit lijkt een detail en is het niet. Eén persoon kan twee accounts
+          hebben — zijn spelersaccount en het account waarmee hij de club
+          beheert — en zolang nergens staat welk van de twee actief is, kan
+          een scherm heel redelijk niets tonen zonder dat iemand begrijpt
+          waarom. Dat is precies wat er gebeurd is bij de uitnodigingen: de
+          wachtrij stond vol en het scherm zei nul, omdat er met het verkeerde
+          account gekeken werd. */}
+      {account && (
+        <span className="ml-auto shrink-0 pl-3 text-xs text-[var(--text-faint)]">
+          <span className="hidden sm:inline">{t('nav.signedInAs')} </span>
+          <span className="text-[var(--text-muted)]">{account}</span>
+        </span>
+      )}
     </nav>
   )
 }

@@ -48,10 +48,26 @@ export default async function Page() {
             <a href="#clubs" className="hidden rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] sm:block">
               {t('site.nav.clubs')}
             </a>
+            {/* Drie deuren, en het moet in één blik duidelijk zijn welke de
+                jouwe is. Hier stond eerst "Clublogin" als hoofdknop, die naar
+                de clublijst ging — een knop die iets anders belooft dan hij
+                doet. En wie aangemeld was kreeg "Mijn club", ook als hij
+                gewoon speler was en helemaal geen club had.
+
+                Nu: de clublijst is een link, aanmelden is een link, en de
+                hoofdknop is wat een nieuwe bezoeker moet doen — een account
+                maken. Ben je al aangemeld, dan is de hoofdknop je eigen
+                profiel, want dat is waarvoor je terugkomt. */}
+            <Link href="/clubs" className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
+              {t('site.nav.clubsDir')}
+            </Link>
             {loggedIn ? (
               <>
-                <Link href="/clubs" className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
-                  {t('site.nav.myClub')}
+                <Link
+                  href="/ik"
+                  className="rounded-full bg-[var(--brand)] px-4 py-2 font-medium text-[var(--on-brand)] transition hover:brightness-110"
+                >
+                  {t('site.nav.myProfile')}
                 </Link>
                 <form action="/auth/signout" method="post">
                   <button className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
@@ -62,13 +78,13 @@ export default async function Page() {
             ) : (
               <>
                 <Link href="/login" className="rounded-full px-3.5 py-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]">
-                  {t('site.nav.playerLogin')}
+                  {t('common.signIn')}
                 </Link>
                 <Link
-                  href="/clubs"
+                  href="/registreren"
                   className="rounded-full bg-[var(--brand)] px-4 py-2 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
-                  {t('site.nav.clubLogin')}
+                  {t('site.nav.createAccount')}
                 </Link>
               </>
             )}
@@ -106,17 +122,21 @@ export default async function Page() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/registreren"
+                  href={loggedIn ? '/ik' : '/registreren'}
                   className="rounded-full bg-[var(--brand)] px-6 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
                 >
-                  {t('site.hero.ctaPlayer')}
+                  {loggedIn ? t('site.hero.ctaMine') : t('site.hero.ctaPlayer')}
                 </Link>
-                <a
-                  href="#clubs"
+                {/* Naar de clublijst en niet naar het verkooppraatje verderop:
+                    wie hier landt zoekt meestal één bepaalde club, niet een
+                    uitleg over wat wij voor clubs doen. Dat staat er verderop
+                    nog altijd, met een eigen kop. */}
+                <Link
+                  href="/clubs"
                   className="rounded-full border border-[var(--line-strong)] bg-[var(--bg)] px-6 py-3.5 font-medium transition hover:bg-[var(--surface-hover)]"
                 >
-                  {t('site.hero.ctaClub')}
-                </a>
+                  {t('site.hero.ctaBrowse')}
+                </Link>
               </div>
               <p className="mt-4 text-sm text-[var(--text-faint)]">{t('site.hero.note')}</p>
             </div>

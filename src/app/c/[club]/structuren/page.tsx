@@ -22,6 +22,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   if (!claims?.claims) redirect(`/c/${slug}/login?next=/c/${slug}/structuren`)
 
   const role = await getClubRole(club.id)
@@ -46,7 +47,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/structuren'
         subtitle={t('struct.subtitle')}
         actions={canManage && <NewStructureButton clubId={club.id} clubSlug={slug} />}
       />
-      <ClubNav slug={slug} active="structures" canManage t={t} />
+      <ClubNav slug={slug} active="structures" canManage t={t} account={accountEmail} />
 
       {own.length === 0 ? (
         <EmptyState

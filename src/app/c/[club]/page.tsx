@@ -36,6 +36,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
 
   const supabase = await createClient()
   const { data: claims } = await supabase.auth.getClaims()
+  const accountEmail = (claims?.claims?.email as string | undefined) ?? null
   const role = claims?.claims ? await getClubRole(club.id) : null
   const t = translator(isLocale(club.locale) ? club.locale : 'nl')
 
@@ -93,7 +94,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         }
       />
 
-      {role && <ClubNav slug={slug} active="tournaments" canManage={canManage} t={t} />}
+      {role && <ClubNav slug={slug} active="tournaments" canManage={canManage} t={t} account={accountEmail} />}
 
       {!role && (
         <Notice tone="warn">

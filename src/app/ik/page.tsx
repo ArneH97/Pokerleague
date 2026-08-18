@@ -168,9 +168,10 @@ export default async function Page() {
         <main className="mx-auto max-w-3xl space-y-5 px-5 py-7">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">{me.display_name}</h1>
-            {me.username && (
-              <p className="mt-1 text-sm text-[var(--text-faint)]">@{me.username}</p>
-            )}
+            <p className="mt-1 text-sm text-[var(--text-faint)]">
+              {me.username && <span>@{me.username} · </span>}
+              {t('nav.signedInAs')} {me.email}
+            </p>
             {/* Eén regel die zegt wat deze pagina is. Zonder die regel is dit
                 gewoon "een tweede site met ook iets van mij erop" — en dat is
                 precies de verwarring die dit platform veroorzaakte. */}
@@ -237,6 +238,18 @@ export default async function Page() {
                   ))}
                 </ul>
               </>
+            )}
+
+            {/* Beheer je een club, dan hangt dat aan het account dat die club
+                als bestuur heeft opgegeven — en dat hoeft niet hetzelfde
+                account te zijn als waarmee je speelt. Zolang dat nergens staat
+                kan een scherm heel redelijk niets tonen zonder dat iemand
+                begrijpt waarom. Precies dat is misgelopen bij de
+                uitnodigingen. */}
+            {staff.length === 0 && (
+              <p className="mt-4 border-t border-[var(--line)] pt-3 text-xs leading-relaxed text-[var(--text-faint)]">
+                {t('me.staffElsewhere')}
+              </p>
             )}
 
             {staff.length > 0 && (
