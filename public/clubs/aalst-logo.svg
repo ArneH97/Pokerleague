@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" width="800" height="260">
+  <defs><linearGradient id="body" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0%" stop-color="#2FDCCB"/><stop offset="52%" stop-color="#14B2AD"/><stop offset="100%" stop-color="#0A7C85"/></linearGradient></defs>
+  <g transform="translate(30,20) scale(1.05)"><path d="M100 14 C 79 51 26 80 26 122 C 26 150 46 169 70 169 C 83 169 94 163 100 153 C 106 163 117 169 130 169 C 154 169 174 150 174 122 C 174 80 121 51 100 14 Z" fill="url(#body)"/>
+  <path d="M34.5 127.9 A 34 34 0 0 1 70.8 89.2" fill="none" stroke="#053238" stroke-opacity=".2" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M165.5 127.9 A 34 34 0 0 0 129.2 89.2" fill="none" stroke="#053238" stroke-opacity=".2" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M100 148 C 100 168 94 184 79 197 L121 197 C 106 184 100 168 100 148 Z" fill="url(#body)"/></g>
+  <g font-family="Inter, sans-serif">
+    <text x="270" y="128" font-size="86" font-weight="800" letter-spacing="-2" fill="#F2F8F8">AALST</text>
+    <text x="273" y="182" font-size="37" font-weight="600" letter-spacing="10.5" fill="#2FDCCB">POKER CLUB</text>
+  </g>
+</svg>

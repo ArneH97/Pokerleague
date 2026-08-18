@@ -23,13 +23,15 @@
 --   * Twee keer draaien doet niets dubbel: het script stopt als de
 --     demo-avonden er al staan.
 --
+-- Bedoeld voor de SQL-editor van Supabase. Er staan met opzet geen
+-- psql-commando's in (zoals `\set`): de editor is geen psql en struikelt
+-- daarover met "syntax error at or near \".
+--
 -- Waarom via `floor_add_entry` / `floor_eliminate` / `floor_finish_tournament`
 -- en niet rechtstreeks in de tabellen: dan rekent de app zelf de inleg, de
 -- prijzenpot, de knock-outs en de punten uit. Met de hand geschreven rijen
 -- zien er goed uit tot je ze naast een klassement legt en de sommen niet
 -- kloppen. Achteraf zetten we alleen de datums terug in de tijd.
-
-\set ON_ERROR_STOP on
 
 do $$
 declare
@@ -42,6 +44,7 @@ declare
   v_club   uuid;
   v_struct uuid;
   v_pay    uuid;
+  v_season uuid;
   v_me     uuid;
   v_t      uuid;
   v_tp     uuid;
@@ -128,16 +131,23 @@ begin
     returning id into v_pay;
   end if;
 
+  -- Het lopende seizoen, als de club er een heeft. Daar hangt de
+  -- puntenformule aan: zonder seizoen rekent de app met haar standaardformule
+  -- en wijkt het klassement af van wat de club zelf ingesteld heeft.
+  select id into v_season
+  from seasons where club_id = v_club and is_active
+  order by starts_on desc limit 1;
+
   -- ------------------------------------------------------------- de avonden
   for i in 1 .. array_length(c_days, 1) loop
     v_when := date_trunc('hour', now()) - (c_days[i] || ' days')::interval;
     v_when := date_trunc('day', v_when) + interval '20 hours';
 
     insert into tournaments (
-      club_id, payout_template_id, structure_id, name, scheduled_at,
+      club_id, season_id, payout_template_id, structure_id, name, scheduled_at,
       status, player_visibility, buyin_cents, fee_cents, starting_stack, max_reentries
     ) values (
-      v_club, v_pay, v_struct,
+      v_club, v_season, v_pay, v_struct,
       c_titles[i],
       v_when,
       'running'::tournament_status, 'public'::visibility,
@@ -223,10 +233,10 @@ begin
   -- heeft ziet er verlaten uit, ook al draait ze.
   for i in 1 .. 2 loop
     insert into tournaments (
-      club_id, payout_template_id, structure_id, name, scheduled_at,
+      club_id, season_id, payout_template_id, structure_id, name, scheduled_at,
       status, player_visibility, buyin_cents, fee_cents, starting_stack, max_reentries
     ) values (
-      v_club, v_pay, v_struct,
+      v_club, v_season, v_pay, v_struct,
       case i when 1 then 'Demo · Zondagavond #5' else 'Demo · Woensdagavond #3' end,
       date_trunc('day', now() + (case i when 1 then 4 else 11 end || ' days')::interval)
         + interval '20 hours',
@@ -268,8 +278,10 @@ begin
   raise notice 'Klaar: % demo-avonden bij %.', array_length(c_days, 1), c_slug;
 end $$;
 
--- Wat er nu staat, ter controle.
-select t.name,
+-- Wat er nu staat, ter controle. Pas de slug hieronder mee aan als je het
+-- script voor een andere club draait.
+select c.name as club,
+       t.name,
        (t.ended_at at time zone 'Europe/Brussels')::date as gespeeld,
        r.position as jouw_plaats,
        r.entries_total as veld,
@@ -278,8 +290,10 @@ select t.name,
        round(r.points) as punten
 from tournament_results r
 join tournaments t on t.id = r.tournament_id
-join players p on p.id = r.player_id
+join clubs c       on c.id = t.club_id
+join players p     on p.id = r.player_id
 where t.name like 'Demo ·%'
+  and c.slug = 'cutoff'
   and lower(p.email) = 'halsberghe.arne@hotmail.com'
 order by t.scheduled_at;
 

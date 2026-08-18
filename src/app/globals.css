@@ -98,7 +98,12 @@
   --gold:          #fbbf24;
   --gold-soft:     #f3d18a;
 
-  --danger:        #f87171;
+  /* Verlies in rood, en dan ook echt rood.
+     Stond op #f87171 — dat is licht en laag verzadigd, en op nachtblauw leest
+     het als roze. Bij bedragen is dat het verkeerde register: het maakt van
+     een verlies iets zachts. #e5484d is dieper, duidelijk rood, en houdt
+     genoeg contrast tegen de achtergrond. */
+  --danger:        #e5484d;
   --warn:          #fbbf24;
   --ok:            #34d399;
 
@@ -155,10 +160,13 @@
   height: 26rem;
   z-index: -1;
   pointer-events: none;
+  /* Ingehouden. Sterker gezet liepen de amber en het blauw in elkaar over en
+     kreeg je in de overlap een paarsroze waas — precies de kleur die een
+     scherm goedkoop doet lijken. Twee vlekken die elkaar nauwelijks raken,
+     allebei zacht, is genoeg om diepte te geven. */
   background:
-    radial-gradient(44% 54% at 50% 28%, color-mix(in oklab, var(--brand) 24%, transparent), transparent 70%),
-    radial-gradient(40% 46% at 88% 8%, color-mix(in oklab, var(--accent) 24%, transparent), transparent 72%),
-    radial-gradient(36% 42% at 8% 12%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 72%);
+    radial-gradient(42% 50% at 50% 26%, color-mix(in oklab, var(--brand) 17%, transparent), transparent 68%),
+    radial-gradient(38% 44% at 92% 6%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 70%);
 }
 
 /* Boven en onder zit in een geïnstalleerde app het scherm van de telefoon zelf
