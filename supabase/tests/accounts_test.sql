@@ -304,3 +304,100 @@ begin
   perform set_config('request.jwt.claim.role', '', true);
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Wat een speler ziet van de avond waar hij nu in zit
+-- ---------------------------------------------------------------------------
+-- En vooral: dat hij alleen zijn eigen stapel kan wijzigen. Die functie geeft
+-- geen rechten, maar de startpagina hangt eraan — dus als hier ooit iets
+-- verschuift, moet dat opvallen.
+
+begin;
+do $$
+declare
+  v_club uuid; v_struct uuid; v_pay uuid; v_tour uuid;
+  v_tp_a uuid; v_tp_b uuid; v_a uuid; v_b uuid; v_uid uuid;
+  v_n int; v_chips int; v_avg int; v_left int;
+begin
+  insert into clubs (slug, name, city, country, locale, timezone)
+  values ('t37', 'Testclub 37', 'Gent', 'BE', 'nl', 'Europe/Brussels') returning id into v_club;
+  insert into blind_structures (club_id, name) values (v_club, 'S') returning id into v_struct;
+  insert into blind_levels (structure_id, idx, is_break, small_blind, big_blind, ante, duration_s)
+  values (v_struct, 0, false, 25, 50, 0, 1200);
+  insert into payout_templates (club_id, name, tiers, rounding)
+  values (v_club, 'P', '[{"min_entries":2,"max_entries":99,"percentages":[100]}]'::jsonb, 100)
+  returning id into v_pay;
+  insert into tournaments (club_id, payout_template_id, structure_id, name, scheduled_at,
+                           status, player_visibility, buyin_cents, fee_cents,
+                           starting_stack, max_reentries)
+  values (v_club, v_pay, v_struct, 'Loopt nu', now(), 'running'::tournament_status,
+          'public'::visibility, 2000, 0, 20000, 0)
+  returning id into v_tour;
+
+  v_tp_a := public.floor_add_entry(v_tour, null, 'Speler A', 'a@t37.be');
+  v_tp_b := public.floor_add_entry(v_tour, null, 'Speler B', 'b@t37.be');
+  select player_id into v_a from tournament_players where id = v_tp_a;
+  select player_id into v_b from tournament_players where id = v_tp_b;
+
+  insert into auth.users (email) values ('a@t37.be') returning id into v_uid;
+  update players set auth_user_id = v_uid, link_state = 'claimed' where id = v_a;
+
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'a@t37.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  set local role authenticated;
+
+  select count(*) into v_n from public.my_live_tournaments();
+  if v_n <> 1 then raise exception 'FOUT: verwacht 1 lopend tornooi, kreeg %', v_n; end if;
+
+  select players_left, avg_stack into v_left, v_avg from public.my_live_tournaments();
+  if v_left <> 2 then raise exception 'FOUT: verwacht 2 spelers over, kreeg %', v_left; end if;
+  if v_avg <> 20000 then raise exception 'FOUT: gemiddelde stapel klopt niet: %', v_avg; end if;
+  raise notice 'OK  hij ziet de avond waar hij in zit, met de juiste cijfers';
+
+  -- Zijn eigen stapel mag hij wijzigen.
+  update tournament_players set chip_count = 31500 where id = v_tp_a;
+  select my_chips into v_chips from public.my_live_tournaments();
+  if v_chips <> 31500 then raise exception 'FOUT: zijn eigen stapel bleef op %', v_chips; end if;
+  raise notice 'OK  hij geeft zijn eigen stapel in';
+
+  -- Die van zijn buurman niet.
+  begin
+    update tournament_players set chip_count = 1 where id = v_tp_b;
+    if (select chip_count from tournament_players where id = v_tp_b) = 1 then
+      raise exception 'FOUT: hij wijzigde de stapel van iemand anders';
+    end if;
+    raise notice 'OK  de stapel van een ander bleef ongemoeid';
+  exception
+    when insufficient_privilege then
+      raise notice 'OK  de stapel van een ander wordt geweigerd';
+  end;
+
+  reset role;
+
+  -- Een afgesloten avond hoort hier niet meer bij.
+  --
+  -- De claims moeten even weg voor deze twee: met een spelerstoken in de
+  -- sessie is `is_service_context()` onwaar, en dan weigert de floorfunctie
+  -- terecht — deze speler is geen staf. Dat de test daarop viel is dus geen
+  -- storing maar het bewijs dat de afscherming werkt.
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+  perform public.floor_eliminate(v_tp_b, null);
+  perform public.floor_finish_tournament(v_tour);
+
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_uid, 'role', 'authenticated', 'email', 'a@t37.be')::text, true);
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  set local role authenticated;
+  select count(*) into v_n from public.my_live_tournaments();
+  if v_n <> 0 then raise exception 'FOUT: een afgesloten avond staat nog bij de lopende'; end if;
+  raise notice 'OK  een afgesloten avond verdwijnt uit de lijst';
+
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
+end $$;
+rollback;

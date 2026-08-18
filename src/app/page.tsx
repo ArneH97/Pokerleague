@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
-import { LoginForm } from '@/components/LoginForm'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator, type T } from '@/lib/i18n/dictionaries'
 import { publicLocale } from '@/lib/i18n/server'
@@ -19,10 +18,15 @@ import { createClient } from '@/lib/supabase/server'
  * zou willen. Wie hier voor het eerst komt heeft nog geen wachtwoord; die
  * heeft een reden nodig.
  *
- * Drie secties dus, en niet meer. Wat het is, wat je krijgt, en dan pas het
- * formulier. Met daartussen één beeld van het product zelf: de klok van een
- * lopend tornooi. Dat kaartje doet meer dan drie alinea's tekst, want het is
- * het enige op deze pagina dat laat zien waar het over gaat.
+ * Twee secties dus. Wat het is, en wat je krijgt. Er stond eerst nog een derde
+ * met het aanmeldformulier erin, en die moest weg: hij herhaalde woordelijk de
+ * hero, en een pagina met twee keer dezelfde vraag erop leest als een pagina
+ * die niet weet wat ze wil. Aanmelden staat in de kop en op de knop ernaast —
+ * dat is genoeg voor wie al een account heeft.
+ *
+ * Met daartussen één beeld van het product zelf: de klok van een lopend
+ * tornooi. Dat kaartje doet meer dan drie alinea's tekst, want het is het
+ * enige op deze pagina dat laat zien waar het over gaat.
  *
  * **Mobiel eerst, en hier is dat geen slogan.** De meeste pokerspelers openen
  * dit op hun telefoon, vaak in de zaal. Alles staat dus in één kolom met knoppen
@@ -58,12 +62,12 @@ export default async function Page() {
                 vragen een account. Wat hij wél mag weten is welke clubs
                 meedoen, en dat staat als strook onderaan de eerste sectie —
                 als informatie, niet als een deur die op een muur uitkomt. */}
-            <a
-              href="#aanmelden"
+            <Link
+              href="/login"
               className="rounded-full px-3 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
             >
               {t('common.signIn')}
-            </a>
+            </Link>
             <LanguageSwitch current={locale} label={t('common.language')} />
           </div>
         </header>
@@ -91,12 +95,12 @@ export default async function Page() {
                 >
                   {t('home.ctaMake')} →
                 </Link>
-                <a
-                  href="#aanmelden"
+                <Link
+                  href="/login"
                   className="rounded-full border border-[var(--line-strong)] px-6 py-3.5 text-center font-medium transition hover:bg-[var(--surface-hover)]"
                 >
                   {t('home.ctaHave')}
-                </a>
+                </Link>
               </div>
               <p className="mt-4 text-sm text-[var(--text-faint)]">{t('home.free')}</p>
             </div>
@@ -127,35 +131,6 @@ export default async function Page() {
                 body={t('home.p2b')}
               />
               <Card figure={t('home.liveWord')} title={t('home.p3')} body={t('home.p3b')} />
-            </div>
-          </div>
-        </section>
-
-        {/* ------------------------------------------------------- aanmelden */}
-        <section id="aanmelden" className="scroll-mt-4 border-t border-[var(--line)]">
-          <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
-            <div className="grid gap-8 rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-6 sm:p-10 lg:grid-cols-[1fr_22rem] lg:items-center lg:gap-14">
-              <div>
-                <h2 className="text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-                  {t('home.joinTitle')}
-                </h2>
-                <p className="mt-3 max-w-md text-pretty leading-relaxed text-[var(--text-muted)]">
-                  {t('home.newHereBody')}
-                </p>
-                <Link
-                  href="/registreren"
-                  className="mt-6 inline-block rounded-full bg-[var(--brand)] px-6 py-3.5 font-medium text-[var(--on-brand)] transition hover:brightness-110"
-                >
-                  {t('site.nav.createAccount')}
-                </Link>
-              </div>
-
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-5 sm:p-6">
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">
-                  {t('common.signIn')}
-                </h3>
-                <LoginForm brandName="PokerLeague" fallbackNext="/ik" bare />
-              </div>
             </div>
           </div>
         </section>

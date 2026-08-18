@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { MyLive, type LiveRow } from '@/components/MyLive'
 import { PlayerProfileForm } from '@/components/PlayerProfileForm'
 import { Card, Notice } from '@/components/ui'
 import { LocaleProvider } from '@/lib/i18n/context'
@@ -100,12 +101,13 @@ export default async function Page() {
   // Ophalen of aanmaken. Zie de uitleg hierboven.
   await supabase.rpc('claim_my_player', {})
 
-  const [meRes, resultsRes, clubsRes, staffRes, statsRes] = await Promise.all([
+  const [meRes, resultsRes, clubsRes, staffRes, statsRes, liveRes] = await Promise.all([
     supabase.rpc('my_player'),
     supabase.rpc('my_results'),
     supabase.rpc('my_clubs'),
     supabase.rpc('my_staff_clubs'),
     supabase.rpc('my_club_stats', {}),
+    supabase.rpc('my_live_tournaments'),
   ])
 
   const me = ((meRes.data ?? []) as unknown as Me[])[0] ?? null
@@ -113,6 +115,7 @@ export default async function Page() {
   const clubs = (clubsRes.data ?? []) as unknown as ClubRow[]
   const staff = (staffRes.data ?? []) as unknown as StaffRow[]
   const stats = (statsRes.data ?? []) as unknown as ClubStat[]
+  const live = (liveRes.data ?? []) as unknown as LiveRow[]
 
   // Lidmaatschap en resultaten zijn twee verschillende dingen, en ze lopen
   // niet gelijk. Je bent lid vanaf het moment dat de floor je toevoegt; je
@@ -185,6 +188,12 @@ export default async function Page() {
               {t('me.lede')}
             </p>
           </div>
+
+          {/* ------------------------------------------------ nu aan tafel
+              Boven alles, want zolang je speelt is dit het enige op deze
+              pagina dat op dat moment telt. Speel je niet, dan staat er
+              niets. */}
+          <MyLive rows={live} />
 
           {/* --------------------------------------------------- waar hoor ik
               De vraag die deze pagina eerst onbeantwoord liet. Speler zijn bij
