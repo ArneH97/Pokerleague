@@ -51,12 +51,16 @@ begin
   end if;
   raise notice 'OK  een nieuwe club krijgt vanzelf een facturatieregel';
 
-  -- Vaste voorwaarden, anders hangt de test aan de dag waarop ze draait.
+  -- Vaste voorwaarden, en de datums op de eerste van de maand in Brusselse
+  -- tijd. Met `current_date - 3 months` hing deze test aan het uur waarop ze
+  -- draait: rond middernacht op de eerste van de maand is het in Brussel al
+  -- een maand later dan op de server, en dan telt de reeks een maand extra.
   update club_billing set setup_cents = 50000, monthly_cents = 3900,
-         started_on = (current_date - interval '3 months')::date
+         started_on = (date_trunc('month', (now() at time zone 'Europe/Brussels'))
+                       - interval '3 months')::date
    where club_id = v_club_a;
   update club_billing set setup_cents = 0, monthly_cents = 3900,
-         started_on = current_date
+         started_on = date_trunc('month', (now() at time zone 'Europe/Brussels'))::date
    where club_id = v_club_b;
 
   insert into blind_structures (club_id, name) values (v_club_a, 'S') returning id into v_struct;

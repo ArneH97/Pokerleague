@@ -58,7 +58,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
   const locale = await clubLocale(club.locale)
   const t = translator(locale)
 
-  const [tourRes, resultRes, potRes] = await Promise.all([
+  const [tourRes, resultRes, potRes, rsvpRes] = await Promise.all([
     supabase
       .from('tournaments')
       .select('id,name,scheduled_at,status,buyin_cents,fee_cents,ended_at')
@@ -78,12 +78,19 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
       .eq('tournament_id', id)
       .eq('is_void', false)
       .overrideTypes<{ amount_cents: number; fee_cents: number }[]>(),
+    // Wie zich vooraf inschreef. De functie weigert zelf voor wie geen staf
+    // is, dus een speler krijgt hier een lege lijst en geen namen.
+    supabase.rpc('tournament_rsvp_list', { p_tournament_id: id }),
   ])
 
   const tour = tourRes.data
   if (!tour) notFound()
 
   const results = resultRes.data ?? []
+  const rsvps = (rsvpRes.data ?? []) as unknown as {
+    player_id: string; display_name: string; email: string | null
+    has_account: boolean; at_table: boolean
+  }[]
   const pot = (potRes.data ?? []).reduce((n, b) => n + b.amount_cents, 0)
   const clubShare = (potRes.data ?? []).reduce((n, b) => n + b.fee_cents, 0)
   const paid = results.reduce((n, r) => n + r.prize_cents, 0)
@@ -106,6 +113,40 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
         subtitle={fmt.format(new Date(tour.ended_at ?? tour.scheduled_at))}
         logoUrl={club.logo_url}
       />
+
+      {/* ------------------------------------------------------ inschrijvingen
+          Boven de uitslag, want vóór de avond is dit het enige op deze pagina
+          dat iets zegt. Erna zakt het vanzelf weg: wie aan tafel kwam, staat
+          niet meer op de lijst. */}
+      {canSeeMoney && rsvps.length > 0 && (
+        <section>
+          <SectionTitle>
+            {t('rsvpList.title').replace('{n}', String(rsvps.length))}
+          </SectionTitle>
+          <Card padded={false} className="overflow-hidden">
+            <ul className="divide-y divide-[var(--line)]">
+              {rsvps.map((r) => (
+                <li key={r.player_id} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{r.display_name}</span>
+                    {r.email && (
+                      <span className="block truncate text-xs text-[var(--text-faint)]">{r.email}</span>
+                    )}
+                  </span>
+                  {!r.has_account && (
+                    <span className="shrink-0 rounded-full border border-[var(--line-strong)] px-2 py-0.5 text-[0.65rem] text-[var(--text-faint)]">
+                      {t('rsvpList.noAccount')}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
+            {t('rsvpList.hint')}
+          </p>
+        </section>
+      )}
 
       {results.length === 0 ? (
         <Notice tone="warn">
