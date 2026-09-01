@@ -44,8 +44,21 @@
 
 do $$
 declare
-  c_blijft  text := 'cutoff';
-  c_avond   text := 'Grand Opening Event';   -- de enige avond die blijft
+  c_blijft   text := 'cutoff';
+
+  -- De avond die blijft, op id. Dat is het id uit de adresbalk van het
+  -- floorscherm: .../c/cutoff/floor/<dit stuk>.
+  --
+  -- Op id en niet op naam, en daar is een reden voor: de vorige versie zocht
+  -- de avond op de naam "Grand Opening Event", en één spatie of hoofdletter
+  -- verschil was genoeg om het script te laten stoppen mét een foutmelding en
+  -- zónder iets te verwijderen. Dat is precies wat er gebeurd kan zijn als je
+  -- dit al eens gedraaid hebt en er nadien nog data stond.
+  --
+  -- Laat je dit leeg (null), dan valt hij terug op de naam hieronder, nu wel
+  -- zonder te struikelen over hoofdletters of spaties.
+  c_avond_id uuid := '38fd3ff1-f0ac-4df9-b5e0-84ff435ce608';
+  c_avond    text := 'Grand Opening Event';
 
   v_club   uuid;
   v_n      int;
@@ -56,16 +69,29 @@ begin
     raise exception 'Er is geen club met slug %. Controleer de naam bovenaan.', c_blijft;
   end if;
 
-  -- Precies die ene avond, op naam. Vindt hij er geen, dan stopt het script
-  -- vóór er iets weg is — beter een script dat niets doet dan een script dat
-  -- de avond wist die je wilde houden.
-  select coalesce(array_agg(id), '{}') into v_houden
-  from tournaments
-  where club_id = v_club and name = c_avond;
+  if c_avond_id is not null then
+    select coalesce(array_agg(id), '{}') into v_houden
+    from tournaments
+    where club_id = v_club and id = c_avond_id;
 
-  if coalesce(array_length(v_houden, 1), 0) = 0 then
-    raise exception 'Geen avond met de naam "%" bij %. Er is niets verwijderd. De avonden die er wél staan, zie je met: select name, scheduled_at, status from tournaments;', c_avond, c_blijft;
+    if coalesce(array_length(v_houden, 1), 0) = 0 then
+      raise exception 'Er is geen avond met id % bij %. Er is niets verwijderd. Kijk het id na in de adresbalk van het floorscherm, of zet c_avond_id op null om op naam te zoeken.', c_avond_id, c_blijft;
+    end if;
+  else
+    -- Zonder hoofdlettergevoeligheid en zonder spaties aan de randen: dit
+    -- script hoort niet te struikelen over hoe iemand de avond intikte.
+    select coalesce(array_agg(id), '{}') into v_houden
+    from tournaments
+    where club_id = v_club and lower(btrim(name)) = lower(btrim(c_avond));
+
+    if coalesce(array_length(v_houden, 1), 0) = 0 then
+      raise exception 'Geen avond met de naam "%" bij %. Er is niets verwijderd. De avonden die er wél staan, zie je met: select id, name, scheduled_at, status from tournaments;', c_avond, c_blijft;
+    end if;
   end if;
+
+  raise notice 'Blijft staan: % — %',
+    (select name from tournaments where id = v_houden[1]),
+    (select scheduled_at from tournaments where id = v_houden[1]);
 
   raise notice 'Vooraf: % clubs, % avonden, % spelers, % uitslagen.',
     (select count(*) from clubs),
@@ -82,10 +108,11 @@ begin
 
   -- 2. De avond die blijft, wordt leeggemaakt. Die rijen hangen aan het
   --    tornooi en niet aan de club, dus ze overleven stap 1.
-  delete from buyins                  where tournament_id = any(v_houden);
+  delete from buyins                   where tournament_id = any(v_houden);
   delete from tournament_registrations where tournament_id = any(v_houden);
-  delete from tournament_players      where tournament_id = any(v_houden);
-  delete from tournament_tables       where tournament_id = any(v_houden);
+  delete from tournament_results       where tournament_id = any(v_houden);
+  delete from tournament_players       where tournament_id = any(v_houden);
+  delete from tournament_tables        where tournament_id = any(v_houden);
 
   -- 3. Alles wat een mens is, overal.
   delete from player_invites;
