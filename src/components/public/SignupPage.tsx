@@ -4,6 +4,7 @@ import { RsvpForm } from '@/components/public/RsvpForm'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator, type Locale, type T } from '@/lib/i18n/dictionaries'
 import { themeVars, type Club } from '@/lib/club'
+import { playerUrl } from '@/lib/site'
 import { formatMoney } from '@/lib/types'
 
 /**
@@ -47,7 +48,7 @@ export interface SignupCard {
   locale: string
 }
 
-export function SignupPage({
+export async function SignupPage({
   card, club, locale,
 }: {
   card: SignupCard | null
@@ -56,6 +57,13 @@ export function SignupPage({
 }) {
   const t = translator(locale)
   const logoUrl = club.logo_url
+
+  // Absolute adressen naar het platform. Op een clubdomein schrijft de proxy
+  // elk pad door naar /c/<club>/…, dus `/registreren` liep daar op een 404 —
+  // precies waar `playerUrl` voor bestaat. De taal reist mee, zodat iemand die
+  // via de Franse affiche binnenkwam ook een Frans registratieformulier krijgt.
+  const registerHref = await playerUrl(`/registreren?club=${club.slug}&l=${locale}`)
+  const loginHref = await playerUrl(`/login?next=%2Fik&l=${locale}`)
 
   return (
     <LocaleProvider locale={locale}>
@@ -85,9 +93,10 @@ export function SignupPage({
                 <div className="mt-7">
                   <RsvpForm
                     tournamentId={card.tournament_id}
-                    clubSlug={card.club_slug}
                     clubName={card.club_name}
                     bonusStack={card.bonus_stack}
+                    registerHref={registerHref}
+                    loginHref={loginHref}
                   />
                 </div>
               ) : (

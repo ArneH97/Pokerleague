@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { inputClass } from '@/components/ui'
 import { useT } from '@/lib/i18n/context'
 import { rsvp, type RsvpResult } from '@/lib/rsvpActions'
@@ -22,14 +21,28 @@ import { rsvp, type RsvpResult } from '@/lib/rsvpActions'
  * plaats staat al vast. Het account erbij is voor hém interessant, niet voor
  * ons, en dus staat het er als iets dat hij mag doen en niet als iets dat nog
  * moet.
+ *
+ * **Twee verschillende aanbiedingen.** Wie hier al een account heeft, krijgt
+ * "meld je aan" en niet "maak een account". Dat onderscheid komt uit de
+ * database mee en niet uit een gok: stuurden we iedereen naar het
+ * registratieformulier, dan liep de helft van de vaste spelers vast op de
+ * melding dat hun adres al bezet is.
+ *
+ * De twee adressen komen als eigenschap binnen en worden hier niet zelf
+ * gemaakt. Op `cutoff.pokerleague.be` schrijft de proxy elk pad door naar
+ * `/c/cutoff/…`, dus een gewone link naar `/registreren` liep daar op een 404.
+ * De server weet op welk domein hij staat en geeft het juiste adres mee.
  */
 export function RsvpForm({
-  tournamentId, clubSlug, clubName, bonusStack,
+  tournamentId, clubName, bonusStack, registerHref, loginHref,
 }: {
   tournamentId: string
-  clubSlug: string
   clubName: string
   bonusStack: number
+  /** Volledig adres naar het registratieformulier op het platform. */
+  registerHref: string
+  /** Volledig adres naar het aanmeldscherm op het platform. */
+  loginHref: string
 }) {
   const t = useT()
   const [firstName, setFirstName] = useState('')
@@ -39,25 +52,26 @@ export function RsvpForm({
   const [busy, setBusy] = useState(false)
   const [state, setState] = useState<RsvpResult | null>(null)
 
-  const done = state === 'ok' || state === 'already'
+  const done = state?.status === 'ok' || state?.status === 'already'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setState(null)
-    const r = await rsvp(tournamentId, { firstName, lastName, email, birthdate })
-    setState(r)
+    setState(await rsvp(tournamentId, { firstName, lastName, email, birthdate }))
     setBusy(false)
   }
 
-  if (done) {
+  if (done && state) {
+    const heeftAccount = state.hasAccount
+
     return (
       <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] p-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--brand)]">
-          {state === 'already' ? t('rsvp.alreadyTag') : t('rsvp.doneTag')}
+          {state.status === 'already' ? t('rsvp.alreadyTag') : t('rsvp.doneTag')}
         </p>
         <h2 className="mt-2 text-xl font-semibold">
-          {(state === 'already' ? t('rsvp.alreadyTitle') : t('rsvp.doneTitle'))
+          {(state.status === 'already' ? t('rsvp.alreadyTitle') : t('rsvp.doneTitle'))
             .replace('{name}', firstName || lastName)}
         </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-muted)]">
@@ -66,16 +80,20 @@ export function RsvpForm({
         </p>
 
         <div className="mt-6 border-t border-[var(--line)] pt-5">
-          <p className="text-sm font-medium">{t('rsvp.accountTitle')}</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-[var(--text-muted)]">
-            {t('rsvp.accountBody')}
+          <p className="text-sm font-medium">
+            {heeftAccount ? t('rsvp.knownTitle') : t('rsvp.accountTitle')}
           </p>
-          <Link
-            href={`/registreren?club=${clubSlug}`}
+          <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-[var(--text-muted)]">
+            {heeftAccount ? t('rsvp.knownBody') : t('rsvp.accountBody')}
+          </p>
+          {/* Een gewone <a> en geen <Link>: dit springt naar een ander domein,
+              en dan is de routering van Next niet aan zet. */}
+          <a
+            href={heeftAccount ? loginHref : registerHref}
             className="mt-4 inline-block rounded-full bg-[var(--brand)] px-6 py-3 font-medium text-[var(--on-brand)] transition hover:brightness-110"
           >
-            {t('rsvp.accountCta')} →
-          </Link>
+            {heeftAccount ? t('rsvp.knownCta') : t('rsvp.accountCta')} →
+          </a>
           <p className="mt-3 text-xs text-[var(--text-faint)]">{t('rsvp.accountLater')}</p>
         </div>
       </div>
@@ -127,11 +145,11 @@ export function RsvpForm({
       {state && !done && (
         <p className="mt-4 text-sm text-[var(--danger)]">
           {t(
-            state === 'too_young' ? 'rsvp.errTooYoung'
-              : state === 'bad_email' ? 'rsvp.errEmail'
-                : state === 'bad_name' ? 'rsvp.errName'
-                  : state === 'closed' ? 'rsvp.errClosed'
-                    : state === 'full' ? 'rsvp.errFull'
+            state.status === 'too_young' ? 'rsvp.errTooYoung'
+              : state.status === 'bad_email' ? 'rsvp.errEmail'
+                : state.status === 'bad_name' ? 'rsvp.errName'
+                  : state.status === 'closed' ? 'rsvp.errClosed'
+                    : state.status === 'full' ? 'rsvp.errFull'
                       : 'common.error',
           )}
         </p>

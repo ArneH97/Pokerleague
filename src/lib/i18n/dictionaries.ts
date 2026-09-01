@@ -977,7 +977,12 @@ const nl = {
   'rsvp.accountBody':
     'Dan zie je na elke avond je eigen uitslag, je saldo en het klassement van de club — bij elke club waar je speelt.',
   'rsvp.accountCta': 'Account maken',
-  'rsvp.accountLater': 'Hoeft niet nu. Je plaats staat hoe dan ook vast.',
+  'rsvp.accountLater':
+    'Hoeft niet nu — je plaats staat hoe dan ook vast. Registreer je later met hetzelfde mailadres, dan komt alles vanzelf samen.',
+  'rsvp.knownTitle': 'Je hebt hier al een account',
+  'rsvp.knownBody':
+    'Meld je aan en je ziet je resultaten, je saldo en het klassement van elke club waar je speelt.',
+  'rsvp.knownCta': 'Aanmelden',
   'rsvp.closedTitle': 'De inschrijvingen zijn gesloten',
   'rsvp.closedBody': 'Deze avond is bezig of voorbij. Kom gerust langs, de floor schrijft je aan de deur in.',
   'rsvp.noneTitle': 'Nog niets ingepland',
@@ -2017,7 +2022,12 @@ const fr: Record<Key, string> = {
   'rsvp.accountBody':
     'Vous verrez alors après chaque soirée votre résultat, votre solde et le classement du club — dans chaque club où vous jouez.',
   'rsvp.accountCta': 'Créer un compte',
-  'rsvp.accountLater': 'Pas indispensable maintenant. Votre place est réservée quoi qu’il arrive.',
+  'rsvp.accountLater':
+    'Pas indispensable maintenant — votre place est réservée quoi qu’il arrive. Inscrivez-vous plus tard avec la même adresse e-mail et tout se rejoindra tout seul.',
+  'rsvp.knownTitle': 'Vous avez déjà un compte ici',
+  'rsvp.knownBody':
+    'Connectez-vous et vous verrez vos résultats, votre solde et le classement de chaque club où vous jouez.',
+  'rsvp.knownCta': 'Se connecter',
   'rsvp.closedTitle': 'Les inscriptions sont closes',
   'rsvp.closedBody': 'Cette soirée est en cours ou terminée. Passez quand même : le floor vous inscrira à l’entrée.',
   'rsvp.noneTitle': 'Rien de prévu pour l’instant',
@@ -3052,7 +3062,12 @@ const en: Record<Key, string> = {
   'rsvp.accountBody':
     'Then after every night you see your own result, your balance and the club standings — at every club you play.',
   'rsvp.accountCta': 'Create an account',
-  'rsvp.accountLater': 'No need right now. Your seat is claimed either way.',
+  'rsvp.accountLater':
+    'No need right now — your seat is claimed either way. Register later with the same e-mail address and everything joins up by itself.',
+  'rsvp.knownTitle': 'You already have an account here',
+  'rsvp.knownBody':
+    'Sign in and you will see your results, your balance and the standings at every club you play.',
+  'rsvp.knownCta': 'Sign in',
   'rsvp.closedTitle': 'Sign-ups have closed',
   'rsvp.closedBody': 'This night is under way or over. Drop by anyway — the floor will sign you in at the door.',
   'rsvp.noneTitle': 'Nothing on the calendar yet',

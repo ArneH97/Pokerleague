@@ -3,7 +3,7 @@ import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { LoginForm } from '@/components/LoginForm'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator } from '@/lib/i18n/dictionaries'
-import { publicLocale } from '@/lib/i18n/server'
+import { publicLocale, urlLocale } from '@/lib/i18n/server'
 
 /**
  * Aanmelden als speler. Volgt de taal die de bezoeker koos op de
@@ -21,8 +21,11 @@ export async function generateMetadata() {
   return { title: translator(await publicLocale())('common.signIn') }
 }
 
-export default async function Page() {
-  const locale = await publicLocale()
+export default async function Page({ searchParams }: PageProps<'/login'>) {
+  // `?l=fr` komt mee van een Franse affiche of clubpagina. Zonder dit stapt
+  // iemand die de hele weg in het Frans aflegde hier ineens over op het
+  // Nederlands, precies wanneer hij om zijn wachtwoord gevraagd wordt.
+  const locale = urlLocale((await searchParams).l) ?? (await publicLocale())
   const t = translator(locale)
   return (
     <LocaleProvider locale={locale}>

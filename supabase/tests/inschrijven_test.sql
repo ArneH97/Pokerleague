@@ -28,7 +28,7 @@ declare
   v_t uuid; v_oud uuid; v_bezig uuid;
   v_user uuid; v_floor uuid; v_speler uuid;
   v_p uuid; v_tp uuid;
-  v_res text; v_n int; v_chips int;
+  v_res jsonb; v_n int; v_chips int;
   r record;
 begin
   insert into clubs (slug, name, city, country, locale, timezone, primary_color,
@@ -85,7 +85,7 @@ begin
   set local role anon;
 
   v_res := public.rsvp_for_tournament(v_t, 'Jan', 'Peeters', 'jan@test.be', '1988-04-12');
-  if v_res <> 'ok' then raise exception 'FOUT: inschrijven gaf % in plaats van ok', v_res; end if;
+  if v_res->>'status' <> 'ok' then raise exception 'FOUT: inschrijven gaf % in plaats van ok', v_res; end if;
 
   reset role;
 
@@ -110,7 +110,7 @@ begin
   set local role anon;
   v_res := public.rsvp_for_tournament(v_t, 'Jan', 'Peeters', 'JAN@test.be', '1988-04-12');
   reset role;
-  if v_res <> 'already' then
+  if v_res->>'status' <> 'already' then
     raise exception 'FOUT: tweede keer inschrijven gaf % in plaats van already', v_res;
   end if;
 
@@ -125,13 +125,13 @@ begin
   set local role anon;
   v_res := public.rsvp_for_tournament(v_t, 'Kind', 'Jong', 'kind@test.be',
                                       (current_date - interval '15 years')::date);
-  if v_res <> 'too_young' then raise exception 'FOUT: een 15-jarige kreeg %', v_res; end if;
+  if v_res->>'status' <> 'too_young' then raise exception 'FOUT: een 15-jarige kreeg %', v_res->>'status'; end if;
 
   v_res := public.rsvp_for_tournament(v_t, 'Geen', 'Adres', 'nietsmail', '1990-01-01');
-  if v_res <> 'bad_email' then raise exception 'FOUT: een kapot adres gaf %', v_res; end if;
+  if v_res->>'status' <> 'bad_email' then raise exception 'FOUT: een kapot adres gaf %', v_res->>'status'; end if;
 
   v_res := public.rsvp_for_tournament(v_t, null, null, 'naamloos@test.be', '1990-01-01');
-  if v_res <> 'bad_name' then raise exception 'FOUT: zonder naam gaf %', v_res; end if;
+  if v_res->>'status' <> 'bad_name' then raise exception 'FOUT: zonder naam gaf %', v_res->>'status'; end if;
   reset role;
 
   select count(*) into v_n from players
@@ -154,10 +154,10 @@ begin
 
   set local role anon;
   v_res := public.rsvp_for_tournament(v_oud, 'Te', 'Laat', 'laat@test.be', '1990-01-01');
-  if v_res <> 'closed' then raise exception 'FOUT: een afgelopen avond gaf %', v_res; end if;
+  if v_res->>'status' <> 'closed' then raise exception 'FOUT: een afgelopen avond gaf %', v_res->>'status'; end if;
 
   v_res := public.rsvp_for_tournament(v_bezig, 'Te', 'Laat', 'laat@test.be', '1990-01-01');
-  if v_res <> 'closed' then raise exception 'FOUT: een lopende avond gaf %', v_res; end if;
+  if v_res->>'status' <> 'closed' then raise exception 'FOUT: een lopende avond gaf %', v_res->>'status'; end if;
   reset role;
   raise notice 'OK  een avond die bezig of afgelopen is, staat dicht';
 
@@ -219,7 +219,7 @@ begin
   set local role anon;
   v_res := public.rsvp_for_tournament(v_t, 'Marie', 'Claes', 'marie@test.be', '1979-09-09');
   reset role;
-  if v_res <> 'ok' then raise exception 'FOUT: Marie kreeg %', v_res; end if;
+  if v_res->>'status' <> 'ok' then raise exception 'FOUT: Marie kreeg %', v_res->>'status'; end if;
 
   perform set_config('request.jwt.claim.sub', v_floor::text, true);
   set local role authenticated;
@@ -289,8 +289,8 @@ begin
   set local role anon;
   v_res := public.rsvp_for_tournament(v_t, 'Marie', 'Claes', 'marie@test.be', '1979-09-09');
   reset role;
-  if v_res <> 'ok' then
-    raise exception 'FOUT: opnieuw inschrijven na intrekken gaf %', v_res;
+  if v_res->>'status' <> 'ok' then
+    raise exception 'FOUT: opnieuw inschrijven na intrekken gaf %', v_res->>'status';
   end if;
 
   perform set_config('request.jwt.claim.sub', v_floor::text, true);
@@ -313,6 +313,43 @@ begin
   end;
   reset role;
   raise notice 'OK  staf kan een inschrijving intrekken; daarna kan die persoon zich opnieuw inschrijven';
+
+  -- ------------------------------------------------------------------ 10 ---
+  -- Het antwoord zegt of er al een account is. Daar hangt aan af of het
+  -- scherm naar "registreren" of naar "aanmelden" wijst.
+  select id into v_p from players where lower(email) = 'jan@test.be';
+  if (select auth_user_id from players where id = v_p) is not null then
+    raise exception 'FOUT: Jan heeft al een account en dat hoort niet in deze opzet';
+  end if;
+
+  perform set_config('request.jwt.claim.role', 'anon', true);
+  set local role anon;
+  v_res := public.rsvp_for_tournament(v_t, 'Jan', 'Peeters', 'jan@test.be', '1988-04-12');
+  reset role;
+  if (v_res->>'has_account')::boolean then
+    raise exception 'FOUT: Jan heeft geen account maar het antwoord zegt van wel';
+  end if;
+
+  -- En nu wél. Zijn profiel krijgt een account gekoppeld.
+  update players set auth_user_id = v_speler, link_state = 'claimed' where id = v_p;
+
+  perform set_config('request.jwt.claim.role', 'anon', true);
+  set local role anon;
+  v_res := public.rsvp_for_tournament(v_t, 'Jan', 'Peeters', 'jan@test.be', '1988-04-12');
+  reset role;
+  if not (v_res->>'has_account')::boolean then
+    raise exception 'FOUT: Jan heeft een account maar het antwoord zegt van niet';
+  end if;
+
+  -- Een gloednieuw adres kan per definitie geen account hebben.
+  perform set_config('request.jwt.claim.role', 'anon', true);
+  set local role anon;
+  v_res := public.rsvp_for_tournament(v_t, 'Nieuwe', 'Speler', 'nieuw@test.be', '1985-05-05');
+  reset role;
+  if v_res->>'status' <> 'ok' or (v_res->>'has_account')::boolean then
+    raise exception 'FOUT: een nieuw adres gaf % / %', v_res->>'status', v_res->>'has_account';
+  end if;
+  raise notice 'OK  het antwoord zegt of er al een PokerLeague-account op dat adres staat';
 
   perform set_config('request.jwt.claim.sub', '', true);
   perform set_config('request.jwt.claim.role', '', true);

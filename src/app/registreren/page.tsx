@@ -3,7 +3,7 @@ import { RegisterForm } from '@/components/RegisterForm'
 import { getClub } from '@/lib/club'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator } from '@/lib/i18n/dictionaries'
-import { publicLocale } from '@/lib/i18n/server'
+import { publicLocale, urlLocale } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 /** Registreren als speler. Wie al aangemeld is hoort hier niet te zijn. */
@@ -25,7 +25,7 @@ export default async function Page({ searchParams }: PageProps<'/registreren'>) 
   if (claims?.claims) redirect(joinSlug ? `/aansluiten/${joinSlug}` : '/ik')
 
   const club = joinSlug ? await getClub(joinSlug) : null
-  const locale = await publicLocale()
+  const locale = urlLocale(q.l) ?? (await publicLocale())
 
   return (
     <LocaleProvider locale={locale}>

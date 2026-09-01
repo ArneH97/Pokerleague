@@ -30,6 +30,21 @@ export async function publicLocale(): Promise<Locale> {
 }
 
 /**
+ * De taal die in de URL staat, als die er staat.
+ *
+ * Voor een affiche. De Franse en de Nederlandse versie wijzen naar hetzelfde
+ * adres met een andere `?l=`, zodat iemand die de Franse affiche scant een
+ * Franse pagina krijgt — ook als hij hier nooit eerder een taal koos, en ook
+ * als hij vorige maand toevallig op Nederlands klikte. De keuze van de
+ * bezoeker blijft daarna gewoon werken: de taalknop bovenaan verandert het
+ * koekje en dan wint dat weer.
+ */
+export function urlLocale(v: string | string[] | undefined): Locale | null {
+  const raw = Array.isArray(v) ? v[0] : v
+  return isLocale(raw) ? raw : null
+}
+
+/**
  * De taal van een clubscherm.
  *
  * De keuze van de bezoeker wint; de taal van de club is de standaard. Zo

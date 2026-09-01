@@ -15,9 +15,22 @@ import { createClient } from '@/lib/supabase/server'
  * beleefdheid tegenover iemand die op zijn telefoon staat te tikken.
  */
 
-export type RsvpResult =
+export type RsvpStatus =
   | 'ok' | 'already' | 'closed' | 'too_young'
   | 'bad_email' | 'bad_name' | 'full' | 'error'
+
+export interface RsvpResult {
+  status: RsvpStatus
+  /**
+   * Staat er al een PokerLeague-account op dit adres?
+   *
+   * Bepaalt waar de knop erna naartoe wijst. Zonder dit stuurden we iemand
+   * die hier al jaren speelt naar een registratieformulier dat hem vertelt
+   * dat zijn adres bezet is — een doodlopende straat op het moment dat hij
+   * net goedgezind was.
+   */
+  hasAccount: boolean
+}
 
 export async function rsvp(
   tournamentId: string,
@@ -28,9 +41,11 @@ export async function rsvp(
   const email = form.email.trim().toLowerCase()
   const birthdate = form.birthdate.trim()
 
-  if (!first && !last) return 'bad_name'
-  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return 'bad_email'
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) return 'too_young'
+  const mis = (status: RsvpStatus): RsvpResult => ({ status, hasAccount: false })
+
+  if (!first && !last) return mis('bad_name')
+  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return mis('bad_email')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) return mis('too_young')
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('rsvp_for_tournament', {
@@ -41,6 +56,11 @@ export async function rsvp(
     p_birthdate: birthdate,
   })
 
-  if (error) return 'error'
-  return (data as unknown as RsvpResult) ?? 'error'
+  if (error) return mis('error')
+
+  const row = data as unknown as { status?: string; has_account?: boolean } | null
+  return {
+    status: (row?.status as RsvpStatus) ?? 'error',
+    hasAccount: row?.has_account === true,
+  }
 }
