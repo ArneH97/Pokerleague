@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { RsvpPanel } from '@/components/RsvpPanel'
 import { ButtonLink, Card, Notice, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
 import { translator } from '@/lib/i18n/dictionaries'
@@ -124,23 +125,12 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
             {t('rsvpList.title').replace('{n}', String(rsvps.length))}
           </SectionTitle>
           <Card padded={false} className="overflow-hidden">
-            <ul className="divide-y divide-[var(--line)]">
-              {rsvps.map((r) => (
-                <li key={r.player_id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{r.display_name}</span>
-                    {r.email && (
-                      <span className="block truncate text-xs text-[var(--text-faint)]">{r.email}</span>
-                    )}
-                  </span>
-                  {!r.has_account && (
-                    <span className="shrink-0 rounded-full border border-[var(--line-strong)] px-2 py-0.5 text-[0.65rem] text-[var(--text-faint)]">
-                      {t('rsvpList.noAccount')}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <RsvpPanel tournamentId={id} rows={rsvps.map((r) => ({
+              playerId: r.player_id,
+              name: r.display_name,
+              email: r.email,
+              hasAccount: r.has_account,
+            }))} />
           </Card>
           <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
             {t('rsvpList.hint')}

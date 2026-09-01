@@ -262,6 +262,58 @@ begin
   if v_n <> 2 then raise exception 'FOUT: Marie hoort bij % clubs in plaats van 2', v_n; end if;
   raise notice 'OK  wie al ergens speelt, houdt één profiel over alle clubs heen';
 
+  -- ------------------------------------------------------------------- 9 ---
+  -- Een inschrijving intrekken, en daarna weer inschrijven.
+  perform set_config('request.jwt.claim.sub', v_floor::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_floor, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+
+  select p.id into v_p from players p where lower(p.email) = 'marie@test.be';
+  if not public.cancel_rsvp(v_t, v_p) then
+    raise exception 'FOUT: intrekken gaf onwaar terug';
+  end if;
+
+  select count(*) into v_n from public.tournament_rsvp_list(v_t);
+  if v_n <> 0 then raise exception 'FOUT: na het intrekken staan er nog % namen', v_n; end if;
+
+  -- Een tweede keer intrekken verandert niets meer en mag geen fout geven.
+  if public.cancel_rsvp(v_t, v_p) then
+    raise exception 'FOUT: twee keer intrekken deed alsof er iets veranderde';
+  end if;
+  reset role;
+
+  -- En daarna kan ze zich gewoon opnieuw inschrijven.
+  perform set_config('request.jwt.claim.role', 'anon', true);
+  set local role anon;
+  v_res := public.rsvp_for_tournament(v_t, 'Marie', 'Claes', 'marie@test.be', '1979-09-09');
+  reset role;
+  if v_res <> 'ok' then
+    raise exception 'FOUT: opnieuw inschrijven na intrekken gaf %', v_res;
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_floor::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  set local role authenticated;
+  select count(*) into v_n from public.tournament_rsvp_list(v_t);
+  if v_n <> 1 then raise exception 'FOUT: na opnieuw inschrijven staan er % namen', v_n; end if;
+  reset role;
+
+  -- Een gewone speler mag niemand van de lijst halen.
+  perform set_config('request.jwt.claim.sub', v_speler::text, true);
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_speler, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  begin
+    perform public.cancel_rsvp(v_t, v_p);
+    raise exception 'FOUT: een gewone speler kon een inschrijving intrekken';
+  exception when insufficient_privilege then
+    null;
+  end;
+  reset role;
+  raise notice 'OK  staf kan een inschrijving intrekken; daarna kan die persoon zich opnieuw inschrijven';
+
   perform set_config('request.jwt.claim.sub', '', true);
   perform set_config('request.jwt.claim.role', '', true);
   perform set_config('request.jwt.claims', '', true);

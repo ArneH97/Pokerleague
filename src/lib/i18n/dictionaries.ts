@@ -993,6 +993,8 @@ const nl = {
   'rsvpList.hint':
     'Deze mensen krijgen aan de deur automatisch hun bonuschips. Zodra je iemand toevoegt aan de tafel, verdwijnt hij uit deze lijst.',
   'rsvpList.seat': 'Aan tafel',
+  'rsvpList.remove': 'Van de lijst halen',
+  'rsvpList.removeYes': 'Toch weghalen',
   'rsvpList.floorHint': 'tik om in te schrijven',
 
   // Platformbeheer. Alleen zichtbaar voor wie in platform_admins staat, maar
@@ -2031,6 +2033,8 @@ const fr: Record<Key, string> = {
   'rsvpList.hint':
     'Ces personnes reçoivent automatiquement leurs jetons bonus à l’entrée. Dès que vous ajoutez quelqu’un à la table, il disparaît de cette liste.',
   'rsvpList.seat': 'À table',
+  'rsvpList.remove': 'Retirer de la liste',
+  'rsvpList.removeYes': 'Oui, retirer',
   'rsvpList.floorHint': 'touchez pour inscrire',
 
   'adm.link': 'Administration',
@@ -3064,6 +3068,8 @@ const en: Record<Key, string> = {
   'rsvpList.hint':
     'These people automatically get their bonus chips at the door. The moment you add someone to the table, they drop off this list.',
   'rsvpList.seat': 'Seat',
+  'rsvpList.remove': 'Take off the list',
+  'rsvpList.removeYes': 'Yes, remove',
   'rsvpList.floorHint': 'tap to sign in',
 
   'adm.link': 'Admin',

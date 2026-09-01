@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { DealPanel } from '@/components/DealPanel'
+import { RsvpChecklist } from '@/components/RsvpChecklist'
 import { PayoutList, InTheMoneyNotice } from '@/components/PayoutList'
 import { PayoutPanel } from '@/components/PayoutPanel'
 import { createClient } from '@/lib/supabase/client'
@@ -352,29 +353,14 @@ export function FloorPlayers({
             </span>
           </div>
 
-          <ul className="space-y-1.5">
-            {rsvps.map((r) => (
-              <li
-                key={r.playerId}
-                className="flex items-center gap-3 rounded-xl bg-[var(--surface-2)] px-3.5 py-2.5"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{r.name}</span>
-                  {r.email && (
-                    <span className="block truncate text-xs text-[var(--text-faint)]">{r.email}</span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void addExisting(r.playerId)}
-                  className="shrink-0 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
-                >
-                  {t('rsvpList.seat')}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <RsvpChecklist
+            rows={rsvps}
+            tournamentId={tournamentId}
+            busy={busy}
+            tone="floor"
+            onSeat={(playerId) => addExisting(playerId)}
+            onChanged={reload}
+          />
         </section>
       )}
 
