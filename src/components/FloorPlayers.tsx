@@ -85,6 +85,8 @@ export function FloorPlayers({
 
   const [openMoney, setOpenMoney] = useState<string | null>(null)
   const [killing, setKilling] = useState<string | null>(null)
+  /** Wie er op het punt staat helemaal uit het tornooi te verdwijnen. */
+  const [removing, setRemoving] = useState<string | null>(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
   const [dealOpen, setDealOpen] = useState(false)
@@ -253,6 +255,19 @@ export function FloorPlayers({
   async function undoBuyin(tpId: string) {
     setOpenMoney(null)
     await run(() => supabase.rpc('floor_undo_last_buyin', { p_tournament_player_id: tpId }))
+  }
+
+  /**
+   * De verkeerde man toegevoegd. Niet uitschakelen — dat maakt hem eerste in
+   * een tornooi waar hij niet in hoort — maar weghalen, met zijn inkoop erbij.
+   * De server weigert het zodra er echt geld mee gemoeid is.
+   */
+  async function removeEntry(tpId: string) {
+    setRemoving(null)
+    setOpenMoney(null)
+    await run(() => supabase.rpc('floor_remove_entry', { p_tournament_player_id: tpId }))
+    if (inTheMoney?.tournamentPlayerId === tpId) setInTheMoney(null)
+    await payouts.reload()
   }
 
   async function setChips(tpId: string, value: number) {
@@ -581,8 +596,13 @@ export function FloorPlayers({
         <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
           {visibleActive.map((p) => (
             <li key={p.id} className="px-3 py-2.5">
-              <div className="flex items-center gap-3">
-                <span className="min-w-0 flex-1">
+              {/* Op een telefoon krijgt de naam een eigen regel en staan de
+                  stapel en de knoppen eronder. Zetten we alles op één regel,
+                  dan blijft er van "Jean-Baptiste Vandenbroucke" precies "J…"
+                  over — en de naam is het enige waarmee je de juiste man
+                  uitschakelt. Vanaf een tablet past het wel naast elkaar. */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="min-w-0 flex-1 basis-full sm:basis-0">
                   <span className="flex flex-wrap items-center gap-x-2">
                     <span className="truncate font-medium">{p.name}</span>
                     {/* Zonder mailadres kan je hem volgend seizoen niet
@@ -665,10 +685,29 @@ export function FloorPlayers({
                   <Small onClick={() => void undoBuyin(p.id)} disabled={busy}>
                     ↩ {t('players.undoBuyin')}
                   </Small>
+                  {/* Hier en niet naast "Uitschakelen": dit is de knop voor de
+                      verkeerde man, en die staat één klik verder weg dan de
+                      knop die je de hele avond nodig hebt. */}
+                  <Small
+                    danger
+                    onClick={() => setRemoving(removing === p.id ? null : p.id)}
+                    disabled={busy}
+                  >
+                    {t('players.remove')}
+                  </Small>
                   <Small onClick={() => setOpenMoney(null)} disabled={busy}>
                     {t('players.close')}
                   </Small>
                 </div>
+              )}
+
+              {removing === p.id && (
+                <RemoveConfirm
+                  t={t}
+                  busy={busy}
+                  onYes={() => void removeEntry(p.id)}
+                  onNo={() => setRemoving(null)}
+                />
               )}
 
               {/* Bij een bountytornooi is de vraag wie hem eruit speelde geen
@@ -706,35 +745,62 @@ export function FloorPlayers({
             </li>
           )}
           {visibleOut.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 px-3 py-2.5 text-[var(--text-muted)]">
-              <span className="tnum w-8 shrink-0 text-right font-semibold text-[var(--text-faint)]">
-                {p.finishPosition ?? '—'}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate line-through decoration-[var(--line-strong)]">
-                  {p.name}
-                </span>
-                {p.email && (
-                  <span className="block truncate text-xs text-[var(--text-faint)]">
-                    {p.email}
+            <li key={p.id} className="px-3 py-2.5 text-[var(--text-muted)]">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {/* Plaats en naam horen bij elkaar en blijven samen op één
+                    regel; de knoppen zakken eronder zodra ze er niet meer
+                    naast passen. */}
+                <span className="flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-0">
+                  <span className="tnum w-8 shrink-0 text-right font-semibold text-[var(--text-faint)]">
+                    {p.finishPosition ?? '—'}
                   </span>
-                )}
-              </span>
-              {!finished && (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {/* Ook hier staat er gewoon "Rebuy". Dat het intern een
-                      re-entry is — hij was uitgeschakeld en komt terug met
-                      een verse stack — hoeft de floor niet te weten; de
-                      situatie bepaalt dat al. */}
-                  {p.reentriesUsed + p.rebuysUsed < maxReentries && (
-                    <Small onClick={() => void rebuy(p.id, 'reentry')} disabled={busy}>
-                      {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate line-through decoration-[var(--line-strong)]">
+                      {p.name}
+                    </span>
+                    {p.email && (
+                      <span className="block truncate text-xs text-[var(--text-faint)]">
+                        {p.email}
+                      </span>
+                    )}
+                  </span>
+                </span>
+                {!finished && (
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    {/* Ook hier staat er gewoon "Rebuy". Dat het intern een
+                        re-entry is — hij was uitgeschakeld en komt terug met
+                        een verse stack — hoeft de floor niet te weten; de
+                        situatie bepaalt dat al. */}
+                    {p.reentriesUsed + p.rebuysUsed < maxReentries && (
+                      <Small onClick={() => void rebuy(p.id, 'reentry')} disabled={busy}>
+                        {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
+                      </Small>
+                    )}
+                    <Small onClick={() => void undo(p.id)} disabled={busy}>
+                      {t('players.undo')}
                     </Small>
-                  )}
-                  <Small onClick={() => void undo(p.id)} disabled={busy}>
-                    {t('players.undo')}
-                  </Small>
-                </div>
+                    {/* Wie zichzelf per ongeluk uitschakelde in plaats van
+                        weg te halen, komt hier terecht. Zonder deze knop is
+                        "terugdraaien" de enige uitweg en sta je nog steeds
+                        in een tornooi waar je niet in hoort. */}
+                    <Small
+                      danger
+                      onClick={() => setRemoving(removing === p.id ? null : p.id)}
+                      disabled={busy}
+                    >
+                      {t('players.remove')}
+                    </Small>
+                  </div>
+                )}
+              </div>
+
+              {removing === p.id && (
+                <RemoveConfirm
+                  t={t}
+                  busy={busy}
+                  onYes={() => void removeEntry(p.id)}
+                  onNo={() => setRemoving(null)}
+                />
               )}
             </li>
           ))}
@@ -785,6 +851,37 @@ export function FloorPlayers({
         )
       )}
     </section>
+  )
+}
+
+/**
+ * De bevestiging bij het weghalen van een deelname.
+ *
+ * Twee knoppen op de rij zelf en geen venster: aan de floor staat er iemand
+ * te wachten, en een dialoog die het scherm overneemt is precies wat je dan
+ * niet wil. De zin erboven zegt wat er verdwijnt, want dat is het enige wat
+ * je hier nog kan verkeerd inschatten.
+ */
+function RemoveConfirm({
+  t, busy, onYes, onNo,
+}: {
+  t: ReturnType<typeof useT>
+  busy: boolean
+  onYes: () => void
+  onNo: () => void
+}) {
+  return (
+    <div className="mt-2.5 rounded-lg border border-[color-mix(in_oklab,var(--danger)_35%,transparent)] bg-[color-mix(in_oklab,var(--danger)_8%,transparent)] p-2.5">
+      <p className="text-xs leading-relaxed text-[var(--danger)]">{t('players.removeConfirm')}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Small danger onClick={onYes} disabled={busy}>
+          {t('players.removeYes')}
+        </Small>
+        <Small onClick={onNo} disabled={busy}>
+          {t('common.cancel')}
+        </Small>
+      </div>
+    </div>
   )
 }
 
