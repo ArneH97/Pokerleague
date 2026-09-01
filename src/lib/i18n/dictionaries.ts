@@ -855,6 +855,9 @@ const nl = {
   'cal.live': 'Bezig',
   'cal.youIn': 'Jij speelt',
   'cal.entriesShort': '{n} ingeschreven',
+  'cal.rsvpCount': '{n} komen',
+  'cal.rsvpIn': 'Ik kom',
+  'cal.rsvpOut': 'Toch niet',
   'cal.empty': 'Nog niets ingepland',
   'cal.emptyBody':
     'Je clubs hebben nog geen avonden in de agenda staan. Zodra ze er een aanmaken verschijnt hij hier vanzelf.',
@@ -1901,6 +1904,9 @@ const fr: Record<Key, string> = {
   'cal.live': 'En cours',
   'cal.youIn': 'Vous jouez',
   'cal.entriesShort': '{n} inscrits',
+  'cal.rsvpCount': '{n} viennent',
+  'cal.rsvpIn': 'Je viens',
+  'cal.rsvpOut': 'Finalement non',
   'cal.empty': 'Rien de prévu pour l’instant',
   'cal.emptyBody':
     'Vos clubs n’ont encore aucune soirée à l’agenda. Dès qu’ils en créent une, elle apparaît ici toute seule.',
@@ -2941,6 +2947,9 @@ const en: Record<Key, string> = {
   'cal.live': 'Under way',
   'cal.youIn': 'You’re in',
   'cal.entriesShort': '{n} signed up',
+  'cal.rsvpCount': '{n} coming',
+  'cal.rsvpIn': 'I am coming',
+  'cal.rsvpOut': 'Actually, no',
   'cal.empty': 'Nothing on the calendar yet',
   'cal.emptyBody':
     'Your clubs have not scheduled any nights yet. The moment they create one, it turns up here by itself.',

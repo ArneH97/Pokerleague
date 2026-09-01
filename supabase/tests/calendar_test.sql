@@ -22,6 +22,7 @@ declare
   v_struct uuid; v_pay uuid;
   v_user uuid; v_me uuid;
   v_open uuid; v_dicht uuid; v_bezig uuid; v_klaar uuid; v_ander uuid; v_later uuid;
+  v_vreemd_dicht uuid;
   v_tp uuid;
   v_n int; v_slug text; v_i boolean;
   r record;
@@ -89,6 +90,12 @@ begin
   values (v_club_x, 'Niet van jou', now() + interval '2 days',
           'scheduled'::tournament_status, 'public'::visibility, 2000, 0, 20000)
   returning id into v_later;
+
+  insert into tournaments (club_id, name, scheduled_at, status, player_visibility,
+                           buyin_cents, fee_cents, starting_stack)
+  values (v_club_x, 'Besloten bij vreemden', now() + interval '3 days',
+          'scheduled'::tournament_status, 'members'::visibility, 2000, 0, 20000)
+  returning id into v_vreemd_dicht;
 
   -- Hij schrijft zich in voor de avond die bezig is.
   v_tp := public.floor_add_entry(v_bezig, v_me, null, null);
@@ -178,6 +185,61 @@ begin
   end;
   reset role;
   raise notice 'OK  zonder aanmelding komt er niets uit de agenda';
+
+  -- ------------------------------------------------------------------- 7 ---
+  -- Zelf inschrijven vanuit de kalender.
+  perform set_config('request.jwt.claim.sub', v_user::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+
+  select * into r from public.my_calendar() where name = 'Volgende donderdag';
+  if r.i_rsvp then raise exception 'FOUT: hij staat ingeschreven zonder dat hij dat deed'; end if;
+  if not r.can_rsvp then raise exception 'FOUT: hij kan zich niet inschrijven voor een geplande avond'; end if;
+
+  if public.rsvp_as_me(v_open)->>'status' <> 'ok' then
+    raise exception 'FOUT: zelf inschrijven lukte niet';
+  end if;
+
+  select * into r from public.my_calendar() where name = 'Volgende donderdag';
+  if not r.i_rsvp then raise exception 'FOUT: de kalender toont zijn inschrijving niet'; end if;
+  if r.registered <> 1 then raise exception 'FOUT: de teller staat op %', r.registered; end if;
+
+  if public.rsvp_as_me(v_open)->>'status' <> 'already' then
+    raise exception 'FOUT: twee keer inschrijven gaf niet already';
+  end if;
+
+  -- Afzeggen mag, en daarna kan hij opnieuw.
+  if not public.cancel_my_rsvp(v_open) then raise exception 'FOUT: afzeggen lukte niet'; end if;
+  select * into r from public.my_calendar() where name = 'Volgende donderdag';
+  if r.i_rsvp then raise exception 'FOUT: hij staat er nog op na het afzeggen'; end if;
+  if public.cancel_my_rsvp(v_open) then raise exception 'FOUT: twee keer afzeggen deed alsof er iets veranderde'; end if;
+  if public.rsvp_as_me(v_open)->>'status' <> 'ok' then
+    raise exception 'FOUT: opnieuw inschrijven na afzeggen lukte niet';
+  end if;
+
+  -- Een avond die bezig is, staat dicht. En wie al aan tafel zit, krijgt geen
+  -- knop meer.
+  if public.rsvp_as_me(v_bezig)->>'status' <> 'closed' then
+    raise exception 'FOUT: een lopende avond liet zich toch inschrijven';
+  end if;
+  select * into r from public.my_calendar() where name = 'Nu bezig';
+  if r.can_rsvp then raise exception 'FOUT: hij kan zich inschrijven terwijl hij al aan tafel zit'; end if;
+
+  -- Een besloten avond van een vreemde club laat zich niet inschrijven, ook
+  -- niet als hij het id ergens opving.
+  --
+  -- Een publieke avond van diezelfde club mág wel: dat is hetzelfde als
+  -- binnenwandelen. Hij wordt er dan meteen lid, precies zoals aan de deur.
+  if public.rsvp_as_me(v_vreemd_dicht)->>'status' <> 'hidden' then
+    raise exception 'FOUT: hij schreef zich in voor een besloten avond van een vreemde club';
+  end if;
+  if public.rsvp_as_me(v_later)->>'status' <> 'ok' then
+    raise exception 'FOUT: een publieke avond liet zich niet inschrijven';
+  end if;
+  reset role;
+  raise notice 'OK  een lid schrijft zichzelf in en uit vanuit zijn kalender';
 
   perform set_config('request.jwt.claim.sub', '', true);
   perform set_config('request.jwt.claim.role', '', true);

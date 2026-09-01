@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { PlayerNav } from '@/components/PlayerNav'
+import { RsvpToggle } from '@/components/RsvpToggle'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator, type Locale, type T } from '@/lib/i18n/dictionaries'
 import { publicLocale } from '@/lib/i18n/server'
@@ -23,9 +24,14 @@ import { formatMoney } from '@/lib/types'
  * de club, en de naam erbij — geen van beide alleen. Wie kleuren minder goed
  * onderscheidt heeft de naam; wie snel scrolt heeft de kleur.
  *
- * **Geen inschrijfknop.** Die bestaat nog niet in het product, en een knop die
- * niets doet is erger dan geen knop. Wat er wél staat is of je al ingeschreven
- * bent, want dat weet de database wel.
+ * **Inschrijven kan hier.** Bij een avond die nog moet komen staat rechts een
+ * knop: één tik en je staat op de lijst, nog een tik en je staat er weer af.
+ * Voor een lid dat al aangemeld is, is dat het hele formulier — naam, adres en
+ * geboortedatum weet het platform al. De uitgebreide inschrijfpagina blijft
+ * bestaan voor wie van een affiche komt en nog geen account heeft.
+ *
+ * De rij zelf blijft een link naar die pagina, want daar staat wat de avond
+ * kost, hoeveel bonuschips eraan hangen en hoeveel volk er al komt.
  */
 
 interface Row {
@@ -41,8 +47,12 @@ interface Row {
   timezone: string
   buyin_cents: number
   fee_cents: number
+  bonus_stack: number
   entries: number
+  registered: number
   i_play: boolean
+  i_rsvp: boolean
+  can_rsvp: boolean
 }
 
 export async function generateMetadata() {
@@ -143,7 +153,11 @@ function Event({ row, t, locale }: { row: Row; t: T; locale: Locale }) {
   return (
     <li>
       <Link
-        href={live ? `/c/${row.club_slug}/live/${row.tournament_id}` : `/c/${row.club_slug}/kalender`}
+        href={
+          live
+            ? `/c/${row.club_slug}/live/${row.tournament_id}`
+            : `/c/${row.club_slug}/inschrijven/${row.tournament_id}`
+        }
         className="flex items-stretch gap-3 overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] transition-colors hover:bg-[var(--surface-hover)]"
       >
         {/* De kleurstreep van de club. Vier pixels, en het is het enige waar je
@@ -172,6 +186,14 @@ function Event({ row, t, locale }: { row: Row; t: T; locale: Locale }) {
               {row.entries > 0 && (
                 <span className="tnum">{t('cal.entriesShort').replace('{n}', String(row.entries))}</span>
               )}
+              {row.registered > 0 && !live && (
+                <span className="tnum">{t('cal.rsvpCount').replace('{n}', String(row.registered))}</span>
+              )}
+              {row.bonus_stack > 0 && row.can_rsvp && !row.i_rsvp && (
+                <span className="font-medium text-[var(--brand)]">
+                  +{row.bonus_stack.toLocaleString('nl-BE')} {t('rsvp.chips')}
+                </span>
+              )}
               {live && (
                 <span className="flex shrink-0 items-center gap-1 rounded-full bg-[color-mix(in_oklab,var(--ok)_18%,transparent)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--ok)]">
                   <span aria-hidden className="size-1.5 rounded-full bg-[var(--ok)]" />
@@ -181,11 +203,15 @@ function Event({ row, t, locale }: { row: Row; t: T; locale: Locale }) {
             </span>
           </span>
 
-          {row.i_play && (
+          {/* Rechts staat wat je nog kan doen. Zit je al aan tafel, dan is er
+              niets meer te beslissen en staat er alleen een merkteken. */}
+          {row.i_play ? (
             <span className="shrink-0 rounded-full border border-[var(--line-strong)] px-2.5 py-1 text-[0.65rem] font-medium text-[var(--text-muted)]">
               {t('cal.youIn')}
             </span>
-          )}
+          ) : row.can_rsvp ? (
+            <RsvpToggle tournamentId={row.tournament_id} isIn={row.i_rsvp} size="sm" />
+          ) : null}
         </span>
       </Link>
     </li>
