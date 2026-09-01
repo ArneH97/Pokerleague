@@ -63,7 +63,7 @@ export function FloorPlayers({
   clubLocale: string
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const { players, members, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
+  const { players, members, rsvps, loading, error, reload } = useFloorPlayers(tournamentId, clubId)
   const t = useT()
 
   const [busy, setBusy] = useState(false)
@@ -329,6 +329,54 @@ export function FloorPlayers({
         busy={busy}
         onMarkPaid={(id, paid) => void markPaid(id, paid)}
       />
+
+      {/* --------------------------------------------- vooraf ingeschreven
+          De afvinklijst van de avond. Wie op de affiche zijn plaats vastzette,
+          staat hier met één knop ernaast: tikken en hij zit aan tafel, met
+          zijn bonuschips er al bij geteld.
+
+          Bovenaan en niet onderaan, want in het eerste half uur is dit het
+          enige waar de floor mee bezig is. En de lijst wordt vanzelf korter:
+          wie eenmaal zit, verdwijnt eruit. Is iedereen binnen, dan is het blok
+          weg en staat er geen leeg kader in de weg. */}
+      {!finished && rsvps.length > 0 && (
+        <section className="rounded-2xl border border-[var(--brand)] bg-[var(--surface)] p-4">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h3 className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--brand)]">
+              {t('rsvpList.title').replace('{n}', String(rsvps.length))}
+            </h3>
+            {/* Op een telefoon valt deze regel weg: daar is de knop zelf
+                duidelijk genoeg en anders breekt de kop over twee regels. */}
+            <span className="hidden text-xs text-[var(--text-faint)] sm:inline">
+              {t('rsvpList.floorHint')}
+            </span>
+          </div>
+
+          <ul className="space-y-1.5">
+            {rsvps.map((r) => (
+              <li
+                key={r.playerId}
+                className="flex items-center gap-3 rounded-xl bg-[var(--surface-2)] px-3.5 py-2.5"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{r.name}</span>
+                  {r.email && (
+                    <span className="block truncate text-xs text-[var(--text-faint)]">{r.email}</span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void addExisting(r.playerId)}
+                  className="shrink-0 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
+                >
+                  {t('rsvpList.seat')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* ------------------------------------------------- filter + toevoegen */}
       {/* Twee losse dingen naast elkaar, en dat is precies de bedoeling: links

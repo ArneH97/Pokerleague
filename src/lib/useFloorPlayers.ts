@@ -32,6 +32,14 @@ export interface ClubMember {
   email: string | null
 }
 
+/** Iemand die vooraf inschreef en nog niet aan tafel zit. */
+export interface FloorRsvp {
+  playerId: string
+  name: string
+  email: string | null
+  hasAccount: boolean
+}
+
 interface Row {
   id: string
   player_id: string
@@ -54,11 +62,12 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
   const supabase = useMemo(() => createClient(), [])
   const [players, setPlayers] = useState<FloorPlayer[]>([])
   const [members, setMembers] = useState<ClubMember[]>([])
+  const [rsvps, setRsvps] = useState<FloorRsvp[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [tpRes, memberRes] = await Promise.all([
+    const [tpRes, memberRes, rsvpRes] = await Promise.all([
       supabase
         .from('tournament_players')
         .select(
@@ -71,6 +80,11 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
         .select('player_id,players(display_name,email)')
         .eq('club_id', clubId)
         .overrideTypes<MemberRow[]>(),
+      // Wie vooraf inschreef en nog niet aan tafel zit. De functie laat
+      // iemand vallen zodra hij ingeschreven is aan de deur, dus deze lijst
+      // wordt vanzelf korter naarmate de zaal vol loopt — dat is precies wat
+      // je wil afvinken.
+      supabase.rpc('tournament_rsvp_list', { p_tournament_id: tournamentId }),
     ])
 
     if (tpRes.error) {
@@ -103,6 +117,19 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
         }))
         .filter((m) => m.name !== ''),
     )
+    setRsvps(
+      ((rsvpRes.data ?? []) as unknown as {
+        player_id: string; display_name: string; email: string | null
+        has_account: boolean; at_table: boolean
+      }[])
+        .filter((r) => !r.at_table)
+        .map((r) => ({
+          playerId: r.player_id,
+          name: r.display_name,
+          email: r.email,
+          hasAccount: r.has_account,
+        })),
+    )
     setError(null)
     setLoading(false)
   }, [supabase, tournamentId, clubId])
@@ -129,5 +156,5 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
     }
   }, [supabase, tournamentId, load])
 
-  return { players, members, loading, error, reload: load }
+  return { players, members, rsvps, loading, error, reload: load }
 }

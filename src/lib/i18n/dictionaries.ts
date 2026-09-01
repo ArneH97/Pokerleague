@@ -992,6 +992,8 @@ const nl = {
   'rsvpList.noAccount': 'nog geen account',
   'rsvpList.hint':
     'Deze mensen krijgen aan de deur automatisch hun bonuschips. Zodra je iemand toevoegt aan de tafel, verdwijnt hij uit deze lijst.',
+  'rsvpList.seat': 'Aan tafel',
+  'rsvpList.floorHint': 'tik om in te schrijven',
 
   // Platformbeheer. Alleen zichtbaar voor wie in platform_admins staat, maar
   // wel in drie talen — het scherm volgt dezelfde taalkeuze als de rest, en
@@ -2028,6 +2030,8 @@ const fr: Record<Key, string> = {
   'rsvpList.noAccount': 'pas encore de compte',
   'rsvpList.hint':
     'Ces personnes reçoivent automatiquement leurs jetons bonus à l’entrée. Dès que vous ajoutez quelqu’un à la table, il disparaît de cette liste.',
+  'rsvpList.seat': 'À table',
+  'rsvpList.floorHint': 'touchez pour inscrire',
 
   'adm.link': 'Administration',
   'adm.overline': 'Administration de la plateforme',
@@ -3059,6 +3063,8 @@ const en: Record<Key, string> = {
   'rsvpList.noAccount': 'no account yet',
   'rsvpList.hint':
     'These people automatically get their bonus chips at the door. The moment you add someone to the table, they drop off this list.',
+  'rsvpList.seat': 'Seat',
+  'rsvpList.floorHint': 'tap to sign in',
 
   'adm.link': 'Admin',
   'adm.overline': 'Platform admin',
