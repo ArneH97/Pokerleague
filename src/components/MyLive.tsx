@@ -38,6 +38,8 @@ export interface LiveRow {
   level_idx: number
   my_chips: number
   my_chips_by: string | null
+  my_chips_at: string | null
+  counts_frozen: boolean
   players_left: number
   entries: number
   avg_stack: number
@@ -142,20 +144,27 @@ function Row({ r }: { r: LiveRow }) {
           <input
             inputMode="numeric"
             value={chips}
+            disabled={r.counts_frozen}
             onChange={(e) => setChips(e.target.value)}
             onFocus={(e) => e.target.select()}
-            className="tnum w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 text-lg outline-none focus:border-[var(--brand)]"
+            className="tnum w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 text-lg outline-none focus:border-[var(--brand)] disabled:opacity-45"
           />
         </label>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || r.counts_frozen}
           onClick={() => void save()}
           className="rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:opacity-45"
           style={{ background: accent, color: 'var(--on-brand)' }}
         >
           {busy ? t('common.busy') : saved ? t('common.saved') : t('common.save')}
         </button>
+
+        {/* Een veld dat op slot staat zonder uitleg leest als een storing.
+            Met de reden erbij is het een mededeling: de floor is bezig. */}
+        {r.counts_frozen && (
+          <span className="w-full text-xs text-[var(--warn)]">{t('live.frozen')}</span>
+        )}
 
         {ratio !== null && (
           <span className="tnum w-full text-xs text-[var(--text-faint)] sm:w-auto">

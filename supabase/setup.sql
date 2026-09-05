@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -10465,5 +10465,375 @@ begin
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     grant execute on function public.floor_rebuy(uuid, buyin_kind) to authenticated;
     grant execute on function public.floor_undo_last_buyin(uuid) to authenticated;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0051_chips_in_spel.sql
+-- =========================================================================
+
+-- Pokerleague — hoeveel chips er écht in spel zijn
+--
+-- Op het zaalscherm en in het dealpaneel staat "chips in spel". Dat getal werd
+-- geraden uit de tellers: elke inkoop, rebuy en re-entry één startstapel, elke
+-- addon een addonstapel. Sinds vanmiddag klopt dat op twee punten niet meer.
+--
+--   * **De bonus van de voorinschrijving stond er nooit in.** Wie vooraf
+--     inschrijft begint met 45.000 en niet met 40.000. Met twintig van die
+--     spelers zit er 100.000 aan chips op tafel die het scherm niet kent — en
+--     dan lijkt het alsof er een fiches-la verdwenen is terwijl alles klopt.
+--   * **Een rebuy legt niet langer een startstapel bíj.** Hij zet de stapel op
+--     de startstapel (zie 0050). Wie met 8.000 opnieuw inkocht, brengt er dus
+--     32.000 bij en geen 40.000.
+--
+-- Raden is hier ook niet nodig, want elke inkoop staat al als eigen rij in het
+-- geldregister. Er ontbrak alleen een kolom: hoeveel chips die inkoop op tafel
+-- legde. Vanaf nu staat dat erbij, en is "chips in spel" gewoon de som van die
+-- kolom — even hard als de prijzenpot, en met dezelfde herkomst.
+--
+-- **Waarom een trigger en niet een regel in elke functie.** De twee functies
+-- die inkopen boeken zijn de drukste van de avond en samen driehonderd regels.
+-- Ze allebei herschrijven om er één berekening in te weven, daags voor een
+-- opening, is precies het soort verandering waarvan je 's nachts wakker ligt.
+-- Een trigger op `buyins` heeft alles wat hij nodig heeft — het tornooi en de
+-- stapel van de speler op dat moment — en laat die functies met rust.
+--
+-- Dat werkt omdat beide functies dezelfde volgorde aanhouden. Bij een eerste
+-- inkoop bestaat de deelnemersrij al, mét de bonus erin; bij een rebuy is de
+-- stapel nog die van vóór de inkoop. Precies wat er nodig is.
+
+alter table buyins
+  add column if not exists chips_delta int;
+
+comment on column public.buyins.chips_delta is
+  'Hoeveel chips deze inkoop op tafel legde. Bij een eerste inkoop de startstapel plus een eventuele bonus voor voorinschrijving; bij een rebuy het verschil met wat de speler nog had; bij een re-entry een verse startstapel; bij een addon de addonstapel. De som over alle niet-geschrapte rijen is het aantal chips in spel.';
+
+-- ---------------------------------------------------------------------------
+-- 1. De berekening, één keer, op de rand van de tabel
+-- ---------------------------------------------------------------------------
+
+create or replace function public.set_buyin_chip_delta()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t  tournaments%rowtype;
+  tp tournament_players%rowtype;
+begin
+  -- Wie het zelf meegeeft, weet het beter. Laat staan.
+  if new.chips_delta is not null then
+    return new;
+  end if;
+
+  select * into t  from tournaments        where id = new.tournament_id;
+  select * into tp from tournament_players where id = new.tournament_player_id;
+
+  new.chips_delta := case new.kind
+    -- De eerste inkoop: de stapel die de speler zojuist kreeg, bonus en al.
+    when 'buyin'   then coalesce(tp.chip_count, t.starting_stack)
+    -- Een addon is een extra portie bovenop wat er ligt.
+    when 'addon'   then coalesce(t.addon_stack, t.starting_stack)
+    -- Een rebuy vervangt de stapel: er komt bij wat het verschil is met wat
+    -- de speler nog had liggen.
+    when 'rebuy'   then greatest(0, t.starting_stack - coalesce(tp.chip_count, 0))
+    -- Een re-entry: de speler lag eruit en zijn chips telden al niet meer mee,
+    -- dus dit is een volle verse stapel.
+    else t.starting_stack
+  end;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists buyins_chip_delta on buyins;
+create trigger buyins_chip_delta
+  before insert on buyins
+  for each row execute function public.set_buyin_chip_delta();
+
+-- ---------------------------------------------------------------------------
+-- 2. Wat er al geboekt is
+-- ---------------------------------------------------------------------------
+-- Bestaande rijen krijgen wat er destijds gebeurde, en niet wat er vandaag zou
+-- gebeuren: tot 0050 legde een rebuy wél een volle startstapel bij. Een oude
+-- avond hoort achteraf niet van cijfers te veranderen.
+
+update buyins b
+set chips_delta = case b.kind
+  when 'addon' then coalesce(t.addon_stack, t.starting_stack)
+  else t.starting_stack
+end
+from tournaments t
+where t.id = b.tournament_id
+  and b.chips_delta is null;
+
+-- ---------------------------------------------------------------------------
+-- 3. Het getal zelf
+-- ---------------------------------------------------------------------------
+-- Voor de zaalklok en het dealpaneel. Leesbaar voor wie het tornooi mag zien —
+-- dit is een totaal en geen bedrag, en het staat op het scherm in de zaal.
+
+create or replace function public.chips_in_play(p_tournament_id uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select coalesce(sum(b.chips_delta), 0)::int
+  from buyins b
+  where b.tournament_id = p_tournament_id
+    and not b.is_void
+    and public.can_view_tournament(p_tournament_id);
+$$;
+
+comment on function public.chips_in_play(uuid) is
+  'Hoeveel chips er in spel horen te zijn, uit het geldregister en niet uit wat spelers doorgeven. IJkpunt bij het tellen aan de finaletafel.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.chips_in_play(uuid) to authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    grant execute on function public.chips_in_play(uuid) to anon;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0052_stapels_bevriezen.sql
+-- =========================================================================
+
+-- Pokerleague — de ingave van spelers bevriezen, en zien wie wat intikte
+--
+-- Aan het einde van de avond komt het moment waarop de chipcounts ineens
+-- zwaar wegen: daar hangt een deal aan, of de bepaling van wie er in het geld
+-- valt. Op dat moment wil de floor rondgaan, de stapels tellen en ze zelf
+-- invullen — en wil hij niet dat er ondertussen nog iemand op zijn gsm een
+-- getal verzet. Vandaar een grendel.
+--
+-- **De grendel geldt alleen voor spelers.** De floor blijft invullen, want dat
+-- is precies wat hij aan het doen is. Het is geen slot op de tabel maar een
+-- slot op één weg ernaartoe.
+--
+-- **En hij staat op de avond, niet op de speler.** Bevriezen is een moment in
+-- het verloop van het tornooi ("we gaan tellen"), geen eigenschap van iemand.
+-- We bewaren het tijdstip en niet enkel ja/nee, zodat het scherm kan zeggen
+-- sinds wanneer — en zodat je achteraf ziet dat er geteld is vóór de deal.
+--
+-- **Wat er al werd bijgehouden.** Elke wijziging van een chipcount stempelt al
+-- wie hem zette (`floor` of `player`) en wanneer. Dat stond nergens op het
+-- scherm. Het hoort er wel: een stapel die de speler zelf twintig minuten
+-- geleden intikte, is iets anders dan eentje die de floor net geteld heeft, en
+-- dat verschil bepaalt of je gaat rondlopen of niet.
+
+alter table tournaments
+  add column if not exists counts_frozen_at timestamptz;
+
+comment on column public.tournaments.counts_frozen_at is
+  'Sinds wanneer spelers hun eigen chipcount niet meer mogen wijzigen. Leeg = ingave staat open. De floor blijft altijd invullen.';
+
+-- ---------------------------------------------------------------------------
+-- 1. De bewaking van de chipcount kent de grendel
+-- ---------------------------------------------------------------------------
+
+create or replace function public.guard_player_chip_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_is_staff boolean;
+  v_is_self  boolean;
+  v_frozen   timestamptz;
+begin
+  if public.is_service_context() then
+    return new;
+  end if;
+
+  v_is_staff := public.has_club_role(new.club_id, array['owner','admin','floor']::club_role[]);
+  if v_is_staff then
+    if new.chip_count is distinct from old.chip_count then
+      new.chip_count_updated_at := now();
+      new.chip_count_by := 'floor';
+    end if;
+    return new;
+  end if;
+
+  select exists (
+    select 1 from players p
+    where p.id = new.player_id and p.auth_user_id = auth.uid()
+  ) into v_is_self;
+
+  if not v_is_self then
+    raise exception 'Geen rechten om deze deelnemer bij te werken'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  if old.status <> 'active' then
+    raise exception 'Je kan geen stack meer ingeven: je bent niet meer actief in dit tornooi'
+      using errcode = 'check_violation';
+  end if;
+
+  -- De grendel. Alleen voor de speler zelf; de floor is hierboven al langs.
+  select t.counts_frozen_at into v_frozen
+  from tournaments t where t.id = new.tournament_id;
+
+  if v_frozen is not null and new.chip_count is distinct from old.chip_count then
+    raise exception 'De floor is de stapels aan het tellen. Je kan je aantal nu niet wijzigen.'
+      using errcode = 'check_violation';
+  end if;
+
+  -- Alles behalve het chipaantal moet gelijk blijven.
+  if (new.status, new.table_no, new.seat_no, new.finish_position,
+      new.reentries_used, new.rebuys_used, new.addons_used, new.bounties_won,
+      new.player_id, new.tournament_id, new.club_id)
+     is distinct from
+     (old.status, old.table_no, old.seat_no, old.finish_position,
+      old.reentries_used, old.rebuys_used, old.addons_used, old.bounties_won,
+      old.player_id, old.tournament_id, old.club_id)
+  then
+    raise exception 'Je kan alleen je eigen chipaantal aanpassen'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  if new.chip_count is not null and (new.chip_count < 0 or new.chip_count > 1000000000) then
+    raise exception 'Onmogelijk chipaantal' using errcode = 'check_violation';
+  end if;
+
+  new.chip_count_updated_at := now();
+  new.chip_count_by := 'player';
+  return new;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 2. De knop
+-- ---------------------------------------------------------------------------
+
+create or replace function public.floor_freeze_counts(
+  p_tournament_id uuid,
+  p_frozen        boolean
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t      tournaments%rowtype;
+  v_when timestamptz;
+begin
+  select * into t from tournaments where id = p_tournament_id;
+  if not found then
+    raise exception 'Tornooi bestaat niet';
+  end if;
+
+  if not public.is_service_context()
+     and not public.has_club_role(t.club_id, array['owner','admin','floor']::club_role[]) then
+    raise exception 'Geen rechten' using errcode = 'insufficient_privilege';
+  end if;
+
+  -- Nog eens bevriezen terwijl het al vast staat, laat het tijdstip staan:
+  -- anders verspringt "sinds 14 minuten" naar "sinds nu" omdat iemand twee
+  -- keer klikte.
+  v_when := case
+              when not p_frozen then null
+              else coalesce(t.counts_frozen_at, now())
+            end;
+
+  update tournaments set counts_frozen_at = v_when where id = p_tournament_id;
+  return v_when;
+end;
+$$;
+
+comment on function public.floor_freeze_counts(uuid, boolean) is
+  'Zet de ingave van chipcounts door spelers op slot, of geeft ze weer vrij. De floor kan altijd invullen. Geeft het tijdstip terug waarop de grendel dichtging.';
+
+-- ---------------------------------------------------------------------------
+-- 3. De spelerskant weet het ook
+-- ---------------------------------------------------------------------------
+-- Zonder dit staat er op de gsm van de speler een invulveld dat bij het
+-- opslaan een foutmelding geeft. Beter is een veld dat op slot staat met de
+-- reden erbij.
+
+drop function if exists public.my_live_tournaments();
+
+create or replace function public.my_live_tournaments()
+returns table (
+  tournament_id        uuid,
+  tournament_player_id uuid,
+  name                 text,
+  club_slug            text,
+  club_name            text,
+  logo_url             text,
+  primary_color        text,
+  currency             char(3),
+  status               text,
+  clock                text,
+  level_idx            int,
+  my_chips             int,
+  my_chips_by          text,
+  my_chips_at          timestamptz,
+  counts_frozen        boolean,
+  players_left         int,
+  entries              int,
+  avg_stack            int,
+  prize_pool_cents     bigint
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with me as (
+    select id from players
+    where auth_user_id = auth.uid() and merged_into_id is null
+  ),
+  mijn as (
+    select tp.*
+    from tournament_players tp
+    join tournaments t on t.id = tp.tournament_id
+    where tp.player_id = (select id from me)
+      and t.status in ('running', 'paused')
+      and tp.status in ('active', 'registered')
+  )
+  select
+    t.id,
+    m.id,
+    t.name,
+    c.slug,
+    c.name,
+    c.logo_url,
+    c.primary_color,
+    c.currency,
+    t.status::text,
+    t.clock::text,
+    t.level_idx,
+    m.chip_count,
+    m.chip_count_by::text,
+    m.chip_count_updated_at,
+    t.counts_frozen_at is not null,
+    (select count(*)::int from tournament_players x
+      where x.tournament_id = t.id and x.status in ('active','registered')),
+    (select count(*)::int from tournament_players x where x.tournament_id = t.id),
+    (public.chips_in_play(t.id) / greatest(1, (
+       select count(*)::int from tournament_players x
+       where x.tournament_id = t.id and x.status in ('active','registered'))))::int,
+    (select coalesce(sum(b.amount_cents), 0) from buyins b
+      where b.tournament_id = t.id and not b.is_void)
+  from mijn m
+  join tournaments t on t.id = m.tournament_id
+  join clubs c       on c.id = t.club_id
+  order by t.scheduled_at desc;
+$$;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.floor_freeze_counts(uuid, boolean) to authenticated;
+    grant execute on function public.my_live_tournaments() to authenticated;
   end if;
 end $$;

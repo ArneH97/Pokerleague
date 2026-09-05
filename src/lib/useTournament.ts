@@ -39,7 +39,7 @@ interface State {
 
 const EMPTY_STATS: TournamentStats = {
   entriesTotal: 0, playersLeft: 0, totalChips: 0, prizePoolCents: 0,
-  buyins: 0, rebuys: 0, reentries: 0, addons: 0,
+  buyins: 0, rebuys: 0, reentries: 0, addons: 0, chipsInPlay: 0,
 }
 
 function toLevel(r: BlindLevelRow): BlindLevel {
@@ -88,7 +88,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
       return
     }
 
-    const [clubRes, levelRes, playerRes, potRes, dealRes, prizeRes] = await Promise.all([
+    const [clubRes, levelRes, playerRes, potRes, dealRes, prizeRes, chipRes] = await Promise.all([
       supabase.from('clubs').select('id,slug,name,currency,timezone,locale,logo_url,mark_url,primary_color')
         .eq('id', t.club_id).maybeSingle<ClubRow>(),
       t.structure_id
@@ -112,6 +112,11 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
       // De prijzenladder hangt in de zaal op het bord; hier halen we hem op
       // zodat het zaalscherm hem af en toe kan tonen.
       supabase.rpc('tournament_prizes', { p_tournament_id: tournamentId }),
+      // Hoeveel chips er in spel horen te zijn. Uit de databank en niet uit
+      // de tellers hierboven: de bonuschips van een voorinschrijving en een
+      // rebuy die de stapel vervangt, vallen niet te herleiden uit "hoeveel
+      // inkopen waren er". Zie migratie 0051.
+      supabase.rpc('chips_in_play', { p_tournament_id: tournamentId }),
     ])
 
     const players = (playerRes.data ?? []) as { status: string; chip_count: number | null }[]
@@ -136,6 +141,7 @@ export function useTournament(tournamentId: string): State & { reload: () => voi
         rebuys: count('rebuy'),
         reentries: count('reentry'),
         addons: count('addon'),
+        chipsInPlay: Number(chipRes.data ?? 0),
       },
       deal: dealRes.data
         ? {

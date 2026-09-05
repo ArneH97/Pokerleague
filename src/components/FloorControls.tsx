@@ -299,6 +299,7 @@ export function FloorControls({
         potCents={stats.prizePoolCents}
         entriesClosed={entriesClosed}
         expectedChips={expectedChips}
+        countsFrozenAt={tournament.counts_frozen_at}
         clubLocale={club?.locale ?? 'nl'}
       />
 

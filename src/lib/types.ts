@@ -36,6 +36,8 @@ export interface TournamentRow {
   level_elapsed_ms: number
   started_at: string | null
   ended_at: string | null
+  /** Sinds wanneer spelers hun eigen chipcount niet meer mogen wijzigen. */
+  counts_frozen_at: string | null
 }
 
 export interface BlindLevelRow {
@@ -77,14 +79,25 @@ export interface TournamentStats {
   rebuys: number
   reentries: number
   addons: number
+  /**
+   * Hoeveel chips er in spel horen te zijn, opgeteld uit het geldregister.
+   * Zie `chips_in_play` in migratie 0051.
+   */
+  chipsInPlay: number
 }
 
 /**
  * Hoeveel chips er in spel horen te zijn.
  *
- * Elke inkoop en elke rebuy of re-entry legt een startstack op tafel, een
- * addon zijn eigen aantal. Dit getal is exact: het volgt uit het geldregister
- * en niet uit wat spelers doorgeven.
+ * Dit getal is exact: het volgt uit het geldregister en niet uit wat spelers
+ * doorgeven. Elke inkoop draagt bij wat ze op tafel legde — een eerste inkoop
+ * de startstapel plus een eventuele bonus voor voorinschrijving, een rebuy
+ * alleen het verschil met wat de speler nog had, een addon zijn eigen aantal.
+ *
+ * Het stond hier eerst als een som van tellers maal de startstapel. Dat werkte
+ * zolang elke inkoop precies één startstapel op tafel legde, en dat is sinds
+ * de bonuschips en de nieuwe rebuyregel niet meer zo. De berekening staat nu
+ * in de databank, per inkoop, op het moment dat de chips er komen.
  *
  * Daarom rekent de gemiddelde stack hiermee en niet met de opgetelde
  * chipcounts. Die counts zijn een schatting — op een gewone avond vult bijna
@@ -92,12 +105,10 @@ export interface TournamentStats {
  * startstack blijven staan in plaats van te stijgen bij elke afvaller.
  */
 export function expectedChipsInPlay(
-  t: Pick<TournamentRow, 'starting_stack' | 'addon_stack'>,
-  stats: Pick<TournamentStats, 'buyins' | 'rebuys' | 'reentries' | 'addons'>,
+  _t: Pick<TournamentRow, 'starting_stack' | 'addon_stack'>,
+  stats: Pick<TournamentStats, 'chipsInPlay'>,
 ): number {
-  const start = t.starting_stack ?? 0
-  return (stats.buyins + stats.rebuys + stats.reentries) * start
-    + stats.addons * (t.addon_stack ?? start)
+  return stats.chipsInPlay
 }
 
 /** Databaserij omzetten naar de klokstand die clock.ts verwacht. */

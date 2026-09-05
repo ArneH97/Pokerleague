@@ -45,6 +45,7 @@ export function FloorPlayers({
   potCents,
   entriesClosed,
   expectedChips,
+  countsFrozenAt,
   clubLocale,
 }: {
   tournamentId: string
@@ -60,6 +61,8 @@ export function FloorPlayers({
   entriesClosed: boolean
   /** Hoeveel chips er in spel horen te zijn; ijkpunt bij het tellen. */
   expectedChips: number
+  /** Sinds wanneer spelers hun eigen stapel niet meer mogen wijzigen. */
+  countsFrozenAt: string | null
   /** De taal van de club. Vertrekpunt voor de taalkeuze bij een nieuwe speler. */
   clubLocale: string
 }) {
@@ -91,6 +94,14 @@ export function FloorPlayers({
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
   const [dealOpen, setDealOpen] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
+
+  // "7 min geleden" moet vanzelf 8 worden. Elke halve minuut volstaat: het
+  // gaat om een orde van grootte, niet om een stopwatch.
+  const [nu, setNu] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNu(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Wie er geld krijgt, en wat er al uitbetaald is.
   const payouts = usePayouts(tournamentId)
@@ -258,6 +269,18 @@ export function FloorPlayers({
   }
 
   /**
+   * De ingave door spelers op slot, zodat de floor kan rondgaan en tellen.
+   * De floor zelf blijft invullen; dat is precies wat hij aan het doen is.
+   */
+  async function bevries(aan: boolean) {
+    // Geen reload nodig: het floorscherm luistert op wijzigingen aan het
+    // tornooi, dus de grendel komt vanzelf terug binnen.
+    await run(() => supabase.rpc('floor_freeze_counts', {
+      p_tournament_id: tournamentId, p_frozen: aan,
+    }))
+  }
+
+  /**
    * De verkeerde man toegevoegd. Niet uitschakelen — dat maakt hem eerste in
    * een tornooi waar hij niet in hoort — maar weghalen, met zijn inkoop erbij.
    * De server weigert het zodra er echt geld mee gemoeid is.
@@ -322,6 +345,46 @@ export function FloorPlayers({
         <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text-muted)]">
           {t('players.isFinished')}
         </p>
+      )}
+
+      {/* De grendel op de ingave door spelers.
+          Staat hier, boven de lijst, en niet weggestopt in een menu: het is
+          een handeling die bij een moment hoort — "we gaan tellen" — en dat
+          moment komt met de zaal om je heen. */}
+      {!finished && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+            countsFrozenAt
+              ? 'border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_10%,transparent)]'
+              : 'border-[var(--line)] bg-[var(--surface-2)]'
+          }`}
+        >
+          <span className="min-w-0">
+            <span className={`block text-sm font-medium ${countsFrozenAt ? 'text-[var(--warn)]' : ''}`}>
+              {countsFrozenAt ? t('players.frozenTitle') : t('players.openTitle')}
+            </span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-[var(--text-faint)]">
+              {countsFrozenAt
+                ? t('players.frozenBody').replace(
+                    '{n}',
+                    String(Math.max(0, Math.round((nu.getTime() - Date.parse(countsFrozenAt)) / 60_000))),
+                  )
+                : t('players.openBody')}
+            </span>
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void bevries(!countsFrozenAt)}
+            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
+              countsFrozenAt
+                ? 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+                : 'bg-[var(--brand)] text-[var(--on-brand)] hover:brightness-110'
+            }`}
+          >
+            {countsFrozenAt ? t('players.unfreeze') : t('players.freeze')}
+          </button>
+        </div>
       )}
 
       {/* Bovenaan, want dit is het enige wat op dat moment telt. */}
@@ -624,11 +687,10 @@ export function FloorPlayers({
                       </span>
                     )}
                   </span>
-                  {p.email && (
-                    <span className="block truncate text-xs text-[var(--text-faint)]">
-                      {p.email}
-                    </span>
-                  )}
+                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-[var(--text-faint)]">
+                    {p.email && <span className="truncate">{p.email}</span>}
+                    <Herkomst door={p.chipCountBy} wanneer={p.chipCountAt} nu={nu} t={t} />
+                  </span>
                 </span>
 
                 <ChipInput
@@ -1069,6 +1131,43 @@ function NewPlayerForm({
  * Bij elke toetsaanslag opslaan zou betekenen dat "20000" onderweg even
  * "2", "20", "200" is — en dat staat dan zo op het zaalscherm.
  */
+/**
+ * Wie deze stapel intikte, en hoe lang geleden.
+ *
+ * Aan het einde van de avond is dat het verschil tussen een getal waarop je
+ * een deal kan bouwen en een getal dat iemand twintig minuten geleden op zijn
+ * gsm gokte. De databank houdt het allang bij; het stond alleen nergens.
+ *
+ * Alleen minuten, geen seconden en geen exacte tijdstippen: je wil weten of
+ * het vers is, niet hoe vers precies.
+ */
+function Herkomst({
+  door, wanneer, nu, t,
+}: {
+  door: string | null
+  wanneer: string | null
+  nu: Date
+  t: ReturnType<typeof useT>
+}) {
+  if (door === null || wanneer === null) {
+    return <span className="italic">{t('players.chipsNever')}</span>
+  }
+
+  const minuten = Math.max(0, Math.round((nu.getTime() - Date.parse(wanneer)) / 60_000))
+  const geleden = minuten < 1
+    ? t('players.chipsJustNow')
+    : minuten < 60
+      ? t('players.chipsMinutesAgo').replace('{n}', String(minuten))
+      : t('players.chipsHoursAgo').replace('{n}', String(Math.floor(minuten / 60)))
+
+  const speler = door === 'player'
+  return (
+    <span className={speler ? 'text-[var(--warn)]' : ''}>
+      {speler ? t('players.chipsByPlayer') : t('players.chipsByFloor')} · {geleden}
+    </span>
+  )
+}
+
 function ChipInput({
   value, disabled, label, onCommit,
 }: {
