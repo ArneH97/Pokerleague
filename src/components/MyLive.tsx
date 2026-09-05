@@ -47,6 +47,8 @@ export interface LiveRow {
   my_chips_by: string | null
   my_chips_at: string | null
   counts_frozen: boolean
+  my_table: number | null
+  my_seat: number | null
   players_left: number
   entries: number
   avg_stack: number
@@ -175,6 +177,19 @@ function Row({ r }: { r: LiveRow }) {
             {r.club_name} · {t('live.level')} {r.level_idx + 1}
             {r.clock === 'paused' ? ` · ${t('live.paused')}` : ''}
           </span>
+          {/* Waar je zit. Bovenaan bij de naam van de avond en niet tussen de
+              cijfers: dit is het enige wat je nodig hebt als je met je jas nog
+              aan de zaal binnenkomt. */}
+          {r.my_table !== null && r.my_seat !== null && (
+            <span
+              className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ background: `color-mix(in oklab, ${accent} 18%, transparent)`, color: accent }}
+            >
+              {t('live.tableSeat')
+                .replace('{t}', String(r.my_table))
+                .replace('{s}', String(r.my_seat))}
+            </span>
+          )}
         </span>
         <Link
           href={`/c/${r.club_slug}/live/${r.tournament_id}`}

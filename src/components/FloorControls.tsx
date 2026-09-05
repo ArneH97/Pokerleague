@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FloorPlayers } from '@/components/FloorPlayers'
+import { SeatingPanel } from '@/components/SeatingPanel'
 import { createClient } from '@/lib/supabase/client'
 import {
   resolveClock, levelsForClock, formatDuration, formatBlinds, breakLabel,
@@ -316,6 +317,14 @@ export function FloorControls({
         expectedChips={expectedChips}
         countsFrozenAt={tournament.counts_frozen_at}
         clubLocale={club?.locale ?? 'nl'}
+      />
+
+      {/* De tafelindeling. Dichtgeklapt tot je hem nodig hebt: aan de deur
+          gaat het over inschrijven, de indeling komt erna. */}
+      <SeatingPanel
+        tournamentId={tournamentId}
+        seatsPerTable={tournament.seats_per_table}
+        finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
       />
 
       {levels.length > 0 && (
