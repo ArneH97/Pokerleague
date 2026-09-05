@@ -58,6 +58,7 @@ const TABLE: [RegExp, Key][] = [
   // Geld en stapels.
   [/re-entry\/rebuy per tornooi/i, 'db.maxReentries'],
   [/^Er is geen inkoop om terug te draaien/i, 'db.nothingToUndo'],
+  [/meer dan de startstapel/i, 'db.rebuyAboveStack'],
   [/^Gebruik floor_add_entry/i, 'db.useAddEntry'],
   [/^Een bedrag kan niet negatief/i, 'db.negativeAmount'],
   [/^Geen bedragen opgegeven|^De bedragen in het voorstel zijn leeg/i, 'db.noAmounts'],

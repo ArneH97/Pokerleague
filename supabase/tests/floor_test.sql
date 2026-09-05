@@ -295,16 +295,20 @@ begin
   assert (select count(*) from buyins where tournament_id = v_tour) = 2,
     'de geschrapte inkoop hoort te blijven staan als spoor';
 
-  -- Een rebuy legt de buy-in in de pot en een startstack op tafel.
+  -- Een rebuy legt de buy-in in de pot en zet een verse startstack op tafel.
+  -- Niet erbij optellen: je koopt geen extra chips maar een nieuwe stapel.
+  -- Zie 0050. Deze speler staat op 12.000, dus de rebuy brengt hem op 20.000.
+  update tournament_players set chip_count = 12000 where id = v_tp;
   perform public.floor_rebuy(v_tp, 'rebuy');
-  assert (select chip_count from tournament_players where id = v_tp) = 40000,
-    'de rebuy hoorde een startstack bij te leggen';
+  assert (select chip_count from tournament_players where id = v_tp) = 20000,
+    'de rebuy hoorde de stapel op de startstack te zetten';
   select coalesce(sum(amount_cents),0) into v_pot
   from buyins where tournament_id = v_tour and not is_void;
   assert v_pot = 4000, 'de rebuy kwam niet in de prijzenpot terecht';
   perform public.floor_undo_last_buyin(v_tp);
-  assert (select chip_count from tournament_players where id = v_tp) = 20000,
+  assert (select chip_count from tournament_players where id = v_tp) = 12000,
     'de rebuy werd niet netjes teruggedraaid';
+  update tournament_players set chip_count = 20000 where id = v_tp;
 
   -- Een re-entry terugdraaien geeft de speler zijn oude stapel terug.
   update tournament_players set chip_count = 7777 where id = v_tp;
