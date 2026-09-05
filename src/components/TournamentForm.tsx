@@ -20,6 +20,40 @@ import { dbMessage } from '@/lib/dbMessage'
 
 export interface Option { id: string; name: string; extra?: string }
 
+/**
+ * Een avond die al bestaat. Staat dit er, dan bewerkt het formulier in plaats
+ * van aan te maken.
+ *
+ * `clockRan` en `finished` komen van de server mee en niet uit de status
+ * alleen: het scherm hoort te weten wat er nog kan vóór je erop klikt. De
+ * databank weigert het ook, maar een knop die je pas na het indrukken vertelt
+ * dat het niet mag, is een slechte knop.
+ */
+export interface Existing {
+  id: string
+  name: string
+  scheduledAt: string
+  buyinCents: number
+  feeCents: number
+  rebuyCents: number | null
+  rebuyFeeCents: number | null
+  addonCents: number | null
+  addonFeeCents: number | null
+  addonStack: number | null
+  bountyMode: string
+  bountyCents: number
+  startingStack: number
+  maxReentries: number
+  lateRegLevel: number | null
+  preregBonusStack: number
+  structureId: string | null
+  payoutTemplateId: string | null
+  seasonId: string | null
+  membersOnly: boolean
+  clockRan: boolean
+  finished: boolean
+}
+
 interface Props {
   clubSlug: string
   clubId: string
@@ -28,6 +62,7 @@ interface Props {
   payouts: Option[]
   seasons: Option[]
   defaults?: { buyinCents: number; feeCents: number; startingStack: number }
+  existing?: Existing
 }
 
 function euroToCents(v: string): number {
@@ -46,7 +81,7 @@ function toLocalInput(d: Date): string {
 }
 
 export function TournamentForm({
-  clubSlug, clubId, currency, structures, payouts, seasons, defaults,
+  clubSlug, clubId, currency, structures, payouts, seasons, defaults, existing,
 }: Props) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -59,24 +94,34 @@ export function TournamentForm({
     return toLocalInput(d)
   }, [])
 
-  const [name, setName] = useState('')
-  const [when, setWhen] = useState(nextFriday)
-  const [buyin, setBuyin] = useState(centsToEuro(defaults?.buyinCents ?? 2000))
-  const [fee, setFee] = useState(centsToEuro(defaults?.feeCents ?? 500))
-  const [stack, setStack] = useState(String(defaults?.startingStack ?? 20000))
-  const [reentries, setReentries] = useState('1')
-  const [lateReg, setLateReg] = useState('6')
-  const [rebuyPrice, setRebuyPrice] = useState(centsToEuro(defaults?.buyinCents ?? 2000))
-  const [rebuyFee, setRebuyFee] = useState(centsToEuro(defaults?.feeCents ?? 500))
-  const [addonOn, setAddonOn] = useState(false)
-  const [addonPrice, setAddonPrice] = useState('10.00')
-  const [addonFee, setAddonFee] = useState('0.00')
-  const [addonStack, setAddonStack] = useState('20000')
-  const [bountyOn, setBountyOn] = useState(false)
-  const [bounty, setBounty] = useState('5.00')
-  const [structureId, setStructureId] = useState(structures[0]?.id ?? '')
-  const [payoutId, setPayoutId] = useState(payouts[0]?.id ?? '')
-  const [seasonId, setSeasonId] = useState(seasons[0]?.id ?? '')
+  const e = existing
+  const bewerken = e !== undefined
+  // Na afloop staan de uitslagen en de punten vast. Dan blijft alleen over wat
+  // niets herrekent: de naam en wie de avond mag zien.
+  const opSlot = e?.finished ?? false
+
+  const [name, setName] = useState(e?.name ?? '')
+  const [when, setWhen] = useState(e ? toLocalInput(new Date(e.scheduledAt)) : nextFriday)
+  const [buyin, setBuyin] = useState(centsToEuro(e?.buyinCents ?? defaults?.buyinCents ?? 2000))
+  const [fee, setFee] = useState(centsToEuro(e?.feeCents ?? defaults?.feeCents ?? 500))
+  const [stack, setStack] = useState(String(e?.startingStack ?? defaults?.startingStack ?? 20000))
+  const [reentries, setReentries] = useState(String(e?.maxReentries ?? 1))
+  const [lateReg, setLateReg] = useState(e ? (e.lateRegLevel === null ? '' : String(e.lateRegLevel)) : '6')
+  const [bonus, setBonus] = useState(String(e?.preregBonusStack ?? 0))
+  const [rebuyPrice, setRebuyPrice] = useState(
+    centsToEuro(e?.rebuyCents ?? e?.buyinCents ?? defaults?.buyinCents ?? 2000))
+  const [rebuyFee, setRebuyFee] = useState(
+    centsToEuro(e?.rebuyFeeCents ?? e?.feeCents ?? defaults?.feeCents ?? 500))
+  const [addonOn, setAddonOn] = useState(e ? e.addonCents !== null : false)
+  const [addonPrice, setAddonPrice] = useState(centsToEuro(e?.addonCents ?? 1000))
+  const [addonFee, setAddonFee] = useState(centsToEuro(e?.addonFeeCents ?? 0))
+  const [addonStack, setAddonStack] = useState(String(e?.addonStack ?? 20000))
+  const [bountyOn, setBountyOn] = useState(e ? e.bountyMode !== 'none' : false)
+  const [bounty, setBounty] = useState(centsToEuro(e?.bountyCents ?? 500))
+  const [membersOnly, setMembersOnly] = useState(e?.membersOnly ?? false)
+  const [structureId, setStructureId] = useState(e?.structureId ?? structures[0]?.id ?? '')
+  const [payoutId, setPayoutId] = useState(e?.payoutTemplateId ?? payouts[0]?.id ?? '')
+  const [seasonId, setSeasonId] = useState(e?.seasonId ?? seasons[0]?.id ?? '')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -93,6 +138,60 @@ export function TournamentForm({
   // Gedoogbeleid: maximaal €50 inzet per tornooi. Waarschuwen, niet blokkeren
   // — het is beleid en geen wet, en de club stelt de grens zelf in.
   const overLimit = totalCents > 5000
+
+  /**
+   * Bewerken loopt via één databankfunctie en niet via een update op de tabel.
+   * Die functie bewaakt wat er nog mag: de blindstructuur ligt vast zodra de
+   * klok gelopen heeft, en na afloop kan alleen de naam nog. Dat hoort op de
+   * server te staan — een scherm dat de knop uitzet is een hulp, geen slot.
+   */
+  async function opslaan(ev: React.FormEvent) {
+    ev.preventDefault()
+    if (!e) return
+    setBusy(true)
+    setError(null)
+
+    const patch: Record<string, unknown> = opSlot
+      ? { name: name.trim(), player_visibility: membersOnly ? 'members' : 'public' }
+      : {
+          name: name.trim(),
+          scheduled_at: new Date(when).toISOString(),
+          player_visibility: membersOnly ? 'members' : 'public',
+          season_id: seasonId || null,
+          payout_template_id: payoutId || null,
+          buyin_cents: buyinCents,
+          fee_cents: feeCents,
+          rebuy_cents: rebuyCents,
+          rebuy_fee_cents: rebuyFeeCents,
+          addon_cents: addonOn ? addonCents : null,
+          addon_fee_cents: addonOn ? addonFeeCents : null,
+          addon_stack: addonOn ? (Number.parseInt(addonStack, 10) || null) : null,
+          bounty_mode: bountyOn ? 'fixed' : 'none',
+          bounty_cents: bountyCents,
+          starting_stack: Number.parseInt(stack, 10) || 0,
+          max_reentries: Number.parseInt(reentries, 10) || 0,
+          late_reg_level: lateReg === '' ? null : Number.parseInt(lateReg, 10),
+          prereg_bonus_stack: Number.parseInt(bonus, 10) || 0,
+        }
+
+    // De structuur alleen meesturen als hij nog mag wijzigen. Anders krijg je
+    // een foutmelding op een veld dat je niet eens hebt aangeraakt.
+    if (!opSlot && !e.clockRan) patch.structure_id = structureId || null
+
+    const { error: err } = await supabase.rpc('update_tournament', {
+      p_tournament_id: e.id,
+      p_patch: patch,
+    })
+
+    if (err) {
+      setError(dbMessage(err, t))
+      setBusy(false)
+      return
+    }
+
+    router.push(`/c/${clubSlug}/tornooien/${e.id}`)
+    router.refresh()
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -132,6 +231,9 @@ export function TournamentForm({
         addon_stack: addonOn ? (Number.parseInt(addonStack, 10) || null) : null,
         max_reentries: Number.parseInt(reentries, 10) || 0,
         late_reg_level: lateReg === '' ? null : Number.parseInt(lateReg, 10),
+        // Wie vooraf inschrijft begint met extra chips. Nul betekent: geen
+        // bonus, en dan zwijgt de inschrijfpagina er ook over.
+        prereg_bonus_stack: Number.parseInt(bonus, 10) || 0,
       })
       .select('id')
       .single<{ id: string }>()
@@ -151,7 +253,12 @@ export function TournamentForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={bewerken ? opslaan : onSubmit} className="space-y-6">
+      {opSlot && <Notice tone="warn">{t('tour.lockedFinished')}</Notice>}
+      {bewerken && !opSlot && e.clockRan && (
+        <Notice tone="warn">{t('tour.lockedClock')}</Notice>
+      )}
+
       <Field label={t('tour.name')}>
         <input
           required
@@ -162,6 +269,34 @@ export function TournamentForm({
         />
       </Field>
 
+      {/* Zichtbaarheid staat bewust buiten het slot hieronder: een avond die
+          achteraf toch privé had moeten zijn, hoor je nog te kunnen afschermen
+          zonder dat er iets aan de uitslag verandert. */}
+      {bewerken && (
+        <Card>
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={membersOnly}
+              onChange={(ev) => setMembersOnly(ev.target.checked)}
+              className="size-4"
+            />
+            <span>{t('tour.membersOnly')}</span>
+          </label>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-faint)]">
+            {t('tour.membersOnlyHint')}
+          </p>
+        </Card>
+      )}
+
+      {/* Alles hieronder rekent mee in de uitslag, dus na afloop gaat het op
+          slot. Eén fieldset in plaats van een disabled op elk veld apart:
+          vergeten kan dan niet. */}
+      {/* min-w-0 is hier geen sierlijkheid: een fieldset krijgt van de browser
+          min-inline-size: min-content mee, en dus rekt hij op tot de breedte
+          van de geldtabel binnenin. Op een telefoon schuift de hele pagina dan
+          opzij in plaats van dat die ene tabel scrolt. */}
+      <fieldset disabled={opSlot} className="min-w-0 space-y-6 disabled:opacity-45">
       <Field label={t('tour.when')}>
         <input
           type="datetime-local"
@@ -289,6 +424,10 @@ export function TournamentForm({
         </Field>
       </div>
 
+      <Field label={t('tour.preregBonus')} hint={t('tour.preregBonusHint')}>
+        <input inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} className={inputClass} />
+      </Field>
+
       <Field
         label={t('tour.structure')}
         hint={
@@ -307,7 +446,12 @@ export function TournamentForm({
           </Notice>
         ) : (
           <div className="flex gap-2">
-            <select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={inputClass}>
+            <select
+              value={structureId}
+              onChange={(ev) => setStructureId(ev.target.value)}
+              disabled={e?.clockRan}
+              className={inputClass}
+            >
               {structures.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}{s.extra ? ` — ${s.extra}` : ''}
@@ -333,15 +477,19 @@ export function TournamentForm({
         </Field>
       </div>
 
+      </fieldset>
+
       {error && (
         <Notice tone="error">{error}</Notice>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Button type="submit" variant="brand" size="lg" disabled={busy || structures.length === 0}>
-          {busy ? t('common.busy') : t('tour.create')}
+          {busy ? t('common.busy') : bewerken ? t('tour.save') : t('tour.create')}
         </Button>
-        <ButtonLink href={`/c/${clubSlug}`} size="lg">{t('common.cancel')}</ButtonLink>
+        <ButtonLink href={bewerken ? `/c/${clubSlug}/tornooien/${e.id}` : `/c/${clubSlug}`} size="lg">
+          {t('common.cancel')}
+        </ButtonLink>
       </div>
     </form>
   )

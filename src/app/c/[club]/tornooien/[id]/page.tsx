@@ -223,9 +223,15 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
         </>
       )}
 
-      {tour.status !== 'finished' && role && (
+      {/* Bijstellen blijft ook na afloop staan: een naam die verkeerd
+          gespeld is, hoor je nog te kunnen rechtzetten. Wat er dan nog kan,
+          zegt het bewerkscherm zelf. */}
+      {canSeeMoney && (
         <div className="flex flex-wrap gap-2">
-          <ButtonLink variant="brand" href={`/c/${slug}/floor/${id}`}>{t('club.floor')}</ButtonLink>
+          {tour.status !== 'finished' && (
+            <ButtonLink variant="brand" href={`/c/${slug}/floor/${id}`}>{t('club.floor')}</ButtonLink>
+          )}
+          <ButtonLink href={`/c/${slug}/tornooien/${id}/bewerken`}>{t('tour.editLink')}</ButtonLink>
         </div>
       )}
     </Page>
