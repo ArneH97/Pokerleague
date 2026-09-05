@@ -135,7 +135,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         <section>
           <SectionTitle>{t('club.nowPlaying')}</SectionTitle>
           <Card padded={false} className="overflow-hidden ring-1 ring-[color-mix(in_oklab,var(--ok)_25%,transparent)]">
-            {live.map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} />)}
+            {live.map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} canManage={canManage} />)}
           </Card>
         </section>
       )}
@@ -144,7 +144,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         <section>
           <SectionTitle>{t('club.scheduled')}</SectionTitle>
           <Card padded={false} className="overflow-hidden">
-            {upcoming.map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} />)}
+            {upcoming.map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} canManage={canManage} />)}
           </Card>
         </section>
       )}
@@ -153,7 +153,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
         <section>
           <SectionTitle>{t('club.earlier')}</SectionTitle>
           <Card padded={false} className="overflow-hidden">
-            {past.slice(0, 10).map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} />)}
+            {past.slice(0, 10).map((x) => <Item key={x.id} t={x} club={club} fmt={fmt} tr={t} canManage={canManage} />)}
           </Card>
         </section>
       )}
@@ -163,12 +163,14 @@ export default async function Page_({ params }: PageProps<'/c/[club]'>) {
 }
 
 function Item({
-  t, club, fmt, tr,
+  t, club, fmt, tr, canManage,
 }: {
   t: Row
   club: { slug: string; currency: string }
   fmt: Intl.DateTimeFormat
   tr: T
+  /** Staf krijgt er de knop bij om de avond nog bij te stellen. */
+  canManage: boolean
 }) {
   const s = STATUS[t.status]
   return (
@@ -184,14 +186,22 @@ function Item({
           {formatMoney(t.buyin_cents + t.fee_cents, club.currency)}
         </p>
       </div>
-      {/* Een afgelopen avond bedien je niet meer, die bekijk je. */}
-      <div className="flex shrink-0 items-center gap-2">
+      {/* Een afgelopen avond bedien je niet meer, die bekijk je.
+          Bijstellen staat hier en niet alleen op de tornooipagina: voor een
+          avond die nog moet komen was die pagina vanaf hier niet eens te
+          bereiken — er stond enkel Klok en Floor. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {t.status === 'finished' || t.status === 'cancelled' ? (
           <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/tornooien/${t.id}`}>
             {tr('result.view')}
           </ButtonLink>
         ) : (
           <>
+            {canManage && (
+              <ButtonLink size="sm" href={`/c/${club.slug}/tornooien/${t.id}/bewerken`}>
+                {tr('tour.editLink')}
+              </ButtonLink>
+            )}
             <ButtonLink size="sm" href={`/c/${club.slug}/klok/${t.id}`}>{tr('club.clock')}</ButtonLink>
             <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/floor/${t.id}`}>{tr('club.floor')}</ButtonLink>
           </>
