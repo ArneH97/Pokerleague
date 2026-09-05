@@ -240,7 +240,7 @@ const nl = {
   'floor.structure': 'Structuur',
   'floor.noStructure':
     'Dit tornooi heeft nog geen blindstructuur. Koppel er een aan voor je start, anders heeft de klok niets om af te tellen.',
-  'floor.rolledOver': 'level(s) automatisch doorgerold — de klok liep door zonder dat er geklikt werd.',
+  'floor.rolledOver': 'De klok liep {n} levels door terwijl dit scherm dicht stond. Hij staat nu op {blinds} — kijk even na of de zaal daar ook op speelt.',
   'floor.noRights': 'Geen rechten om dit tornooi te bedienen.',
   'common.error': 'Er ging iets mis.',
   'db.noRightsEdit': 'Je hebt geen rechten om dit te wijzigen.',
@@ -1366,7 +1366,7 @@ const fr: Record<Key, string> = {
   'floor.structure': 'Structure',
   'floor.noStructure':
     "Ce tournoi n'a pas encore de structure de blinds. Associez-en une avant de démarrer, sinon l'horloge n'a rien à décompter.",
-  'floor.rolledOver': "niveau(x) passé(s) automatiquement — l'horloge a continué sans clic.",
+  'floor.rolledOver': "L'horloge a avancé de {n} niveaux pendant que cet écran était fermé. Elle est maintenant sur {blinds} — vérifiez que la salle y est aussi.",
   'floor.noRights': "Vous n'avez pas les droits pour piloter ce tournoi.",
   'common.error': 'Une erreur est survenue.',
   'db.noRightsEdit': 'Vous n’avez pas les droits pour modifier ceci.',
@@ -2478,7 +2478,7 @@ const en: Record<Key, string> = {
   'floor.structure': 'Structure',
   'floor.noStructure':
     'This tournament has no blind structure yet. Attach one before you start, or the clock has nothing to count down.',
-  'floor.rolledOver': 'level(s) rolled over automatically — the clock kept running without a click.',
+  'floor.rolledOver': 'The clock advanced {n} levels while this screen was closed. It now shows {blinds} — check that the room is playing those blinds.',
   'floor.noRights': 'You do not have permission to run this tournament.',
   'common.error': 'Something went wrong.',
   'db.noRightsEdit': 'You do not have permission to change this.',

@@ -210,7 +210,9 @@ export function FloorControls({
             scherm een tijd uit. */}
         {resolved.rolledOver > 1 && running && (
           <p className="mt-3 text-sm text-[var(--warn)]">
-            {resolved.rolledOver} {t('floor.rolledOver')}
+            {t('floor.rolledOver')
+              .replace('{n}', String(resolved.rolledOver))
+              .replace('{blinds}', resolved.level ? formatBlinds(resolved.level) : '—')}
           </p>
         )}
       </section>
