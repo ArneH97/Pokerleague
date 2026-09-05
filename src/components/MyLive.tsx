@@ -55,6 +55,7 @@ export interface LiveRow {
   avg_stack: number
   chips_in_play: number
   my_rank: number | null
+  rank_estimated: boolean
   ranked_players: number
   paid_places: number
   prize_pool_cents: number
@@ -320,20 +321,22 @@ function Row({ r }: { r: LiveRow }) {
       </div>
 
       <div className="grid grid-cols-3 gap-px border-t border-[var(--line)] bg-[var(--line)]">
+        {/* De plaats over het hele veld, niet over wie toevallig zijn stapel
+            invulde. Is er niet van iedereen een aantal bekend, dan is het een
+            schatting uit de verhouding tot het gemiddelde — en dan staat er
+            een ± voor, want doen alsof het geteld is zou het erger maken. */}
         <Cell
           label={t('live.rank')}
           value={r.my_rank === null
             ? '—'
-            : t('live.rankOf')
+            : (r.rank_estimated ? '± ' : '') + t('live.rankOf')
                 .replace('{n}', rangtelwoord(r.my_rank, locale))
-                .replace('{m}', String(r.ranked_players))}
+                .replace('{m}', String(r.players_left))}
           sub={r.my_rank === null
             ? t('live.rankNone')
-            : r.ranked_players < r.players_left
-              ? t('live.rankPartial')
-                  .replace('{n}', String(r.ranked_players))
-                  .replace('{m}', String(r.players_left))
-              : undefined}
+            : r.rank_estimated
+              ? t('live.rankEstimated')
+              : t('live.rankCounted')}
         />
         <Cell
           label={t('clock.playersLeft')}

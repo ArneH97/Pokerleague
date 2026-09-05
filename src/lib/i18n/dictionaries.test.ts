@@ -28,6 +28,8 @@ const ZELFDE = new Set([
   'floor.minusMinute',
   'floor.plusMinute',
   'struct.addLevel',
+  // "+ Level" is in het Nederlands en het Engels hetzelfde woord.
+  'struct.addRow',
   'deal.even',
   'points.bonusKo',
   'site.pick.metaTitle',

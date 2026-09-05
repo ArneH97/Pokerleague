@@ -97,10 +97,16 @@ begin
 
   select * into r from public.my_live_tournaments() limit 1;
   assert r.my_chips = 55000, 'mijn stapel klopt niet';
-  assert r.my_rank = 3, format('ik hoor derde te staan, kreeg %s', r.my_rank);
+  -- Niet iedereen gaf zijn stapel door, dus wordt de plaats geschat uit de
+  -- verhouding tot het gemiddelde (zie 0057). Vijf spelers, 200.000 in spel,
+  -- gemiddeld 40.000: met 55.000 zit je op 0,69 van het dubbele gemiddelde en
+  -- kom je op de tweede plaats uit — over het hele veld, niet over de vier
+  -- mensen die iets invulden.
+  assert r.rank_estimated, 'dit hoort een schatting te zijn';
+  assert r.my_rank = 2, format('tweede verwacht, kreeg %s', r.my_rank);
   assert r.ranked_players = 4,
     format('vier ingevulde stapels verwacht, kreeg %s', r.ranked_players);
-  raise notice 'OK  mijn plaats wordt gerekend over de ingevulde stapels';
+  raise notice 'OK  mijn plaats wordt geschat over het hele veld';
 
   -- Wie zelf niets invulde, krijgt geen plaats in plaats van de laatste.
   perform set_config('request.jwt.claim.sub', '', true);

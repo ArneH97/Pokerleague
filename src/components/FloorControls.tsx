@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FloorPlayers } from '@/components/FloorPlayers'
 import { SeatingPanel } from '@/components/SeatingPanel'
+import { StructurePanel } from '@/components/StructurePanel'
 import { createClient } from '@/lib/supabase/client'
 import {
   resolveClock, levelsForClock, formatDuration, formatBlinds, breakLabel,
@@ -35,7 +36,7 @@ export function FloorControls({
   backHref: string
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const { tournament, club, levels: planned, stats, loading, error, live } = useTournament(tournamentId)
+  const { tournament, club, levels: planned, stats, loading, error, live, reload } = useTournament(tournamentId)
   const { nowMs, nowIso } = useServerTime()
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -329,29 +330,17 @@ export function FloorControls({
         finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
       />
 
-      {levels.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-sm uppercase tracking-widest text-[var(--text-faint)]">{t('floor.structure')}</h2>
-          <ol className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-            {levels.map((l) => (
-              <li
-                key={l.idx}
-                className={`flex items-center justify-between px-4 py-2 text-sm ${
-                  l.idx === resolved.levelIdx ? 'bg-[var(--surface-2)]' : ''
-                } ${l.isBreak ? 'text-[#7dd3fc]' : ''}`}
-              >
-                <span className="w-16 text-[var(--text-faint)]">
-                  {l.isBreak ? t('clock.break') : `#${playNo.get(l.idx) ?? l.idx + 1}`}
-                </span>
-                <span className="flex-1 tabular-nums">{formatBlinds(l)}</span>
-                <span className="tabular-nums text-[var(--text-faint)]">
-                  {Math.round(l.durationS / 60)} {t('floor.min')}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      {/* De blindstructuur van deze avond. Aanpasbaar terwijl er gespeeld
+          wordt, want een tornooi dat uitloopt heeft meer levels nodig dan er
+          bij het aanmaken bedacht zijn. */}
+      <StructurePanel
+        tournamentId={tournamentId}
+        levels={levels}
+        currentIdx={resolved.levelIdx}
+        playNo={playNo}
+        finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
+        onChanged={reload}
+      />
     </Shell>
   )
 }

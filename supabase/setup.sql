@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql · 0053_mijn_tafel.sql · 0054_spelers_per_tafel.sql · 0055_tafelindeling.sql · 0056_live_blinds_en_stoelen.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql · 0053_mijn_tafel.sql · 0054_spelers_per_tafel.sql · 0055_tafelindeling.sql · 0056_live_blinds_en_stoelen.sql · 0057_plaats_schatten.sql · 0058_levels_tijdens_de_avond.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -12301,5 +12301,469 @@ begin
   end if;
   if exists (select 1 from pg_roles where rolname = 'anon') then
     grant execute on function public.clock_position(uuid) to anon;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0057_plaats_schatten.sql
+-- =========================================================================
+
+-- Pokerleague — je plaats schatten in plaats van tellen
+--
+-- "3de van 9" klonk exact en was het niet. Die 9 waren de spelers die hun
+-- stapel hadden ingevuld, en dat zijn er op een gewone avond een handvol. Wie
+-- als enige zijn chips doorgaf stond eerste van één — een getal dat niets zegt
+-- en toch als een stand leest.
+--
+-- **Wat we wél zeker weten.** Het aantal chips in spel staat vast: dat volgt
+-- uit het geldregister en niet uit wat spelers doorgeven. Gedeeld door het
+-- aantal spelers dat nog zit, geeft dat een gemiddelde dat altijd klopt. Jouw
+-- eigen stapel weet je zelf. Twee getallen die er zijn, dus, en daaruit valt
+-- af te leiden waar je ongeveer staat — zonder dat er iemand anders iets moet
+-- invullen.
+--
+-- **De schatting.** Neem aan dat de stapels ruwweg gelijkmatig liggen tussen
+-- niets en het dubbele van het gemiddelde. Zit je precies op het gemiddelde,
+-- dan staat de helft van het veld boven je: bij vijf spelers ben je de derde.
+-- Heb je het dubbele, dan sta je bovenaan; heb je bijna niets, onderaan.
+--
+--     plaats = 1 + (1 - stapel / (2 × gemiddelde)) × (spelers - 1)
+--
+-- Dat is een model en geen meting, en het pretendeert ook niet meer te zijn:
+-- het scherm zet er een ± voor. Maar het is over het hele veld gerekend en
+-- niet over de vier mensen die toevallig hun gsm bovenhaalden, en dus zegt het
+-- iets waar je aan tafel wat aan hebt.
+--
+-- **Behalve als iedereen wél ingevuld heeft.** Dan is tellen beter dan
+-- schatten, en telt hij gewoon. Het scherm laat het ± dan weg. Dat is precies
+-- de situatie na een telronde van de floor, en dan hoort het getal ook hard te
+-- zijn.
+
+drop function if exists public.my_live_tournaments();
+
+create or replace function public.my_live_tournaments()
+returns table (
+  tournament_id        uuid,
+  tournament_player_id uuid,
+  name                 text,
+  club_slug            text,
+  club_name            text,
+  logo_url             text,
+  primary_color        text,
+  currency             char(3),
+  status               text,
+  clock                text,
+  level_idx            int,
+  level_label          text,
+  is_break             boolean,
+  small_blind          int,
+  big_blind            int,
+  ante                 int,
+  next_big_blind       int,
+  level_remaining_ms   bigint,
+  my_chips             int,
+  my_chips_by          text,
+  my_chips_at          timestamptz,
+  counts_frozen        boolean,
+  my_table             int,
+  my_seat              int,
+  players_left         int,
+  entries              int,
+  avg_stack            int,
+  chips_in_play        int,
+  my_rank              int,
+  /** True als de plaats een schatting is uit het gemiddelde. */
+  rank_estimated       boolean,
+  ranked_players       int,
+  paid_places          int,
+  prize_pool_cents     bigint
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with me as (
+    select id from players
+    where auth_user_id = auth.uid() and merged_into_id is null
+  ),
+  mijn as (
+    select tp.*
+    from tournament_players tp
+    join tournaments t on t.id = tp.tournament_id
+    where tp.player_id = (select id from me)
+      and t.status in ('running', 'paused')
+      and tp.status in ('active', 'registered')
+  )
+  select
+    t.id,
+    m.id,
+    t.name,
+    c.slug,
+    c.name,
+    c.logo_url,
+    c.primary_color,
+    c.currency,
+    t.status::text,
+    t.clock::text,
+    k.level_idx,
+    (select l.label from blind_levels l
+      where l.structure_id = t.structure_id and l.idx = k.level_idx),
+    coalesce((select l.is_break from blind_levels l
+      where l.structure_id = t.structure_id and l.idx = k.level_idx), false),
+    coalesce((select l.small_blind from blind_levels l
+      where l.structure_id = t.structure_id and l.idx >= k.level_idx and not l.is_break
+      order by l.idx limit 1), 0),
+    coalesce((select l.big_blind from blind_levels l
+      where l.structure_id = t.structure_id and l.idx >= k.level_idx and not l.is_break
+      order by l.idx limit 1), 0),
+    coalesce((select l.ante from blind_levels l
+      where l.structure_id = t.structure_id and l.idx >= k.level_idx and not l.is_break
+      order by l.idx limit 1), 0),
+    coalesce((select l.big_blind from blind_levels l
+      where l.structure_id = t.structure_id and l.idx > k.level_idx and not l.is_break
+      order by l.idx limit 1), 0),
+    k.remaining_ms,
+    m.chip_count,
+    m.chip_count_by::text,
+    m.chip_count_updated_at,
+    t.counts_frozen_at is not null,
+    m.table_no,
+    m.seat_no,
+    v.over,
+    v.deelnames,
+    v.gemiddeld,
+    v.in_spel,
+
+    -- De plaats. Weet iedereen zijn stapel, dan tellen we; anders schatten we
+    -- uit het gemiddelde. Zonder eigen aantal staat er niets — dat blijft een
+    -- vraag aan de speler en geen verwijt.
+    case
+      when m.chip_count is null then null
+      when v.ingevuld >= v.over then v.exacte_plaats
+      when v.gemiddeld <= 0 then null
+      else greatest(1, least(v.over, round(
+             1 + (1 - least(1, m.chip_count::numeric / (2 * v.gemiddeld))) * (v.over - 1)
+           )::int))
+    end,
+    (m.chip_count is not null and v.ingevuld < v.over and v.gemiddeld > 0),
+    v.ingevuld,
+
+    (select count(*)::int from public.tournament_prizes(t.id)),
+    (select coalesce(sum(b.amount_cents), 0) from buyins b
+      where b.tournament_id = t.id and not b.is_void)
+  from mijn m
+  join tournaments t on t.id = m.tournament_id
+  join clubs c       on c.id = t.club_id
+  cross join lateral public.clock_position(t.id) k
+  cross join lateral (
+    select
+      (select count(*)::int from tournament_players x
+        where x.tournament_id = t.id and x.status in ('active','registered')) as over,
+      (select count(*)::int from tournament_players x
+        where x.tournament_id = t.id) as deelnames,
+      (select count(*)::int from tournament_players x
+        where x.tournament_id = t.id and x.status in ('active','registered')
+          and x.chip_count is not null) as ingevuld,
+      public.chips_in_play(t.id) as in_spel,
+      (public.chips_in_play(t.id) / greatest(1, (
+         select count(*)::int from tournament_players x
+         where x.tournament_id = t.id and x.status in ('active','registered'))))::int as gemiddeld,
+      (select count(*)::int + 1
+        from tournament_players x
+        where x.tournament_id = t.id
+          and x.status in ('active','registered')
+          and x.chip_count is not null
+          and x.chip_count > m.chip_count) as exacte_plaats
+  ) v
+  order by t.scheduled_at desc;
+$$;
+
+comment on function public.my_live_tournaments() is
+  'De avonden waar de aangemelde speler nu aan tafel zit. De plaats wordt geteld als iedereen zijn stapel ingaf, en anders geschat uit de verhouding tot het gemiddelde — dat gemiddelde volgt uit het geldregister en klopt altijd.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.my_live_tournaments() to authenticated;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0058_levels_tijdens_de_avond.sql
+-- =========================================================================
+
+-- Pokerleague — de komende levels bijstellen terwijl de avond loopt
+--
+-- Een tornooi loopt uit, of de finaletafel gaat te snel, of er moet een pauze
+-- bij. Dan wil de floor aan de blindstructuur kunnen zonder eerst een nieuwe
+-- structuur te bouwen en die om te wisselen — dat laatste kan trouwens niet
+-- eens meer zodra de klok gelopen heeft, en met reden.
+--
+-- **Het probleem dat dit oplost, en waarom het niet triviaal is.** Een
+-- blindstructuur is van de *club*, niet van de avond. "Blinds Sunday Opening"
+-- hangt aan elke zondag. Wie er tijdens het spelen twee levels bij plakt omdat
+-- het vanavond uitloopt, verandert daarmee stilzwijgend ook de structuur van
+-- volgende week — en dat merkt niemand tot die week er is.
+--
+-- Vandaar: bij de eerste wijziging tijdens een avond krijgt die avond zijn
+-- eigen kopie. De kopie draagt de naam van de avond, is identiek op het moment
+-- van kopiëren (dus de klok staat waar hij stond), en vanaf dan is elke
+-- aanpassing van deze avond alleen. Het clubsjabloon blijft ongemoeid.
+--
+-- **Wat er niet mag: het verleden.** Levels die al gespeeld zijn, liggen vast.
+-- Hun duur is wat de klok gebruikt heeft om te komen waar hij staat; die
+-- achteraf veranderen zou de klok verschuiven naar een moment dat de zaal niet
+-- heeft meegemaakt. De functie weigert dat, en het scherm zet die rijen op
+-- slot.
+--
+-- **Wat er wél mag:** het level waar je nu in zit en alles erna. Blinds, ante,
+-- duur, pauzes ertussen, en levels achteraan bijzetten. Dat laatste heeft zijn
+-- eigen knop, want "het loopt uit" is de meest voorkomende reden om hier te
+-- zijn en dan wil je één tik, geen formulier.
+
+-- ---------------------------------------------------------------------------
+-- 1. Een eigen structuur voor deze avond
+-- ---------------------------------------------------------------------------
+
+create or replace function public.tournament_own_structure(p_tournament_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t       tournaments%rowtype;
+  v_bron  blind_structures%rowtype;
+  v_nieuw uuid;
+  v_gedeeld boolean;
+begin
+  select * into t from tournaments where id = p_tournament_id;
+  if not found then
+    raise exception 'Tornooi bestaat niet';
+  end if;
+  if t.structure_id is null then
+    raise exception 'Deze avond heeft nog geen blindstructuur' using errcode = 'check_violation';
+  end if;
+
+  select * into v_bron from blind_structures where id = t.structure_id;
+
+  -- Gedeeld als het een platformsjabloon is, of als er nog een andere avond
+  -- aan hangt. Anders is hij al van deze avond alleen en hoeft er niets.
+  v_gedeeld := v_bron.club_id is null
+    or exists (
+      select 1 from tournaments x
+      where x.structure_id = t.structure_id and x.id <> p_tournament_id);
+
+  if not v_gedeeld then
+    return t.structure_id;
+  end if;
+
+  insert into blind_structures (club_id, name, description)
+  values (
+    t.club_id,
+    left(v_bron.name || ' — ' || t.name, 120),
+    'Eigen structuur van deze avond, gekopieerd tijdens het spelen. Wijzigingen hier raken het clubsjabloon niet.')
+  returning id into v_nieuw;
+
+  insert into blind_levels (structure_id, idx, is_break, label, small_blind, big_blind, ante, duration_s)
+  select v_nieuw, l.idx, l.is_break, l.label, l.small_blind, l.big_blind, l.ante, l.duration_s
+  from blind_levels l
+  where l.structure_id = t.structure_id;
+
+  update tournaments set structure_id = v_nieuw where id = p_tournament_id;
+
+  return v_nieuw;
+end;
+$$;
+
+comment on function public.tournament_own_structure(uuid) is
+  'Geeft de blindstructuur van deze avond terug, en maakt er eerst een eigen kopie van als hij met andere avonden gedeeld wordt. Zo raakt bijstellen tijdens het spelen nooit het clubsjabloon.';
+
+-- ---------------------------------------------------------------------------
+-- 2. De komende levels vervangen
+-- ---------------------------------------------------------------------------
+-- `p_from_idx` is het eerste level dat vervangen wordt; alles daarvoor blijft
+-- staan zoals het was. De lijst die je meegeeft komt daarachter, op volgorde.
+
+create or replace function public.floor_set_upcoming_levels(
+  p_tournament_id uuid,
+  p_from_idx      int,
+  p_levels        jsonb
+)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t       tournaments%rowtype;
+  v_str   uuid;
+  v_nu    int;
+  v_lvl   jsonb;
+  v_idx   int;
+  v_n     int := 0;
+begin
+  select * into t from tournaments where id = p_tournament_id;
+  if not found then
+    raise exception 'Tornooi bestaat niet';
+  end if;
+
+  if not public.is_service_context()
+     and not public.has_club_role(t.club_id, array['owner','admin','floor']::club_role[]) then
+    raise exception 'Geen rechten' using errcode = 'insufficient_privilege';
+  end if;
+
+  if t.status in ('finished', 'cancelled') then
+    raise exception 'Dit tornooi is afgelopen' using errcode = 'check_violation';
+  end if;
+
+  if jsonb_typeof(p_levels) <> 'array' then
+    raise exception 'Geef een lijst met levels mee' using errcode = 'check_violation';
+  end if;
+
+  -- Waar de klok werkelijk staat, niet wat er in het veld staat: dat laatste
+  -- loopt achter zodra er geen floorscherm openstaat.
+  select k.level_idx into v_nu from public.clock_position(p_tournament_id) k;
+  v_nu := coalesce(v_nu, t.level_idx);
+
+  if p_from_idx < v_nu then
+    raise exception 'Level % is al gespeeld. Je kan vanaf het huidige level (%) bijstellen.',
+      p_from_idx + 1, v_nu + 1
+      using errcode = 'check_violation';
+  end if;
+
+  if p_from_idx = 0 and jsonb_array_length(p_levels) = 0 then
+    raise exception 'Een structuur moet minstens één level bevatten' using errcode = 'check_violation';
+  end if;
+
+  v_str := public.tournament_own_structure(p_tournament_id);
+
+  delete from blind_levels where structure_id = v_str and idx >= p_from_idx;
+
+  v_idx := p_from_idx;
+  for v_lvl in select * from jsonb_array_elements(p_levels) loop
+    insert into blind_levels (
+      structure_id, idx, is_break, label, small_blind, big_blind, ante, duration_s
+    ) values (
+      v_str,
+      v_idx,
+      coalesce((v_lvl ->> 'is_break')::boolean, false),
+      nullif(trim(coalesce(v_lvl ->> 'label', '')), ''),
+      greatest(0, coalesce((v_lvl ->> 'small_blind')::int, 0)),
+      greatest(0, coalesce((v_lvl ->> 'big_blind')::int, 0)),
+      greatest(0, coalesce((v_lvl ->> 'ante')::int, 0)),
+      greatest(60, coalesce((v_lvl ->> 'duration_s')::int, 1200))
+    );
+    v_idx := v_idx + 1;
+    v_n := v_n + 1;
+  end loop;
+
+  return v_n;
+end;
+$$;
+
+comment on function public.floor_set_upcoming_levels(uuid, int, jsonb) is
+  'Vervangt de levels vanaf p_from_idx door de meegegeven lijst. Levels die al gespeeld zijn blijven onaangeroerd. Maakt zo nodig eerst een eigen structuur voor deze avond, zodat het clubsjabloon niet verandert.';
+
+-- ---------------------------------------------------------------------------
+-- 3. Er eentje bijzetten omdat het uitloopt
+-- ---------------------------------------------------------------------------
+-- Eén tik, want dit is de reden waarom je hier bent. Het nieuwe level volgt de
+-- sprong van de laatste twee: gingen de blinds van 4.000 naar 6.000, dan wordt
+-- de volgende 9.000. Is er maar één level, dan verdubbelt hij. Alles wordt
+-- afgerond op iets wat je met fiches kan betalen.
+
+create or replace function public.floor_append_level(
+  p_tournament_id uuid,
+  p_is_break      boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t        tournaments%rowtype;
+  v_str    uuid;
+  v_laatste blind_levels%rowtype;
+  v_voor   blind_levels%rowtype;
+  v_bb     int;
+  v_sb     int;
+  v_ante   int;
+  v_factor numeric := 1.5;
+  v_idx    int;
+begin
+  select * into t from tournaments where id = p_tournament_id;
+  if not found then
+    raise exception 'Tornooi bestaat niet';
+  end if;
+
+  if not public.is_service_context()
+     and not public.has_club_role(t.club_id, array['owner','admin','floor']::club_role[]) then
+    raise exception 'Geen rechten' using errcode = 'insufficient_privilege';
+  end if;
+
+  if t.status in ('finished', 'cancelled') then
+    raise exception 'Dit tornooi is afgelopen' using errcode = 'check_violation';
+  end if;
+
+  v_str := public.tournament_own_structure(p_tournament_id);
+
+  select * into v_laatste from blind_levels
+  where structure_id = v_str and not is_break order by idx desc limit 1;
+
+  if not found then
+    raise exception 'Deze structuur heeft nog geen speelniveau om op verder te bouwen'
+      using errcode = 'check_violation';
+  end if;
+
+  select * into v_voor from blind_levels
+  where structure_id = v_str and not is_break and idx < v_laatste.idx
+  order by idx desc limit 1;
+
+  if found and v_voor.big_blind > 0 then
+    v_factor := greatest(1.2, least(2.0, v_laatste.big_blind::numeric / v_voor.big_blind));
+  else
+    v_factor := 2.0;
+  end if;
+
+  -- Afronden op iets wat aan tafel te betalen is: honderdtallen zolang het
+  -- klein is, daarna grovere stappen.
+  v_bb := (round((v_laatste.big_blind * v_factor)
+             / greatest(100, power(10, floor(log(greatest(10, v_laatste.big_blind * v_factor))) - 1)))
+           * greatest(100, power(10, floor(log(greatest(10, v_laatste.big_blind * v_factor))) - 1)))::int;
+  v_bb := greatest(v_laatste.big_blind + 100, v_bb);
+  v_sb := (v_bb / 2)::int;
+  v_ante := case when v_laatste.ante > 0 then v_bb else 0 end;
+
+  select coalesce(max(idx), -1) + 1 into v_idx from blind_levels where structure_id = v_str;
+
+  insert into blind_levels (structure_id, idx, is_break, label, small_blind, big_blind, ante, duration_s)
+  values (
+    v_str, v_idx, p_is_break,
+    case when p_is_break then 'Pauze' else null end,
+    case when p_is_break then 0 else v_sb end,
+    case when p_is_break then 0 else v_bb end,
+    case when p_is_break then 0 else v_ante end,
+    case when p_is_break then 600 else v_laatste.duration_s end
+  );
+
+  return jsonb_build_object(
+    'idx', v_idx, 'small_blind', case when p_is_break then 0 else v_sb end,
+    'big_blind', case when p_is_break then 0 else v_bb end,
+    'is_break', p_is_break);
+end;
+$$;
+
+comment on function public.floor_append_level(uuid, boolean) is
+  'Zet er achteraan één level of één pauze bij, in het verlengde van de sprong die de structuur al maakte. Voor een avond die uitloopt.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.tournament_own_structure(uuid)                    to authenticated;
+    grant execute on function public.floor_set_upcoming_levels(uuid, int, jsonb)       to authenticated;
+    grant execute on function public.floor_append_level(uuid, boolean)                 to authenticated;
   end if;
 end $$;
