@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useT, useLocale } from '@/lib/i18n/context'
@@ -47,6 +47,7 @@ export interface LiveRow {
   my_chips_by: string | null
   my_chips_at: string | null
   counts_frozen: boolean
+  level_remaining_ms: number | null
   my_table: number | null
   my_seat: number | null
   players_left: number
@@ -79,8 +80,34 @@ function rangtelwoord(n: number, locale: Locale): string {
   return `${n}${n === 1 || n === 8 || n >= 20 ? 'ste' : 'de'}`
 }
 
-export function MyLive({ rows }: { rows: LiveRow[] }) {
+/**
+ * De avonden waar je nu aan tafel zit.
+ *
+ * De server rendert deze pagina één keer, en dat is niet genoeg: de blinds
+ * stijgen terwijl je kijkt, er vallen mensen af, en het gemiddelde schuift op.
+ * Vandaar dat de lijst zichzelf ververst. Elke twintig seconden is ruim genoeg
+ * — een level duurt twintig minuten — en het is weinig genoeg om een telefoon
+ * in je broekzak niet leeg te trekken.
+ *
+ * De klokstand komt van de databank en niet van dit toestel: die rekent uit
+ * waar de klok werkelijk staat, ook als er geen floorscherm openstaat om het
+ * bij te werken. Zie `clock_position` in migratie 0056.
+ */
+export function MyLive({ rows: eerste }: { rows: LiveRow[] }) {
   const t = useT()
+  const supabase = useMemo(() => createClient(), [])
+  const [rows, setRows] = useState(eerste)
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.rpc('my_live_tournaments')
+    if (data) setRows(data as unknown as LiveRow[])
+  }, [supabase])
+
+  useEffect(() => {
+    const id = setInterval(() => void load(), 20_000)
+    return () => clearInterval(id)
+  }, [load])
+
   if (rows.length === 0) return null
 
   return (
@@ -101,6 +128,31 @@ function Row({ r }: { r: LiveRow }) {
   const t = useT()
   const locale = useLocale()
   const [chips, setChips] = useState(String(r.my_chips ?? 0))
+  // Aftellen binnen het niveau. De server geeft mee hoeveel er nog op stond
+  // toen hij antwoordde; vanaf dat moment tellen we hier verder, zodat het
+  // niet elke twintig seconden verspringt maar gewoon doorloopt.
+  //
+  // Het ijkmoment wordt opnieuw gezet zodra de server een ander getal geeft.
+  // `new Date()` en niet `Date.now()`: dat laatste mag niet tijdens het
+  // renderen, en dit is precies dat.
+  // De afhankelijkheid is juist het punt: bij een nieuw getal van de server
+  // begint het aftellen opnieuw vanaf nu. De lintregel ziet alleen dat de
+  // waarde niet ín de berekening voorkomt.
+  const gemetenOp = useMemo(
+    () => new Date().getTime(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [r.level_remaining_ms],
+  )
+  const [nu, setNu] = useState(() => new Date())
+  useEffect(() => {
+    if (r.clock !== 'running') return
+    const id = setInterval(() => setNu(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [r.clock])
+
+  const overMs = Math.max(0, Number(r.level_remaining_ms ?? 0) - (nu.getTime() - gemetenOp))
+  const resterend = r.level_remaining_ms === null ? null
+    : `${Math.floor(overMs / 60000)}:${String(Math.floor((overMs % 60000) / 1000)).padStart(2, '0')}`
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -236,11 +288,13 @@ function Row({ r }: { r: LiveRow }) {
               {r.small_blind.toLocaleString('nl-BE')} / {r.big_blind.toLocaleString('nl-BE')}
               {r.ante > 0 && <span className="text-sm text-[var(--text-faint)]"> ({r.ante.toLocaleString('nl-BE')})</span>}
             </span>
-            {r.next_big_blind > 0 && (
-              <span className="tnum block text-xs text-[var(--text-faint)]">
-                {t('live.nextBlinds').replace('{n}', r.next_big_blind.toLocaleString('nl-BE'))}
-              </span>
-            )}
+            <span className="tnum block text-xs text-[var(--text-faint)]">
+              {r.clock === 'running' && resterend !== null
+                ? t('live.levelLeft').replace('{n}', resterend)
+                : r.next_big_blind > 0
+                  ? t('live.nextBlinds').replace('{n}', r.next_big_blind.toLocaleString('nl-BE'))
+                  : ''}
+            </span>
           </span>
         </div>
 

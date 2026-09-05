@@ -94,6 +94,10 @@ export function FloorPlayers({
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
   const [dealOpen, setDealOpen] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
+  /** Waar de zojuist toegevoegde speler zou kunnen zitten. */
+  const [stoelVoorstel, setStoelVoorstel] = useState<
+    { tpId: string; naam: string; tafel: number; stoel: number } | null
+  >(null)
 
   // "7 min geleden" moet vanzelf 8 worden. Elke halve minuut volstaat: het
   // gaat om een orde van grootte, niet om een stopwatch.
@@ -207,11 +211,34 @@ export function FloorPlayers({
     setDraft(null)
   }
 
+  /**
+   * Iemand toevoegen, en meteen zeggen waar hij gaat zitten.
+   *
+   * Het voorstel wordt pas ná het toevoegen opgehaald: dan telt de nieuwe
+   * speler mee en klopt de eerstvolgende vrije stoel. Zetten doet het niet
+   * uit zichzelf — aan de deur is er soms een reden om iemand elders te
+   * zetten, en die reden staat niet in de databank.
+   */
+  async function stelStoelVoor(tpId: string, naam: string) {
+    const { data } = await supabase.rpc('seating_suggestion', {
+      p_tournament_id: tournamentId,
+    })
+    const sug = data as unknown as { table_no: number; seat_no: number } | null
+    if (sug) setStoelVoorstel({ tpId, naam, tafel: sug.table_no, stoel: sug.seat_no })
+  }
+
   async function addExisting(playerId: string) {
     closeAdd()
-    await run(() => supabase.rpc('floor_add_entry', {
-      p_tournament_id: tournamentId, p_player_id: playerId,
-    }))
+    const naam = members.find((m) => m.playerId === playerId)?.name ?? ''
+    let nieuw: string | null = null
+    await run(async () => {
+      const res = await supabase.rpc('floor_add_entry', {
+        p_tournament_id: tournamentId, p_player_id: playerId,
+      })
+      nieuw = res.data as unknown as string | null
+      return res
+    })
+    if (nieuw) await stelStoelVoor(nieuw, naam)
     nudgeInvites()
   }
 
@@ -219,14 +246,27 @@ export function FloorPlayers({
     name: string, email: string | null, reason: string | null, locale: string,
   ) {
     closeAdd()
-    await run(() => supabase.rpc('floor_add_entry', {
-      p_tournament_id: tournamentId,
-      p_new_name: name,
-      p_email: email,
-      p_no_email_reason: reason,
-      p_locale: locale,
-    }))
+    let nieuw: string | null = null
+    await run(async () => {
+      const res = await supabase.rpc('floor_add_entry', {
+        p_tournament_id: tournamentId,
+        p_new_name: name,
+        p_email: email,
+        p_no_email_reason: reason,
+        p_locale: locale,
+      })
+      nieuw = res.data as unknown as string | null
+      return res
+    })
+    if (nieuw) await stelStoelVoor(nieuw, name)
     nudgeInvites()
+  }
+
+  async function zetOpVoorgesteldeStoel() {
+    const v = stoelVoorstel
+    if (!v) return
+    setStoelVoorstel(null)
+    await run(() => supabase.rpc('floor_seat_next', { p_tournament_player_id: v.tpId }))
   }
 
   async function eliminate(tpId: string, byId: string | null) {
@@ -384,6 +424,29 @@ export function FloorPlayers({
           >
             {countsFrozenAt ? t('players.unfreeze') : t('players.freeze')}
           </button>
+        </div>
+      )}
+
+      {/* Net iemand ingeschreven: waar zet je hem? Eén tik en hij zit er,
+          of je negeert het en zet hem zelf ergens anders. */}
+      {stoelVoorstel && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color-mix(in_oklab,var(--brand)_35%,transparent)] bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] px-4 py-3">
+          <p className="min-w-0 text-sm">
+            <span className="font-medium">{stoelVoorstel.naam}</span>{' '}
+            <span className="text-[var(--text-muted)]">
+              {t('seat.suggest')
+                .replace('{t}', String(stoelVoorstel.tafel))
+                .replace('{s}', String(stoelVoorstel.stoel))}
+            </span>
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <Primary onClick={() => void zetOpVoorgesteldeStoel()} disabled={busy}>
+              {t('seat.suggestYes')}
+            </Primary>
+            <Small onClick={() => setStoelVoorstel(null)} disabled={busy}>
+              {t('seat.suggestNo')}
+            </Small>
+          </div>
         </div>
       )}
 
@@ -674,6 +737,14 @@ export function FloorPlayers({
                     {p.email === null && (
                       <span className="rounded px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-[var(--warn)] ring-1 ring-[color-mix(in_oklab,var(--warn)_35%,transparent)]">
                         {t('players.noEmailBadge')}
+                      </span>
+                    )}
+                    {/* Waar hij zit. Naast de naam en niet onderaan: als
+                        iemand vraagt waar hij moet gaan zitten, is dit het
+                        antwoord, en dan wil je niet twee regels lezen. */}
+                    {p.tableNo !== null && p.seatNo !== null && (
+                      <span className="tnum rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-[var(--brand)] ring-1 ring-[color-mix(in_oklab,var(--brand)_35%,transparent)]">
+                        T{p.tableNo}·{p.seatNo}
                       </span>
                     )}
                     {p.reentriesUsed + p.rebuysUsed > 0 && (
