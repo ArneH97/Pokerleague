@@ -33,6 +33,9 @@ const ZELFDE = new Set([
   'site.pick.metaTitle',
   // "3 clubs" is in drie talen "3 clubs". Er valt niets aan te vertalen.
   'adm.clubsCount',
+  // Pokerjargon. Aan een Vlaamse of Waalse tafel zegt iedereen "push or
+  // fold"; er een vertaling van maken maakt het onduidelijker, niet duidelijker.
+  'live.critical',
 ])
 
 test('elke taal kent elke sleutel', () => {
