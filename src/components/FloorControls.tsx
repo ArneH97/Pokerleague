@@ -154,6 +154,13 @@ export function FloorControls({
   // Het ijkpunt waartegen de floor zijn telling aan de finaletafel afzet.
   const expectedChips = expectedChipsInPlay(tournament, stats)
 
+  // Hoeveel tafels er open horen te staan. Nog geen indeling — dat komt —
+  // maar wél het getal waar je aan de deur naar kijkt terwijl de zaal
+  // volloopt, en het moment waarop je er eentje kan breken.
+  const tafels = tournament.seats_per_table > 0
+    ? Math.ceil(stats.playersLeft / tournament.seats_per_table)
+    : 0
+
   return (
     <Shell back={back}>
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -267,7 +274,15 @@ export function FloorControls({
       )}
 
       <section className="grid grid-cols-3 gap-3 text-center">
-        <Tile label={t('clock.playersLeft')} value={`${stats.playersLeft} / ${stats.entriesTotal}`} />
+        <Tile
+          label={t('clock.playersLeft')}
+          value={`${stats.playersLeft} / ${stats.entriesTotal}`}
+          {...(tafels > 0
+            ? { sub: t('floor.tablesNeeded')
+                  .replace('{n}', String(tafels))
+                  .replace('{m}', String(tournament.seats_per_table)) }
+            : {})}
+        />
         <Tile label={t('floor.entries')} value={String(stats.entriesTotal)} />
         <Tile
           label={t('clock.prizePool')}
@@ -375,11 +390,12 @@ function Button({
   )
 }
 
-function Tile({ label, value }: { label: string; value: string }) {
+function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-[var(--line)] p-4">
       <p className="text-xs uppercase tracking-widest text-[var(--text-faint)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-[var(--text-faint)]">{sub}</p>}
     </div>
   )
 }

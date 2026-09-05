@@ -41,6 +41,7 @@ interface Row {
   max_reentries: number
   late_reg_level: number | null
   prereg_bonus_stack: number
+  seats_per_table: number
   started_at: string | null
   level_idx: number
 }
@@ -72,7 +73,7 @@ export default async function Page({ params }: PageProps<'/c/[club]/tornooien/[i
       .select(
         'id,club_id,name,scheduled_at,status,player_visibility,season_id,structure_id,payout_template_id,'
         + 'buyin_cents,fee_cents,rebuy_cents,rebuy_fee_cents,addon_cents,addon_fee_cents,addon_stack,'
-        + 'bounty_mode,bounty_cents,starting_stack,max_reentries,late_reg_level,prereg_bonus_stack,'
+        + 'bounty_mode,bounty_cents,starting_stack,max_reentries,late_reg_level,prereg_bonus_stack,seats_per_table,'
         + 'started_at,level_idx',
       )
       .eq('id', id)
@@ -128,6 +129,7 @@ export default async function Page({ params }: PageProps<'/c/[club]/tornooien/[i
     maxReentries: row.max_reentries,
     lateRegLevel: row.late_reg_level,
     preregBonusStack: row.prereg_bonus_stack,
+    seatsPerTable: row.seats_per_table,
     structureId: row.structure_id,
     payoutTemplateId: row.payout_template_id,
     seasonId: row.season_id,

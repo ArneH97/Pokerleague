@@ -38,6 +38,8 @@ export interface TournamentRow {
   ended_at: string | null
   /** Sinds wanneer spelers hun eigen chipcount niet meer mogen wijzigen. */
   counts_frozen_at: string | null
+  /** Hoeveel spelers er maximaal aan één tafel zitten. */
+  seats_per_table: number
 }
 
 export interface BlindLevelRow {

@@ -46,6 +46,7 @@ export interface Existing {
   maxReentries: number
   lateRegLevel: number | null
   preregBonusStack: number
+  seatsPerTable: number
   structureId: string | null
   payoutTemplateId: string | null
   seasonId: string | null
@@ -108,6 +109,7 @@ export function TournamentForm({
   const [reentries, setReentries] = useState(String(e?.maxReentries ?? 1))
   const [lateReg, setLateReg] = useState(e ? (e.lateRegLevel === null ? '' : String(e.lateRegLevel)) : '6')
   const [bonus, setBonus] = useState(String(e?.preregBonusStack ?? 0))
+  const [seats, setSeats] = useState(String(e?.seatsPerTable ?? 9))
   const [rebuyPrice, setRebuyPrice] = useState(
     centsToEuro(e?.rebuyCents ?? e?.buyinCents ?? defaults?.buyinCents ?? 2000))
   const [rebuyFee, setRebuyFee] = useState(
@@ -172,6 +174,7 @@ export function TournamentForm({
           max_reentries: Number.parseInt(reentries, 10) || 0,
           late_reg_level: lateReg === '' ? null : Number.parseInt(lateReg, 10),
           prereg_bonus_stack: Number.parseInt(bonus, 10) || 0,
+          seats_per_table: Number.parseInt(seats, 10) || 9,
         }
 
     // De structuur alleen meesturen als hij nog mag wijzigen. Anders krijg je
@@ -234,6 +237,7 @@ export function TournamentForm({
         // Wie vooraf inschrijft begint met extra chips. Nul betekent: geen
         // bonus, en dan zwijgt de inschrijfpagina er ook over.
         prereg_bonus_stack: Number.parseInt(bonus, 10) || 0,
+        seats_per_table: Number.parseInt(seats, 10) || 9,
       })
       .select('id')
       .single<{ id: string }>()
@@ -424,9 +428,23 @@ export function TournamentForm({
         </Field>
       </div>
 
-      <Field label={t('tour.preregBonus')} hint={t('tour.preregBonusHint')}>
-        <input inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} className={inputClass} />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={t('tour.preregBonus')} hint={t('tour.preregBonusHint')}>
+          <input inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} className={inputClass} />
+        </Field>
+        {/* Een keuzelijst en geen invulveld: het zijn er hooguit negen, en een
+            tikfout in dit getal merk je pas als er tien man rond een tafel
+            voor acht staat. */}
+        <Field label={t('tour.seatsPerTable')} hint={t('tour.seatsPerTableHint')}>
+          <select value={seats} onChange={(ev) => setSeats(ev.target.value)} className={inputClass}>
+            {[10, 9, 8, 7, 6, 5, 4, 3, 2].map((n) => (
+              <option key={n} value={n}>
+                {t('tour.seatsMax').replace('{n}', String(n))}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
 
       <Field
         label={t('tour.structure')}
