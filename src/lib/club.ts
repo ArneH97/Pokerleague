@@ -70,13 +70,28 @@ export const getClub = cache(async (slug: string): Promise<Club | null> => {
   return data ?? null
 })
 
-/** Rol van de ingelogde gebruiker binnen deze club, of null. */
+/**
+ * Rol van de ingelogde gebruiker binnen deze club, of null.
+ *
+ * **Het filter op `user_id` is niet optioneel.** De leespolicy op
+ * `club_members` laat een medewerker álle stafrijen van zijn eigen club zien —
+ * dat is met opzet, want daar moet ooit een medewerkersscherm op draaien.
+ * Zonder dat filter geeft de query dus zoveel rijen als de club medewerkers
+ * heeft, en `maybeSingle()` maakt van "meer dan één rij" een fout. Bij één
+ * medewerker valt dat niemand op; vanaf de tweede is iedereen zijn toegang
+ * kwijt, de eigenaar incluis.
+ */
 export const getClubRole = cache(async (clubId: string): Promise<string | null> => {
   const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+  const uid = claims?.claims?.sub
+  if (!uid) return null
+
   const { data } = await supabase
     .from('club_members')
     .select('role')
     .eq('club_id', clubId)
+    .eq('user_id', String(uid))
     .maybeSingle<{ role: string }>()
   return data?.role ?? null
 })
