@@ -421,3 +421,45 @@ export function averageStack(totalChips: number, playersLeft: number): number {
   if (playersLeft <= 0) return 0
   return Math.round(totalChips / playersLeft)
 }
+
+/**
+ * Hoe lang het nog duurt voor de eerstvolgende pauze begint.
+ *
+ * De vraag die aan tafel het vaakst gesteld wordt en waarop de klok tot nu toe
+ * geen antwoord gaf. Wie wil weten of hij nog een koffie kan halen of beter
+ * wacht, moest zelf de resterende tijd optellen bij de levels die er nog
+ * tussen zitten.
+ *
+ * Wat er geteld wordt: de tijd die nog rest in het huidige level, plus de
+ * volledige duur van elk level daartussen. De pauze zelf telt niet mee — het
+ * gaat om het moment waarop ze begint.
+ *
+ * Twee gevallen geven `null`, en dat is telkens met opzet:
+ *
+ * - **We zitten al in de pauze.** Dan is de vraag beantwoord door de klok zelf,
+ *   die groot "PAUZE" toont met de resterende tijd eronder.
+ * - **Er komt geen pauze meer.** Dan is er niets te tonen, en een vak met een
+ *   streepje erin zou de zaal doen zoeken naar iets dat er niet is.
+ *
+ * Staat de klok stil, dan blijft het getal gewoon staan — bevroren, net als de
+ * grote tijd ernaast. Dat is consequent: een gepauzeerde klok verbergt zichzelf
+ * ook niet.
+ */
+export function msUntilBreak(
+  levels: BlindLevel[],
+  resolved: ResolvedClock,
+): number | null {
+  if (resolved.finished) return null
+  if (resolved.level?.isBreak) return null
+
+  const sorted = [...levels].sort((a, b) => a.idx - b.idx)
+  const volgende = sorted.filter((l) => l.idx > resolved.levelIdx)
+  const pauze = volgende.find((l) => l.isBreak)
+  if (!pauze) return null
+
+  const tussenin = volgende
+    .filter((l) => l.idx < pauze.idx)
+    .reduce((som, l) => som + levelDurationMs(l), 0)
+
+  return Math.max(0, resolved.remainingMs) + tussenin
+}

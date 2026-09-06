@@ -4,7 +4,7 @@ import {
   type BlindLevel, type ClockState,
   resolveClock, start, pause, resume, stop, nextLevel, prevLevel,
   adjustTime, formatDuration, formatBlinds, averageStack, breakLabel,
-  extendLevels, levelsForClock,
+  extendLevels, levelsForClock, msUntilBreak,
 } from './clock'
 
 const T0 = Date.parse('2026-09-06T20:00:00.000Z')
@@ -345,4 +345,47 @@ test('er komen pas levels bij als de klok het einde bereikt', () => {
   assert.equal(r.finished, false, 'de klok loopt gewoon door')
   assert.ok(r.remainingMs > 0, 'en er staat tijd op')
   assert.ok((r.level?.bigBlind ?? 0) > 200, 'met hogere blinds dan het laatste geplande level')
+})
+
+// ---------------------------------------------------------------------------
+// Hoe lang nog tot de pauze
+// ---------------------------------------------------------------------------
+
+test('tijd tot de pauze telt het huidige level en alles ertussen', () => {
+  // Level 1 loopt, 5 minuten in van de 20. Dan nog level 2 (20 min) en dan pas
+  // de pauze: 15 + 20 = 35 minuten.
+  const r = resolveClock(running(0, T0), levels, T0 + 5 * 60_000)
+  assert.equal(msUntilBreak(levels, r), 35 * 60_000)
+})
+
+test('tijd tot de pauze vanuit het level vlak ervoor', () => {
+  // Level 2 loopt, 8 minuten in. De pauze komt er meteen achter: 12 minuten.
+  const r = resolveClock(running(1, T0), levels, T0 + 8 * 60_000)
+  assert.equal(msUntilBreak(levels, r), 12 * 60_000)
+})
+
+test('in de pauze zelf staat er geen aftelling', () => {
+  const r = resolveClock(running(2, T0), levels, T0 + 60_000)
+  assert.equal(r.level?.isBreak, true)
+  assert.equal(msUntilBreak(levels, r), null)
+})
+
+test('na de laatste pauze is er niets meer af te tellen', () => {
+  const r = resolveClock(running(3, T0), levels, T0 + 60_000)
+  assert.equal(msUntilBreak(levels, r), null)
+})
+
+test('een structuur zonder pauzes geeft niets', () => {
+  const zonder = levels.filter((l) => !l.isBreak).map((l, i) => ({ ...l, idx: i }))
+  const r = resolveClock(running(0, T0), zonder, T0 + 60_000)
+  assert.equal(msUntilBreak(zonder, r), null)
+})
+
+test('tijd tot de pauze loopt mee met de klok', () => {
+  const a = resolveClock(running(0, T0), levels, T0 + 5 * 60_000)
+  const b = resolveClock(running(0, T0), levels, T0 + 6 * 60_000)
+  const va = msUntilBreak(levels, a)
+  const vb = msUntilBreak(levels, b)
+  assert.ok(va !== null && vb !== null)
+  assert.equal(va - vb, 60_000)
 })

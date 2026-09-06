@@ -5,6 +5,14 @@
 -- de uitslag. Dat gaat vanzelf mee: alle tabellen die naar een tornooi wijzen
 -- staan op `on delete cascade`. Eén regel weg is alles weg.
 --
+-- **En daarmee ook het klassement.** Dat is geen aparte tabel die je apart moet
+-- opkuisen: `season_standings` en `club_standings_period` rekenen elke keer
+-- opnieuw uit `tournament_results`, en die rijen hangen aan het tornooi. Weg is
+-- weg, en de stand klopt meteen weer. Het script telt ze wel apart mee en
+-- controleert achteraf dat er niets van blijft staan — want "het staat er nog
+-- in het klassement" is precies het soort ding dat je pas drie weken later
+-- ziet.
+--
 -- Blijven staan: de grand opening en haar inschrijvingen. Dat is niet alleen
 -- een belofte in een commentaar — het script telt de inschrijvingen van álle
 -- andere tornooien vóór en na het verwijderen, en draait alles terug als dat
@@ -35,6 +43,7 @@ select
   (select count(*) from tournament_players  x where x.tournament_id = t.id) as deelnames,
   (select count(*) from tournament_registrations x where x.tournament_id = t.id) as inschrijvingen,
   (select count(*) from buyins              x where x.tournament_id = t.id) as inkopen,
+  (select count(*) from tournament_results  x where x.tournament_id = t.id) as klassement,
   t.id
 from tournaments t
 join clubs c on c.id = t.club_id
@@ -58,6 +67,7 @@ declare
   v_insch_na    int;
   v_spelers     int;
   v_struct      int;
+  v_uitslag     int;
   r             record;
 begin
   select id into v_club from clubs where slug = c_slug;
@@ -87,11 +97,13 @@ begin
     select t.id, t.name, t.status, t.scheduled_at,
            (select count(*) from tournament_players x where x.tournament_id = t.id) as spelers,
            (select count(*) from tournament_registrations x where x.tournament_id = t.id) as insch,
-           (select count(*) from buyins x where x.tournament_id = t.id) as inkopen
+           (select count(*) from buyins x where x.tournament_id = t.id) as inkopen,
+           (select count(*) from tournament_results x where x.tournament_id = t.id) as uitslag
     from tournaments t where t.id = any (v_weg) order by t.scheduled_at
   loop
-    raise notice 'Weg: "%" (%, %) — % deelnames, % inschrijvingen, % inkopen.',
-      r.name, r.status, to_char(r.scheduled_at, 'dd/mm/yyyy'), r.spelers, r.insch, r.inkopen;
+    raise notice 'Weg: "%" (%, %) — % deelnames, % inschrijvingen, % inkopen, % uitslagregels in het klassement.',
+      r.name, r.status, to_char(r.scheduled_at, 'dd/mm/yyyy'),
+      r.spelers, r.insch, r.inkopen, r.uitslag;
   end loop;
 
   -- En wat er blijft, zodat je de grand opening met eigen ogen ziet staan.
@@ -123,6 +135,15 @@ begin
   end if;
   raise notice 'OK  % inschrijvingen van de andere tornooien staan er nog, alle %.',
     v_insch_na, v_insch_voor;
+
+  -- Het klassement. Er is niets apart te wissen — de stand wordt elke keer
+  -- opnieuw gerekend uit tournament_results — maar controleren dat er geen
+  -- uitslagregel van deze avond achterbleef, kost niets.
+  select count(*) into v_uitslag from tournament_results where tournament_id = any (v_weg);
+  if v_uitslag > 0 then
+    raise exception 'Er staan nog % uitslagregels van het verwijderde tornooi. Alles teruggedraaid.', v_uitslag;
+  end if;
+  raise notice 'OK  geen enkele uitslagregel van dat tornooi telt nog mee in het klassement.';
 
   -- Had die avond een eigen kopie van de blindstructuur (die maakt het systeem
   -- aan zodra je tijdens het spelen aan de levels komt), dan hangt die nu
@@ -178,8 +199,31 @@ select
   t.status,
   to_char(t.scheduled_at, 'dd/mm/yyyy HH24:MI') as gepland,
   (select count(*) from tournament_players  x where x.tournament_id = t.id) as deelnames,
-  (select count(*) from tournament_registrations x where x.tournament_id = t.id) as inschrijvingen
+  (select count(*) from tournament_registrations x where x.tournament_id = t.id) as inschrijvingen,
+  (select count(*) from tournament_results  x where x.tournament_id = t.id) as klassement
 from tournaments t
 join clubs c on c.id = t.club_id
 where c.slug = 'cutoff'
 order by t.scheduled_at;
+
+-- En het klassement zoals de app het rekent, over alles wat er nog staat.
+-- Hier hoort alleen in te staan wat er op de échte avonden gespeeld is: geen
+-- testers meer, en wie zowel de test als een echte avond speelde, hoort hier
+-- nog maar één avond te tellen.
+--
+-- De periode loopt over de gespeelde avonden, niet over de geplande: het
+-- klassement rekent op `finished_at`, en een avond die je twee weken later
+-- afsluit hoort te tellen op de dag dat je hem afsloot.
+select s.*
+from clubs c
+cross join lateral public.club_standings_period(
+  c.id,
+  coalesce((select min(r.finished_at)::date - 1 from tournament_results r
+              join tournaments t on t.id = r.tournament_id
+             where t.club_id = c.id), current_date),
+  coalesce((select max(r.finished_at)::date + 1 from tournament_results r
+              join tournaments t on t.id = r.tournament_id
+             where t.club_id = c.id), current_date)
+) s
+where c.slug = 'cutoff'
+order by s.points desc, s.display_name;

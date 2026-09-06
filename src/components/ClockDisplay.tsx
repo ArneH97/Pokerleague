@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { resolveClock, levelsForClock, formatDuration, averageStack, breakLabel } from '@/lib/tournament/clock'
+import { resolveClock, levelsForClock, formatDuration, averageStack, breakLabel, msUntilBreak } from '@/lib/tournament/clock'
 import { expectedChipsInPlay, formatMoney, toClockState } from '@/lib/types'
 import { useClockSound } from '@/lib/useClockSound'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
@@ -206,6 +206,13 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   const elapsedTotal = tournament.started_at
     ? Math.max(0, nowMs() - Date.parse(tournament.started_at))
     : 0
+
+  // Hoe lang nog tot de pauze. De vraag die aan tafel het vaakst gesteld wordt,
+  // en waarop de zaal tot nu toe zelf moest rekenen. De laatste vijf minuten
+  // krijgt het vak de accentkleur: dan is het het moment om je koffie te laten
+  // staan in plaats van er nog eentje te halen.
+  const tillBreak = msUntilBreak(levels, resolved)
+  const breakSoon = tillBreak !== null && tillBreak <= 5 * 60_000
 
   return (
     <main
@@ -435,6 +442,14 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
             // big blind op nul, dus dan tonen we niets.
             sub={bigBlind > 0 ? `${formatBb(avg / bigBlind)} bb` : undefined}
           />
+          {tillBreak !== null && (
+            <Stat
+              label={t('clock.tillBreak')}
+              value={formatDuration(tillBreak)}
+              accent={breakSoon ? '#38bdf8' : undefined}
+              highlight={breakSoon}
+            />
+          )}
           <Stat label={t('clock.elapsed')} value={elapsedTotal > 0 ? formatDuration(elapsedTotal) : '—'} />
         </aside>
       </div>
@@ -720,20 +735,23 @@ function LevelPips({
  * "32.6…" is er geen.
  */
 function Stat({
-  label, value, sub, big, accent,
+  label, value, sub, big, accent, highlight,
 }: {
   label: string
   value: string
   sub?: string
   big?: boolean
   accent?: string
+  /** Kleurt het vak op zonder het groter te maken. Voor iets dat even telt. */
+  highlight?: boolean
 }) {
+  const gekleurd = accent && (big || highlight)
   return (
     <div
-      className="rounded-[1.4vh] border px-[0.9vw] py-[1.2vh] text-center backdrop-blur-sm"
+      className="rounded-[1.4vh] border px-[0.9vw] py-[1.2vh] text-center backdrop-blur-sm transition-colors duration-500"
       style={{
-        borderColor: big && accent ? `${accent}55` : 'rgba(255,255,255,0.07)',
-        background: big && accent ? `${accent}12` : 'rgba(255,255,255,0.035)',
+        borderColor: gekleurd ? `${accent}55` : 'rgba(255,255,255,0.07)',
+        background: gekleurd ? `${accent}12` : 'rgba(255,255,255,0.035)',
       }}
     >
       <p className="truncate text-[1.5vh] font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
@@ -743,7 +761,7 @@ function Stat({
         className="tnum font-bold leading-tight"
         style={{
           fontSize: big ? 'min(6.6vh, 4.6vw)' : 'min(4.8vh, 3.4vw)',
-          color: big && accent ? accent : undefined,
+          color: gekleurd ? accent : undefined,
         }}
       >
         {value}
