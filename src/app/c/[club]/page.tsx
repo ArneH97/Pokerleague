@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ClubHeader } from '@/components/ClubHeader'
 import { PublicClubHome } from '@/components/public/PublicClubHome'
@@ -174,10 +175,18 @@ function Item({
 }) {
   const s = STATUS[t.status]
   return (
-    <div className="hairline flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]">
-      <div className="min-w-0">
+    <div className="hairline group flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]">
+      {/* De naam is de weg naar de avond zelf.
+          De rij lichtte al op bij het aanwijzen alsof je erop kon klikken, en
+          dat kon je niet: naar de tornooipagina — met de inschrijvingen en het
+          promomateriaal — was er vanaf hier geen weg. Nu wel, en de hele
+          linkerkant is het doel zodat het op een telefoon te raken valt. */}
+      <Link
+        href={`/c/${club.slug}/tornooien/${t.id}`}
+        className="min-w-0 flex-1 rounded-[var(--radius)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+      >
         <div className="flex items-center gap-2">
-          <p className="truncate font-medium">{t.name}</p>
+          <p className="truncate font-medium underline-offset-4 group-hover:underline">{t.name}</p>
           <Badge tone={s?.tone ?? 'neutral'}>{s ? tr(s.key) : t.status}</Badge>
         </div>
         <p className="tnum mt-0.5 text-sm text-[var(--text-muted)]">
@@ -185,13 +194,17 @@ function Item({
           <span className="mx-1.5 text-[var(--text-faint)]">·</span>
           {formatMoney(t.buyin_cents + t.fee_cents, club.currency)}
         </p>
-      </div>
+      </Link>
       {/* Een afgelopen avond bedien je niet meer, die bekijk je.
           Bijstellen staat hier en niet alleen op de tornooipagina: voor een
           avond die nog moet komen was die pagina vanaf hier niet eens te
           bereiken — er stond enkel Klok en Floor. */}
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {t.status === 'finished' || t.status === 'cancelled' ? (
+          /* Een afgelopen avond bedien je niet meer. De naam links brengt je
+             naar de uitslag; deze knop zegt het nog eens hardop, want op een
+             rij zonder verdere knoppen is het niet vanzelfsprekend dat er
+             iets te klikken valt. */
           <ButtonLink size="sm" variant="brand" href={`/c/${club.slug}/tornooien/${t.id}`}>
             {tr('result.view')}
           </ButtonLink>
