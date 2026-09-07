@@ -26,6 +26,9 @@ export interface TournamentRow {
   bounty_cents: number
   bounty_mode: string
   addon_cents: number | null
+  addon_fee_cents: number | null
+  rebuy_cents: number | null
+  rebuy_fee_cents: number | null
   addon_stack: number | null
   starting_stack: number
   max_reentries: number
@@ -121,6 +124,43 @@ export function toClockState(t: TournamentRow) {
     levelStartedAt: t.level_started_at,
     levelElapsedMs: Number(t.level_elapsed_ms ?? 0),
   }
+}
+
+/**
+ * Wat de speler aan de kassa betaalt voor een inkoop, in cent.
+ *
+ * **Waarom dit hier staat en niet in het scherm.** De floor tikt een rebuy aan
+ * en de speler geeft geld. Wat er op die knop stond, was tot nu toe alleen de
+ * pot — de rake stond er niet bij, en de bounty ook niet. De floor rekende dat
+ * dus zelf bij, elke keer opnieuw, in een zaal waar het lawaaiig is.
+ *
+ * De verdeling hieronder is exact dezelfde als die `floor_rebuy` in de databank
+ * maakt. Dat is geen toeval maar de reden dat deze functie bestaat: één plek
+ * waar staat wat iets kost, zodat de knop en de boeking niet uit elkaar kunnen
+ * lopen.
+ *
+ * - **addon**: eigen prijs als die er is, anders de inleg; eigen rake, anders
+ *   niets. Nooit een bounty — een addon koopt chips, geen kop.
+ * - **rebuy en re-entry**: eigen prijs als die er is, anders de inleg; eigen
+ *   rake, anders die van de inleg. Plus de bounty, tenzij de avond er geen
+ *   heeft.
+ */
+export function entryPriceCents(
+  t: Pick<TournamentRow,
+    'buyin_cents' | 'fee_cents' | 'bounty_cents' | 'bounty_mode'
+    | 'addon_cents' | 'addon_fee_cents' | 'rebuy_cents' | 'rebuy_fee_cents'>,
+  kind: 'rebuy' | 'reentry' | 'addon',
+): { pot: number; fee: number; bounty: number; total: number } {
+  const addon = kind === 'addon'
+  const pot = addon
+    ? (t.addon_cents ?? t.buyin_cents)
+    : (t.rebuy_cents ?? t.buyin_cents)
+  const fee = addon
+    ? (t.addon_fee_cents ?? 0)
+    : (t.rebuy_fee_cents ?? t.fee_cents)
+  const bounty = addon || t.bounty_mode === 'none' ? 0 : t.bounty_cents
+
+  return { pot, fee, bounty, total: pot + fee + bounty }
 }
 
 export function formatMoney(cents: number, currency = 'EUR'): string {

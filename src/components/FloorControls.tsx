@@ -11,7 +11,7 @@ import {
   start, pause, resume, nextLevel, prevLevel, adjustTime, normalise,
   type ClockState,
 } from '@/lib/tournament/clock'
-import { expectedChipsInPlay, toClockState } from '@/lib/types'
+import { entryPriceCents, expectedChipsInPlay, toClockState } from '@/lib/types'
 import { useServerTime, useTicker } from '@/lib/useServerTime'
 import { useTournament } from '@/lib/useTournament'
 import { useT } from '@/lib/i18n/context'
@@ -311,8 +311,12 @@ export function FloorControls({
         maxReentries={tournament.max_reentries}
         finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
         money={{
+          // Wat de speler werkelijk moet neertellen: pot plus rake plus
+          // bounty. Vroeger stond hier alleen de pot, en telde de floor de
+          // rake er zelf bij — elke keer opnieuw, in een lawaaiige zaal.
           buyinCents: tournament.buyin_cents,
-          addonCents: tournament.addon_cents,
+          rebuyCents: entryPriceCents(tournament, 'rebuy').total,
+          addonCents: entryPriceCents(tournament, 'addon').total,
           currency: club?.currency ?? 'EUR',
         }}
         potCents={stats.prizePoolCents}

@@ -55,7 +55,19 @@ export function FloorPlayers({
   maxReentries: number
   finished: boolean
   /** Bedragen op de knoppen zetten: je ziet wát je boekt voor je klikt. */
-  money: { buyinCents: number; addonCents: number | null; currency: string }
+  /**
+   * Wat de speler aan de kassa betaalt, per soort inkoop en inclusief rake en
+   * bounty. Uitgerekend door `entryPriceCents`, dezelfde verdeling als de
+   * databank boekt — zodat het bedrag op de knop en het bedrag in de kassa
+   * niet uit elkaar kunnen lopen.
+   */
+  money: {
+    /** De inleg zelf, voor de prijzenberekening. */
+    buyinCents: number
+    rebuyCents: number
+    addonCents: number
+    currency: string
+  }
   /** Prijzenpot en of de inkopen al gesloten zijn; voor het prijzengeldpaneel. */
   potCents: number
   entriesClosed: boolean
@@ -804,7 +816,7 @@ export function FloorPlayers({
                     onClick={() => void rebuy(p.id, 'rebuy')}
                     disabled={busy || p.reentriesUsed + p.rebuysUsed >= maxReentries}
                   >
-                    {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
+                    {t('players.rebuy')} {formatMoney(money.rebuyCents, money.currency)}
                   </Small>
                   {p.reentriesUsed + p.rebuysUsed >= maxReentries && (
                     <span className="text-xs text-[var(--text-faint)]">
@@ -813,7 +825,7 @@ export function FloorPlayers({
                   )}
                   <Small onClick={() => void rebuy(p.id, 'addon')} disabled={busy}>
                     {t('players.addon')}{' '}
-                    {formatMoney(money.addonCents ?? money.buyinCents, money.currency)}
+                    {formatMoney(money.addonCents, money.currency)}
                   </Small>
                   <Small onClick={() => void undoBuyin(p.id)} disabled={busy}>
                     ↩ {t('players.undoBuyin')}
@@ -906,7 +918,7 @@ export function FloorPlayers({
                         situatie bepaalt dat al. */}
                     {p.reentriesUsed + p.rebuysUsed < maxReentries && (
                       <Small onClick={() => void rebuy(p.id, 'reentry')} disabled={busy}>
-                        {t('players.rebuy')} {formatMoney(money.buyinCents, money.currency)}
+                        {t('players.rebuy')} {formatMoney(money.rebuyCents, money.currency)}
                       </Small>
                     )}
                     <Small onClick={() => void undo(p.id)} disabled={busy}>

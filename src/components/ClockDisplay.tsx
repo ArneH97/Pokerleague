@@ -179,6 +179,21 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
   // som van de doorgegeven chipcounts: die zijn onvolledig, en dan zou dit
   // cijfer de hele avond blijven hangen op de startstack in plaats van te
   // stijgen naarmate er spelers afvallen.
+  // Het eerstvolgende échte speelniveau. Niet `resolved.nextLevel`: staan er
+  // twee pauzes achter elkaar, dan is dat er nog een pauze, en dan zou het
+  // scherm tijdens de pauze naar de volgende pauze wijzen.
+  const volgendSpeel = levels.find((l) => l.idx > levelIdx && !l.isBreak) ?? null
+
+  // Levelnummer zoals de zaal telt: zonder de pauzes mee te tellen.
+  const playNo = new Map<number, number>()
+  {
+    let n = 0
+    for (const l of levels) {
+      if (!l.isBreak) n += 1
+      playNo.set(l.idx, n)
+    }
+  }
+
   const inPlay = expectedChipsInPlay(tournament, stats)
   const avg = inPlay > 0
     ? averageStack(inPlay, stats.playersLeft)
@@ -382,6 +397,25 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           </div>
         )}
 
+        {/* Tijdens de pauze: waar we straks mee verdergaan.
+            Dit is de vraag die tijdens elke pauze aan de bar gesteld wordt, en
+            het antwoord stond alleen in kleine letters onderaan het scherm.
+            Nu staat het waar tijdens een pauze toch niets anders staat: onder
+            de tijd, in dezelfde vorm als de blinds tijdens het spelen, zodat
+            de zaal het herkent zonder te lezen. */}
+        {isBreak && volgendSpeel && (
+          <div className="mt-[2.5vh] flex flex-col items-center">
+            <p className="text-[2.2vh] font-medium uppercase tracking-[0.28em] text-[var(--text-faint)]">
+              {t('clock.nextUp')} — {t('clock.level')} {playNo.get(volgendSpeel.idx) ?? volgendSpeel.idx + 1}
+            </p>
+            <div className="mt-[1.4vh] flex items-end gap-[3vw]">
+              <BlindChip label={t('clock.smallBlind')} value={volgendSpeel.smallBlind} />
+              <BlindChip label={t('clock.bigBlind')} value={volgendSpeel.bigBlind} big accent={accent} />
+              {volgendSpeel.ante > 0 && <BlindChip label={t('clock.ante')} value={volgendSpeel.ante} />}
+            </div>
+          </div>
+        )}
+
         {/* Gepauzeerd of net hervat. Staat boven de inkoopmelding: dit gaat
             over of er gespeeld wordt, en dat komt eerst. */}
         {statusNote && (
@@ -412,11 +446,20 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
                   }
             }
           >
-            {entriesClosed ? t('clock.lastCallOver') : t('clock.lastCallBanner')}
+            {entriesClosed
+              ? t('clock.lastCallOver')
+              /* Aftellen in plaats van "nog 5 minuten" laten staan. Dat
+                 stond er twintig keer achter elkaar hetzelfde terwijl de
+                 tijd wegliep, en dan gelooft de zaal het niet meer. */
+              : `${t('clock.lastCallBanner')} ${formatDuration(resolved.remainingMs)}`}
           </p>
         )}
 
-        <p className="mt-[2vh] text-[2.5vh] text-[var(--text-faint)]">
+        {/* Tijdens een pauze staat het blok hierboven er al, groot en met
+            de blinds erbij. Dan is deze regel dezelfde zin nog eens, klein. */}
+        <p className={`mt-[2vh] text-[2.5vh] text-[var(--text-faint)] ${
+          isBreak && volgendSpeel ? 'invisible' : ''
+        }`}>
           {resolved.nextLevel
             ? resolved.nextLevel.isBreak
               ? `${t('clock.next')} — ${breakLabel(resolved.nextLevel.label, t('clock.break'))}`
