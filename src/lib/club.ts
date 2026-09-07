@@ -49,6 +49,8 @@ export interface Club {
   play_rhythm: string | null
   contact_email: string | null
   contact_phone: string | null
+  /** Eigen domein van de club, als er een ingesteld is. Voor affiches en QR. */
+  custom_domain: string | null
   /** Openingsdag. Zolang die er is en er niets gespeeld is, telt de pagina af. */
   opens_on: string | null
   /** Toont deze club namen aan buitenstaanders? Zie migratie 0023. */
@@ -62,7 +64,7 @@ export const getClub = cache(async (slug: string): Promise<Club | null> => {
   const { data } = await supabase
     .from('clubs')
     .select('id,slug,name,city,currency,timezone,locale,logo_url,mark_url,primary_color,settings,'
-      + 'intro,address_line,maps_url,play_rhythm,contact_email,contact_phone,opens_on,'
+      + 'intro,address_line,maps_url,play_rhythm,contact_email,contact_phone,opens_on,custom_domain,'
       + 'public_names,compliance')
     .eq('slug', slug)
     .eq('is_active', true)

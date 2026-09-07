@@ -30,6 +30,8 @@ const ZELFDE = new Set([
   'struct.addLevel',
   // "+ Level" is in het Nederlands en het Engels hetzelfde woord.
   'struct.addRow',
+  // "Late reg" is aan elke pokertafel in Europa hetzelfde, hoe je ook praat.
+  'promo.lateReg',
   'deal.even',
   'points.bonusKo',
   'site.pick.metaTitle',

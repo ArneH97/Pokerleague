@@ -49,3 +49,32 @@ export async function playerUrl(path = '/'): Promise<string> {
   const { onPlatform } = await import('@/lib/whereAmI')
   return (await onPlatform()) ? path : leagueUrl(path)
 }
+
+/**
+ * Het publieke adres van een club, absoluut.
+ *
+ * Voor wat de club naar buiten brengt: een QR op een affiche, een link in een
+ * bericht. Waar `leagueUrl` naar het platform wijst, wijst dit naar de club
+ * zelf — `cutoff.pokerleague.be` of het eigen domein als de club er een heeft.
+ *
+ * **Waarom niet het `/c/<slug>/…`-pad?** Dat werkt wel, maar het is niet wat je
+ * op een affiche wil hebben staan. Iemand die de QR niet kan scannen typt over
+ * wat eronder staat, en `cutoff.pokerleague.be/inschrijven` is over te typen —
+ * `pokerleague.be/c/cutoff/inschrijven` niet. De proxy vertaalt het korte adres
+ * vanzelf naar het lange.
+ *
+ * In ontwikkeling valt hij terug op een gewoon pad: op localhost bestaat er
+ * geen clubsubdomein, en een QR naar `https://cutoff.localhost` scant naar
+ * niets.
+ */
+export function clubUrl(
+  club: { slug: string; custom_domain?: string | null },
+  path = '/',
+): string {
+  const eigen = club.custom_domain?.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  if (eigen) return `https://${eigen}${path}`
+
+  const domain = leagueDomains()[0]
+  if (!domain || domain.includes('localhost')) return `/c/${club.slug}${path}`
+  return `https://${club.slug}.${domain}${path}`
+}

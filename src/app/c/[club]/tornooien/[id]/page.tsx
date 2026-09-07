@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { PromoPanel } from '@/components/PromoPanel'
 import { RsvpPanel } from '@/components/RsvpPanel'
 import { ButtonLink, Card, Notice, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
@@ -41,6 +42,7 @@ interface TourRow {
   buyin_cents: number
   fee_cents: number
   ended_at: string | null
+  prereg_bonus_stack: number | null
 }
 
 export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[id]'>) {
@@ -62,7 +64,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
   const [tourRes, resultRes, potRes, rsvpRes] = await Promise.all([
     supabase
       .from('tournaments')
-      .select('id,name,scheduled_at,status,buyin_cents,fee_cents,ended_at')
+      .select('id,name,scheduled_at,status,buyin_cents,fee_cents,ended_at,prereg_bonus_stack')
       .eq('id', id)
       .maybeSingle<TourRow>(),
     supabase
@@ -135,6 +137,22 @@ export default async function Page_({ params }: PageProps<'/c/[club]/tornooien/[
           <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
             {t('rsvpList.hint')}
           </p>
+        </section>
+      )}
+
+      {/* ------------------------------------------------------ promomateriaal
+          Alleen zolang er nog ingeschreven kan worden. Een affiche voor een
+          avond die geweest is, is een affiche die niemand wil delen. */}
+      {canSeeMoney && tour.status === 'scheduled' && (
+        <section>
+          <SectionTitle>{t('promo.title')}</SectionTitle>
+          <Card>
+            <PromoPanel
+              clubSlug={slug}
+              tournamentId={id}
+              hasBonus={(tour.prereg_bonus_stack ?? 0) > 0}
+            />
+          </Card>
         </section>
       )}
 

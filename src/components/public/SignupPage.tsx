@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
-import { RsvpForm } from '@/components/public/RsvpForm'
+import { RsvpToggle } from '@/components/RsvpToggle'
+import { SignupChoice } from '@/components/public/SignupChoice'
 import { LocaleProvider } from '@/lib/i18n/context'
 import { translator, type Locale, type T } from '@/lib/i18n/dictionaries'
 import { themeVars, type Club } from '@/lib/club'
 import { playerUrl } from '@/lib/site'
+import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/types'
 
 /**
@@ -63,7 +65,42 @@ export async function SignupPage({
   // precies waar `playerUrl` voor bestaat. De taal reist mee, zodat iemand die
   // via de Franse affiche binnenkwam ook een Frans registratieformulier krijgt.
   const registerHref = await playerUrl(`/registreren?club=${club.slug}&l=${locale}`)
-  const loginHref = await playerUrl(`/login?next=%2Fik&l=${locale}`)
+
+  // Terug naar déze avond na het aanmelden, niet naar een algemeen scherm.
+  // Wie hier weggaat om zich aan te melden, wil hierna één ding: zeggen dat
+  // hij komt. Hem op /ik afzetten betekent dat hij zelf de weg terug moet
+  // zoeken, en dat doet niet iedereen.
+  const terug = card
+    ? `/c/${club.slug}/inschrijven/${card.tournament_id}?l=${locale}`
+    : `/c/${club.slug}/inschrijven?l=${locale}`
+  const loginHref = await playerUrl(
+    `/login?next=${encodeURIComponent(terug)}&l=${locale}`)
+
+  // Is hij al aangemeld? Op het clubdomein nooit — daar woont de sessie van de
+  // floor en niet die van de speler. Op het platform wél, en dat is precies
+  // waar de aanmeldknop hierboven hem naartoe stuurt. Dan slaan we het
+  // formulier over en staat er één knop.
+  const supabase = await createClient()
+  const { data: claims } = await supabase.auth.getClaims()
+  let alIn: boolean | null = null
+  if (claims?.claims && card) {
+    const { data: mij } = await supabase
+      .from('players')
+      .select('id')
+      .eq('auth_user_id', String(claims.claims.sub))
+      .is('merged_into_id', null)
+      .maybeSingle<{ id: string }>()
+    if (mij) {
+      const { data: insch } = await supabase
+        .from('tournament_registrations')
+        .select('id')
+        .eq('tournament_id', card.tournament_id)
+        .eq('player_id', mij.id)
+        .is('cancelled_at', null)
+        .maybeSingle<{ id: string }>()
+      alIn = insch !== null
+    }
+  }
 
   return (
     <LocaleProvider locale={locale}>
@@ -91,13 +128,24 @@ export async function SignupPage({
 
               {card.is_open ? (
                 <div className="mt-7">
-                  <RsvpForm
-                    tournamentId={card.tournament_id}
-                    clubName={card.club_name}
-                    bonusStack={card.bonus_stack}
-                    registerHref={registerHref}
-                    loginHref={loginHref}
-                  />
+                  {alIn === null ? (
+                    <SignupChoice
+                      tournamentId={card.tournament_id}
+                      clubName={card.club_name}
+                      bonusStack={card.bonus_stack}
+                      registerHref={registerHref}
+                      loginHref={loginHref}
+                    />
+                  ) : (
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] p-6 text-center">
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {alIn ? t('choice.youAreIn') : t('choice.oneTap')}
+                      </p>
+                      <div className="mt-4 flex justify-center">
+                        <RsvpToggle tournamentId={card.tournament_id} isIn={alIn} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="mt-7 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] p-6 text-center">
