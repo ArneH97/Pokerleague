@@ -204,7 +204,8 @@ begin
 
   select * into r from public.my_calendar() where name = 'Volgende donderdag';
   if not r.i_rsvp then raise exception 'FOUT: de kalender toont zijn inschrijving niet'; end if;
-  if r.registered <> 1 then raise exception 'FOUT: de teller staat op %', r.registered; end if;
+  -- Hoeveel anderen er komen, staat bewust niet meer in de kalender. Of hij
+  -- zelf ingeschreven staat wel: dat is zijn eigen gegeven.
 
   if public.rsvp_as_me(v_open)->>'status' <> 'already' then
     raise exception 'FOUT: twee keer inschrijven gaf niet already';

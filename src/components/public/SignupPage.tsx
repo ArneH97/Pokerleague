@@ -36,7 +36,6 @@ export interface SignupCard {
   fee_cents: number
   starting_stack: number
   bonus_stack: number
-  registered: number
   is_open: boolean
   club_slug: string
   club_name: string
@@ -215,10 +214,13 @@ function Head({
         </div>
       )}
 
-      <dl className="mt-6 grid grid-cols-3 gap-2 text-center">
+      {/* Twee tegels, geen drie. Hier stond ook "12 ingeschreven", en dat
+          werkte tegen zichzelf: staat er drie, dan denkt de volgende bezoeker
+          dat het niet doorgaat en schrijft hij zich niet in. Een lage teller
+          houdt zichzelf laag. */}
+      <dl className="mt-6 grid grid-cols-2 gap-2 text-center">
         <Cell label={t('rsvp.buyin')} value={cost > 0 ? formatMoney(cost, card.currency) : '—'} />
         <Cell label={t('rsvp.stack')} value={nf.format(card.starting_stack + card.bonus_stack)} />
-        <Cell label={t('rsvp.signedUp')} value={String(card.registered)} />
       </dl>
     </div>
   )

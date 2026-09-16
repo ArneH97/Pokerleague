@@ -49,7 +49,6 @@ interface Row {
   fee_cents: number
   bonus_stack: number
   entries: number
-  registered: number
   i_play: boolean
   i_rsvp: boolean
   can_rsvp: boolean
@@ -185,9 +184,6 @@ function Event({ row, t, locale }: { row: Row; t: T; locale: Locale }) {
               {cost > 0 && <span className="tnum">{formatMoney(cost, row.currency)}</span>}
               {row.entries > 0 && (
                 <span className="tnum">{t('cal.entriesShort').replace('{n}', String(row.entries))}</span>
-              )}
-              {row.registered > 0 && !live && (
-                <span className="tnum">{t('cal.rsvpCount').replace('{n}', String(row.registered))}</span>
               )}
               {row.bonus_stack > 0 && row.can_rsvp && !row.i_rsvp && (
                 <span className="font-medium text-[var(--brand)]">

@@ -71,7 +71,11 @@ begin
     raise exception 'FOUT: de cijfers op de kaart kloppen niet';
   end if;
   if not r.is_open then raise exception 'FOUT: de inschrijving staat dicht terwijl ze open hoort'; end if;
-  if r.registered <> 0 then raise exception 'FOUT: % inschrijvingen op een lege avond', r.registered; end if;
+  -- De kaart telt geen inschrijvingen meer; dat gaat de bezoeker niet aan.
+  -- We kijken hier dus in de tabel zelf of er werkelijk nog niemand staat.
+  select count(*) into v_n from tournament_registrations
+   where tournament_id = r.tournament_id and cancelled_at is null;
+  if v_n <> 0 then raise exception 'FOUT: % inschrijvingen op een lege avond', v_n; end if;
   if r.address_line is null or r.club_name <> 'Inschrijfclub' then
     raise exception 'FOUT: de clubgegevens staan niet op de kaart';
   end if;
@@ -102,8 +106,6 @@ begin
    where tournament_id = v_t and player_id = v_p and cancelled_at is null;
   if v_n <> 1 then raise exception 'FOUT: de inschrijving staat er niet'; end if;
 
-  select * into r from public.tournament_signup_card('ti1');
-  if r.registered <> 1 then raise exception 'FOUT: de teller staat op %', r.registered; end if;
   raise notice 'OK  zonder account: speler aangemaakt, gekoppeld, uitgenodigd en ingeschreven';
 
   -- ------------------------------------------------------------------- 3 ---
@@ -181,10 +183,11 @@ begin
     raise exception 'FOUT: wie niet inschreef begint met % chips in plaats van 20000', v_chips;
   end if;
 
-  -- En de inschrijving is nu een deelname geworden, dus de teller loopt terug.
-  select * into r from public.tournament_signup_card('ti1');
-  if r.registered <> 0 then
-    raise exception 'FOUT: de teller staat nog op % nadat hij aan tafel zat', r.registered;
+  -- En de inschrijving is nu een deelname geworden: ze staat niet meer open.
+  select count(*) into v_n from tournament_registrations
+   where tournament_id = v_t and cancelled_at is null;
+  if v_n <> 0 then
+    raise exception 'FOUT: er staan nog % open inschrijvingen nadat hij aan tafel zat', v_n;
   end if;
   raise notice 'OK  wie vooraf inschreef krijgt 5.000 chips extra, wie niet inschreef niet';
 

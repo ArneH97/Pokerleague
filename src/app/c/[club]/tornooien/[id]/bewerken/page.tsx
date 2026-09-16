@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { DeleteTournament } from '@/components/DeleteTournament'
 import { TournamentForm, type Existing, type Option } from '@/components/TournamentForm'
 import { getClub, getClubRole } from '@/lib/club'
 import { translator } from '@/lib/i18n/dictionaries'
@@ -159,6 +160,11 @@ export default async function Page({ params }: PageProps<'/c/[club]/tornooien/[i
         seasons={seasonRes.data ?? []}
         existing={existing}
       />
+
+      {/* Onderaan en apart: dit is de enige knop hier die iets weggooit dat
+          niet terugkomt. Wie een naam komt rechtzetten, hoort er niet
+          langs te scrollen alsof het een gewoon veld is. */}
+      <DeleteTournament clubSlug={slug} tournamentId={id} />
     </main>
   )
 }
