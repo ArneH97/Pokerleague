@@ -41,6 +41,7 @@ export function FloorPlayers({
   bountyMode,
   maxReentries,
   finished,
+  startingStack,
   money,
   potCents,
   entriesClosed,
@@ -61,6 +62,8 @@ export function FloorPlayers({
    * databank boekt — zodat het bedrag op de knop en het bedrag in de kassa
    * niet uit elkaar kunnen lopen.
    */
+  /** De startstapel van deze avond, zonder voorinschrijfbonus. */
+  startingStack: number
   money: {
     /** De inleg zelf, voor de prijzenberekening. */
     buyinCents: number
@@ -812,11 +815,24 @@ export function FloorPlayers({
                       rebuys er per speler mogen; is dat aantal bereikt, dan
                       gaat de knop op slot in plaats van dat de databank het
                       pas weigert nadat je geklikt hebt. */}
+                  {/* Wat er met de stapel gebeurt, staat op de knop.
+                      Een rebuy zet de stapel op de startstapel — hij telt er
+                      niet bij op. Dat is juist bij een blutte speler, maar het
+                      is ook de handeling waarmee je per ongeluk de chipleader
+                      terugzet naar 40.000. Er staat geen slot meer op (dat
+                      weigerde precies de spelers die vooraf inschreven), dus
+                      het bedrag én de stapel horen zichtbaar te zijn vóór je
+                      drukt in plaats van erna. */}
                   <Small
                     onClick={() => void rebuy(p.id, 'rebuy')}
                     disabled={busy || p.reentriesUsed + p.rebuysUsed >= maxReentries}
                   >
                     {t('players.rebuy')} {formatMoney(money.rebuyCents, money.currency)}
+                    {p.chipCount !== null && p.chipCount !== startingStack && (
+                      <span className="tnum ml-1.5 text-xs text-[var(--text-faint)]">
+                        {p.chipCount.toLocaleString('nl-BE')} → {startingStack.toLocaleString('nl-BE')}
+                      </span>
+                    )}
                   </Small>
                   {p.reentriesUsed + p.rebuysUsed >= maxReentries && (
                     <span className="text-xs text-[var(--text-faint)]">

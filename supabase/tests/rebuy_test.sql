@@ -57,16 +57,30 @@ begin
     'de rebuyteller klopt niet';
   raise notice 'OK  de rebuy staat in het geldregister en op de teller';
 
-  -- ------------------------------------------------------ rebuy boven de startstapel
+  -- ------------------------------- een verouderde telling houdt niets tegen
+  -- Hier stond ooit een slot: weigeren als de speler méér chips had dan de
+  -- startstapel. Dat raakte precies de verkeerde mensen. Wie vooraf
+  -- inschrijft begint met startstapel plus bonus, dus boven de startstapel,
+  -- en dat getal blijft staan tot iemand het bijwerkt. Speelde die zich blut,
+  -- dan weigerde de rebuy op een telling die op dat moment per definitie
+  -- verouderd is.
+  --
+  -- Een rebuy betekent: deze speler is blut. Wat er als laatste doorgegeven
+  -- is, zegt daar niets over.
   update tournament_players set chip_count = 60000 where id = v_tp;
-  begin
-    perform public.floor_rebuy(v_tp, 'rebuy');
-    raise exception 'een rebuy boven de startstapel werd aanvaard';
-  exception when check_violation then
-    raise notice 'OK  een rebuy weigert als hij de stapel zou verkleinen';
-  end;
+  perform public.floor_rebuy(v_tp, 'rebuy');
+  assert (select chip_count from tournament_players where id = v_tp) = 40000,
+    format('een rebuy hoort op de startstapel uit te komen, kreeg %s',
+           (select chip_count from tournament_players where id = v_tp));
+  raise notice 'OK  een rebuy gaat door, ook als de laatste telling hoger stond dan de startstapel';
+
+  -- En een misklik is terug te draaien: dat is het vangnet dat het slot
+  -- moest zijn.
+  perform public.floor_undo_last_buyin(v_tp);
   assert (select chip_count from tournament_players where id = v_tp) = 60000,
-    'de geweigerde rebuy heeft toch aan de stapel gezeten';
+    format('ongedaan maken zette de oude stapel niet terug, staat op %s',
+           (select chip_count from tournament_players where id = v_tp));
+  raise notice 'OK  en een misklik draai je terug naar de stapel van ervoor';
 
   -- ------------------------------------------------- een rebuy terugdraaien
   -- Verkeerde naam aangeklikt. De stapel hoort terug te staan zoals hij was,

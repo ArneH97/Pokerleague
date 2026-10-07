@@ -310,6 +310,7 @@ export function FloorControls({
         bountyMode={tournament.bounty_mode}
         maxReentries={tournament.max_reentries}
         finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
+        startingStack={tournament.starting_stack}
         money={{
           // Wat de speler werkelijk moet neertellen: pot plus rake plus
           // bounty. Vroeger stond hier alleen de pot, en telde de floor de
