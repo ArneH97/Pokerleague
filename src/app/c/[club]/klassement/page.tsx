@@ -41,6 +41,10 @@ interface Standing {
   cashes: number
   total_prize: number
   knockouts: number
+  /** Voldoet deze speler aan het minimum aantal avonden? Alleen bij seizoenen. */
+  qualified?: boolean
+  /** Dat minimum zelf, zodat we kunnen zeggen hoeveel er nog te gaan zijn. */
+  min_required?: number
 }
 
 interface Season {
@@ -212,6 +216,11 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   // gewone freezeout staat er anders een kolom streepjes.
   const showKo = rows.some((r) => r.knockouts > 0)
   const showCounted = rows.some((r) => r.counted !== undefined && r.counted !== r.tournaments)
+
+  // Het minimum aantal avonden om voor de seizoensprijs in aanmerking te
+  // komen. Nul betekent: er is geen drempel, en dan hoort er ook niets over
+  // gezegd te worden.
+  const minVereist = rows.find((r) => (r.min_required ?? 0) > 0)?.min_required ?? 0
   const explain = explainPoints(cfg, t)
 
   const monthName = (m: number) =>
@@ -308,7 +317,19 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
                   <td className="tnum px-4 py-2.5 font-semibold text-[var(--text-faint)]">
                     <span style={i < 3 ? { color: 'var(--brand)' } : undefined}>{i + 1}</span>
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{r.display_name}</td>
+                  <td className="px-4 py-2.5 font-medium">
+                    {r.display_name}
+                    {/* Wie nog onder de drempel zit, staat gewoon in de stand
+                        en telt gewoon punten — hij dingt alleen nog niet mee
+                        naar de prijs. Hem verbergen tot hij er is, zou het
+                        klassement de eerste maanden leeg laten en precies de
+                        race onzichtbaar maken die mensen moet laten komen. */}
+                    {minVereist > 0 && r.qualified === false && (
+                      <span className="ml-2 whitespace-nowrap rounded-full border border-[var(--line-strong)] px-2 py-0.5 text-[0.65rem] text-[var(--text-faint)]">
+                        {t('standings.toGo').replace('{n}', String(minVereist - r.tournaments))}
+                      </span>
+                    )}
+                  </td>
                   <td className="tnum px-4 py-2.5 text-right font-semibold">
                     {Math.round(Number(r.points)).toLocaleString('nl-BE')}
                   </td>
