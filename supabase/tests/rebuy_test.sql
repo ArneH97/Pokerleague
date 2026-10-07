@@ -124,6 +124,39 @@ begin
   assert (select finish_position from tournament_players where id = v_tps[5]) is null,
     'de teruggekeerde speler houdt een eindplaats';
   raise notice 'OK  een re-entry laat de plaats van de andere afvallers kloppen';
+
+  -- ----------------------------------------------- de twee wegen naar hetzelfde
+  -- Een speler die blut zit, kan op twee manieren opnieuw inkopen: de floor
+  -- schakelt hem eerst uit en koopt hem dan terug in, of hij drukt meteen op
+  -- rebuy. Dat is dezelfde handeling aan tafel en het hoort dus hetzelfde
+  -- resultaat te geven.
+  --
+  -- Dat was het ooit niet: de rechtstreekse rebuy telde de startstapel bíj
+  -- wat er nog lag, zodat iemand met 3.000 op 43.000 uitkwam in plaats van op
+  -- 40.000. Deze test staat er zodat dat verschil niet opnieuw insluipt.
+  declare
+    v_weg_a uuid; v_weg_b uuid; v_chips_a int; v_chips_b int;
+  begin
+    v_weg_a := public.floor_add_entry(v_tour, null, 'Weg A', 'wega@test.be');
+    v_weg_b := public.floor_add_entry(v_tour, null, 'Weg B', 'wegb@test.be');
+
+    -- Allebei bijna blut, en allebei even veel.
+    update tournament_players set chip_count = 3000 where id in (v_weg_a, v_weg_b);
+
+    perform public.floor_eliminate(v_weg_a, null);
+    perform public.floor_rebuy(v_weg_a, 'reentry');
+
+    perform public.floor_rebuy(v_weg_b, 'rebuy');
+
+    select chip_count into v_chips_a from tournament_players where id = v_weg_a;
+    select chip_count into v_chips_b from tournament_players where id = v_weg_b;
+
+    assert v_chips_a = v_chips_b,
+      format('uitschakelen+re-entry geeft %s chips, rechtstreeks rebuy geeft %s', v_chips_a, v_chips_b);
+    assert v_chips_b = 40000,
+      format('een rebuy hoort op de startstapel uit te komen, niet op %s', v_chips_b);
+    raise notice 'OK  uitschakelen+re-entry en een rechtstreekse rebuy geven dezelfde stapel';
+  end;
 end $$;
 
 rollback;
