@@ -564,7 +564,10 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           ['chop_cents', t('deal.chop')],
           ['even_cents', t('deal.even')],
         ] as const).filter(([k]) => deal.shares.some((sh) => sh[k] != null))
-        const showAgreed = cols.length === 0
+        // De eigen verdeling staat er als de floor hem aanzette. Oudere
+        // voorstellen dragen die vlag niet; daar geldt nog de oude regel dat
+        // hij verschijnt als er verder niets gekozen is.
+        const showAgreed = deal.shares.some((sh) => sh.show_agreed) || cols.length === 0
         const rows = [...deal.shares].sort((a, b) => b.agreed_cents - a.agreed_cents)
 
         return (

@@ -37,7 +37,16 @@ interface Seat {
   chips: number
 }
 
-type Col = 'icm' | 'chop' | 'even'
+/**
+ * De kolommen die op het zaalscherm kunnen staan.
+ *
+ * `custom` is de eigen verdeling: bedragen die de floor zelf intikt. Die kon
+ * hij altijd al invullen, maar ze bleven binnen dit scherm — de tafel zag ze
+ * pas als er verder niets aanstond. Nu is het een voorstel als de andere drie,
+ * en kan je het naast de ICM op de beamer zetten zodat de tafel ziet waar het
+ * over gaat.
+ */
+type Col = 'icm' | 'chop' | 'even' | 'custom'
 
 export function DealPanel({
   tournamentId,
@@ -64,7 +73,7 @@ export function DealPanel({
   )
   const [counted, setCounted] = useState(false)
   const [amounts, setAmounts] = useState<Record<string, number>>({})
-  const [show, setShow] = useState<Record<Col, boolean>>({ icm: true, chop: true, even: true })
+  const [show, setShow] = useState<Record<Col, boolean>>({ icm: true, chop: true, even: true, custom: false })
   const [openDeal, setOpenDeal] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,7 +110,22 @@ export function DealPanel({
 
   const totalCounted = seats.reduce((sum, s) => sum + (counts[s.id] ?? 0), 0)
   const ratio = expectedChips > 0 ? totalCounted / expectedChips : 0
+  // Binnen vijf procent noemen we de telling kloppend. Daarbuiten is er iets
+  // mis — maar wát er mis is, weet dit scherm niet. Misschien telde iemand een
+  // stapel verkeerd, misschien staat er nog een rebuy niet geboekt. Dat zoekt
+  // de floor aan tafel uit, niet de app.
   const countOk = expectedChips > 0 ? ratio >= 0.95 && ratio <= 1.05 : totalCounted > 0
+
+  // Doorgaan kan altijd, zolang er iets geteld is. Dat is nieuw: hiervoor zat
+  // de knop op slot bij meer dan vijf procent afwijking, en dan stond de floor
+  // aan een finaletafel met een scherm dat weigerde te rekenen terwijl de
+  // tafel op een voorstel wachtte.
+  //
+  // ICM rekent met verhoudingen. Telt iedereen tien procent te hoog, dan komen
+  // er exact dezelfde bedragen uit — de fout valt tegen elkaar weg. Alleen als
+  // één stapel verkeerd is, schuift het geld, en dan is de waarschuwing
+  // precies wat je nodig hebt: ga kijken, en beslis zelf of je het zo laat.
+  const canProceed = totalCounted > 0
 
   const result = useMemo(
     () => computeDeal(seats.map((s) => ({ ...s, chips: counts[s.id] ?? 0 })), remaining),
@@ -134,14 +158,18 @@ export function DealPanel({
   }
 
   /** Hoeveel voorstellen er nu op het zaalscherm zouden komen. */
-  const shownCount = (['icm', 'chop', 'even'] as Col[])
-    .filter((c) => show[c] && (c === 'even' || counted)).length
+  const shownCount = (['icm', 'chop', 'even', 'custom'] as Col[])
+    .filter((c) => show[c] && (c === 'even' || c === 'custom' || counted)).length
 
   /** Wat een bepaald voorstel voor deze zitplaats uitkeert. */
   function valueOf(col: Col, i: number): number {
     const s = result.shares[i]
     if (!s) return 0
-    return col === 'icm' ? (s.icmCents ?? 0) : col === 'chop' ? s.chopCents : even[i] ?? 0
+    if (col === 'icm') return s.icmCents ?? 0
+    if (col === 'chop') return s.chopCents
+    if (col === 'even') return even[i] ?? 0
+    // De eigen verdeling heeft geen formule: dat is wat de floor intikt.
+    return amounts[s.id] ?? 0
   }
 
   function pick(col: Col) {
@@ -159,7 +187,7 @@ export function DealPanel({
    * ooit op geklikt is — dan klopt het ook nog als er achteraf iets is
    * bijgesteld.
    */
-  const agreedCol: Col | 'custom' =
+  const agreedCol: Col =
     (['icm', 'chop', 'even'] as Col[]).find((col) =>
       result.shares.length > 0 &&
       result.shares.every((s, i) => (amounts[s.id] ?? 0) === valueOf(col, i)),
@@ -185,7 +213,7 @@ export function DealPanel({
     const next: Record<string, number> = {}
     seats.forEach((s, i) => { next[s.id] = even[i] ?? 0 })
     setAmounts(next)
-    setShow({ icm: false, chop: false, even: true })
+    setShow({ icm: false, chop: false, even: true, custom: false })
     setStep('propose')
   }
 
@@ -208,11 +236,16 @@ export function DealPanel({
         icm_cents: vis.icm && counted ? share.icmCents : null,
         chop_cents: vis.chop && counted ? share.chopCents : null,
         even_cents: vis.even ? (even[i] ?? 0) : null,
+        // Het afgesproken bedrag reist altijd mee — daar sluit de avond straks
+        // op af. Of het ook op de beamer komt, is een aparte vraag, en die
+        // staat als vlag in de rij zelf.
         agreed_cents: amounts[s.id] ?? 0,
+        show_agreed: vis.custom,
       }
     })
-    const method = vis.icm && vis.chop && vis.even ? 'all'
-      : vis.icm ? 'icm' : vis.chop ? 'chipchop' : 'even'
+    const method = vis.custom && !vis.icm && !vis.chop && !vis.even ? 'custom'
+      : vis.icm && vis.chop && vis.even ? 'all'
+      : vis.icm ? 'icm' : vis.chop ? 'chipchop' : vis.even ? 'even' : 'custom'
 
     const { error: err } = await supabase.rpc('deal_propose', {
       p_tournament_id: tournamentId,
@@ -303,14 +336,20 @@ export function DealPanel({
             {(ratio * 100).toFixed(1)}% · {countOk ? t('deal.countOk') : t('deal.countOff')}
           </p>
         </div>
-        <p className="mt-1 text-xs text-[var(--text-faint)]">{t('deal.countTolerance')}</p>
+        {countOk ? (
+          <p className="mt-1 text-xs text-[var(--text-faint)]">{t('deal.countTolerance')}</p>
+        ) : (
+          <p className="mt-2 rounded-lg border border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] p-2.5 text-xs leading-relaxed text-[var(--warn)]">
+            {t('deal.countWarn').replace('{pct}', (ratio * 100).toFixed(1))}
+          </p>
+        )}
 
         {error && <p className="mt-2 text-sm text-[var(--danger)]">{error}</p>}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={busy || !countOk}
+            disabled={busy || !canProceed}
             onClick={() => void saveStacks()}
             className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
           >
@@ -372,9 +411,9 @@ export function DealPanel({
           </p>
         </div>
 
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {(['icm', 'chop', 'even'] as const).map((c) => {
-            const available = c === 'even' || counted
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {(['icm', 'chop', 'even', 'custom'] as const).map((c) => {
+            const available = c === 'even' || c === 'custom' || counted
             const on = show[c] && available
             return (
               <button
@@ -393,7 +432,10 @@ export function DealPanel({
                   <span aria-hidden className={on ? 'text-[var(--brand)]' : 'text-[var(--text-faint)]'}>
                     {on ? '☑' : '☐'}
                   </span>
-                  {c === 'icm' ? t('deal.icm') : c === 'chop' ? t('deal.chop') : t('deal.even')}
+                  {c === 'icm' ? t('deal.icm')
+                    : c === 'chop' ? t('deal.chop')
+                    : c === 'even' ? t('deal.even')
+                    : t('deal.custom')}
                 </span>
                 <span className="mt-0.5 block tabular-nums text-xs text-[var(--text-muted)]">
                   {available
@@ -512,7 +554,7 @@ export function DealPanel({
 
         <button
           type="button"
-          disabled={busy || (!show.icm && !show.chop && !show.even)}
+          disabled={busy || (!show.icm && !show.chop && !show.even && !show.custom)}
           onClick={() => void project()}
           className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
         >

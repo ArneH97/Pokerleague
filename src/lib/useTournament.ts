@@ -15,6 +15,15 @@ export interface OpenDeal {
     name: string
     chips: number
     agreed_cents: number
+    /**
+     * Of de eigen verdeling van de floor ook op het zaalscherm hoort.
+     *
+     * Het afgesproken bedrag reist altijd mee — daar sluit de avond op af —
+     * maar dat is niet hetzelfde als het willen tonen. Ontbreekt de vlag, dan
+     * komt het voorstel van vóór deze versie: toen stond de eigen verdeling
+     * er alleen als er verder niets gekozen was, en dat gedrag houden we aan.
+     */
+    show_agreed?: boolean
     icm_cents?: number | null
     chop_cents?: number | null
     even_cents?: number | null
