@@ -11,19 +11,32 @@
 -- punten. Niemand verliest zijn geschiedenis omdat er een nieuwe competitie
 -- begint, en jij kan achteraf nog altijd zien wie er in september won.
 --
--- **De puntentelling.** multiplier 10, exponent 0,75, en drie punten voor wie
--- komt opdagen. Bij twintig spelers:
+-- **De puntentelling.** multiplier 10, exponent 0,75, drie punten voor wie
+-- komt opdagen, en dertig euro als ijkpunt voor de inleg. Bij twintig spelers
+-- op een avond van dertig euro:
 --
---     1e  47,7   2e  29,6   3e  22,6   5e  16,4   10e  11,0   laatste  7,7
+--     1e  48   2e  30   3e  23   5e  16   10e  11   laatste  8
 --
--- Winnen is zes keer zoveel als laatste worden. Het veld telt mee via √N: een
--- avond met dertig spelers is voor de winnaar een vijfde meer waard dan een
--- avond met twintig — genoeg om drukke avonden te laten tellen, te weinig om
--- één zondag de league te laten beslissen.
+-- Winnen is zes keer zoveel als laatste worden, en ongeveer evenveel als zes
+-- avonden komen opdagen.
 --
--- **Beste twintig resultaten tellen.** Bij ongeveer veertig speelavonden tot
--- eind februari mag je er dus de helft laten vallen. Wie een paar weken niet
--- kan, ligt daarmee niet uit de race.
+-- **De inleg weegt mee.** Hetzelfde veld op een avond van vijftig euro:
+--
+--     1e  61   2e  37   5e  20   laatste  9
+--
+-- Vijftig euro is dus 29 procent meer waard dan dertig — de wortel van de
+-- verhouding. Genoeg om de grote avond te laten tellen, te weinig om de
+-- goedkope avond zinloos te maken: wie alleen de dertig-eurotornooien speelt,
+-- blijft meedoen voor het pakket.
+--
+-- Het veld telt mee via √N: een avond met dertig spelers is voor de winnaar
+-- een vijfde meer waard dan een avond met twintig — genoeg om drukke avonden
+-- te laten tellen, te weinig om één zondag de league te laten beslissen.
+--
+-- **Beste vijftien resultaten tellen.** Bij ongeveer veertig speelavonden tot
+-- eind februari mag je er dus ruim de helft laten vallen. Wie een maand niet
+-- kan, ligt daarmee niet uit de race — en wie élke avond komt, bouwt geen
+-- voorsprong meer op louter aanwezigheid.
 --
 -- **Minstens tien avonden om mee te dingen.** Anders staat er iemand bovenaan
 -- die twee keer kwam en er één won.
@@ -60,20 +73,22 @@ begin
       count_best_n, min_tournaments)
     values (
       v_club, c_seizoen, 'sqrt_ratio',
-      jsonb_build_object('multiplier', 10, 'exponent', 0.75),
+      jsonb_build_object('multiplier', 10, 'exponent', 0.75,
+                         'buyin_ref', 30, 'buyin_weight', 0.5),
       0,      -- geen bonus per knockout: dat is een aparte competitie
       3,      -- deelname levert iets op, maar weinig
-      20,     -- beste twintig resultaten tellen
+      15,     -- beste vijftien resultaten tellen
       10)     -- minstens tien avonden om mee te dingen
     returning id into v_rc;
     raise notice 'Puntentelling "%" aangemaakt.', c_seizoen;
   else
     update ranking_configs
     set method = 'sqrt_ratio',
-        params = jsonb_build_object('multiplier', 10, 'exponent', 0.75),
+        params = jsonb_build_object('multiplier', 10, 'exponent', 0.75,
+                                    'buyin_ref', 30, 'buyin_weight', 0.5),
         bonus_per_ko = 0,
         bonus_entry = 3,
-        count_best_n = 20,
+        count_best_n = 15,
         min_tournaments = 10
     where id = v_rc;
     raise notice 'Puntentelling "%" bestond al en is bijgewerkt.', c_seizoen;
@@ -128,6 +143,15 @@ begin
   v_herrekend := public.season_recompute_points(v_season);
   raise notice 'OK  % uitslagregel(s) opnieuw doorgerekend met de nieuwe telling.', v_herrekend;
 
+  -- ------------------------------------------- en één klassement in plaats van drie
+  -- Tot eind februari is er één competitie. De jaar- en maandstand ernaast
+  -- zetten drie lijstjes met drie verschillende namen bovenaan, en dan is de
+  -- vraag "wie staat er eerst" niet meer te beantwoorden. Dit is een
+  -- instelling en geen verwijdering: zet hem na februari terug af en de
+  -- jaarstand is er weer, met alles wat er intussen gespeeld is.
+  update clubs set standings_seasons_only = true where id = v_club;
+  raise notice 'OK  het klassement toont voortaan alleen seizoenen, ook voor de spelers.';
+
   raise notice '---';
   raise notice 'Klaar. Het klassementsscherm toont voortaan "%" als eerste seizoen.', c_seizoen;
   raise notice 'Nieuwe tornooien: kies dit seizoen in het aanmaakscherm, of draai dit script opnieuw — dan worden ze alsnog gekoppeld.';
@@ -137,11 +161,25 @@ end $$;
 -- Nakijken
 -- ===========================================================================
 
--- Welke avonden hangen er aan de league?
+-- Welke avonden hangen er aan de league, en wat weegt elke avond?
+--
+-- `weging` is de factor waarmee de inleg meetelt: 1,00 bij dertig euro, 1,29
+-- bij vijftig. `winnaar_bij_20` is wat een overwinning tegen twintig spelers
+-- op die avond oplevert. Kijk die kolom na: staat er bij een avond een
+-- verrassend getal, dan staat de inleg in het tornooi anders dan je dacht —
+-- de weging kijkt naar het bedrag dat naar de pot gaat, zonder rake.
 select
   to_char(t.scheduled_at, 'dd/mm/yyyy') as gepland,
   t.name                                 as tornooi,
   t.status,
+  round(t.buyin_cents / 100.0, 2)        as inleg,
+  round(t.fee_cents  / 100.0, 2)         as rake,
+  round(least(2.0, greatest(0.5,
+    sqrt((t.buyin_cents / 100.0) / 30))), 2)                              as weging,
+  public.calc_points('sqrt_ratio',
+    jsonb_build_object('multiplier', 10, 'exponent', 0.75,
+                       'buyin_ref', 30, 'buyin_weight', 0.5),
+    1, 20, 0, t.buyin_cents, 0, 3)                                        as winnaar_bij_20,
   (select count(*) from tournament_results r where r.tournament_id = t.id) as uitslagregels
 from tournaments t
 join seasons s on s.id = t.season_id

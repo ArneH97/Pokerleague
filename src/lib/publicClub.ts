@@ -109,6 +109,47 @@ export async function getPublicStandings(
   return (data ?? []) as unknown as PublicStanding[]
 }
 
+export interface PublicSeason {
+  id: string
+  name: string
+  starts_on: string
+  ends_on: string | null
+  is_active: boolean
+}
+
+export interface PublicSeasonStanding extends PublicStanding {
+  /** Hoeveel van zijn avonden meetellen, als er een beste-N-regel is. */
+  counted: number
+  /** Haalt deze speler het minimum aantal avonden van het seizoen? */
+  qualified: boolean
+  /** Dat minimum zelf; 0 betekent dat er geen drempel is. */
+  min_required: number
+}
+
+/**
+ * De seizoenen waar publiek iets van te zien is.
+ *
+ * Een seizoen zonder afgesloten publieke avond staat er niet bij: een league
+ * aankondigen met een lege stand eronder is erger dan hem nog niet tonen.
+ */
+export async function getPublicSeasons(slug: string): Promise<PublicSeason[]> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_public_seasons', { p_club_slug: slug })
+  return (data ?? []) as unknown as PublicSeason[]
+}
+
+/** De stand van één seizoen voor de zaal, mét beste-N en drempel. */
+export async function getPublicSeasonStandings(
+  slug: string, seasonId?: string,
+): Promise<PublicSeasonStanding[]> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_public_season_standings', {
+    p_club_slug: slug,
+    p_season_id: seasonId ?? null,
+  })
+  return (data ?? []) as unknown as PublicSeasonStanding[]
+}
+
 /** De prijzenladder. Deze functie was al open voor bezoekers. */
 export async function getPrizeLadder(tournamentId: string): Promise<number[]> {
   const supabase = await createClient()

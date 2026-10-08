@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { SeasonAssign, type AssignRow } from '@/components/settings/SeasonAssign'
 import { SettingsForm } from '@/components/settings/SettingsForm'
 import { Field, Notice, Page, PageHeader, SectionTitle, inputClass } from '@/components/ui'
 import { getClub, getClubRole } from '@/lib/club'
@@ -8,7 +9,8 @@ import { translator } from '@/lib/i18n/dictionaries'
 import { clubLocale } from '@/lib/i18n/server'
 import {
   saveClubBasics, saveClubLook, saveClubPublic, saveCompliance,
-  savePayoutTemplate, saveRankingConfig, saveSeason,
+  savePayoutTemplate, saveRankingConfig, saveSeason, saveSeasonTournaments,
+  saveStandingsScope,
 } from '@/lib/settingsActions'
 import { createClient } from '@/lib/supabase/server'
 
@@ -87,19 +89,24 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
     )
   }
 
-  const [payoutRes, rankingRes, seasonRes] = await Promise.all([
+  const [payoutRes, rankingRes, seasonRes, tourRes] = await Promise.all([
     supabase.from('payout_templates').select('id,name,tiers,rounding')
       .eq('club_id', club.id).order('name').overrideTypes<PayoutRow[]>(),
     supabase.from('ranking_configs').select('id,name,method,params,bonus_per_ko,bonus_entry,count_best_n,min_tournaments')
       .eq('club_id', club.id).order('name').overrideTypes<RankingRow[]>(),
     supabase.from('seasons').select('id,name,starts_on,ends_on,ranking_config_id,is_active')
       .eq('club_id', club.id).order('starts_on', { ascending: false }).overrideTypes<SeasonRow[]>(),
+    supabase.rpc('season_tournaments', { p_club_id: club.id }),
   ])
 
   const payout = payoutRes.data?.[0] ?? null
   const ranking = rankingRes.data?.[0] ?? null
   const seasons = seasonRes.data ?? []
   const rankings = rankingRes.data ?? []
+
+  // Veertig avonden terug is ruim een halve kalender; verder terug gaan maakt
+  // het scherm onhanteerbaar en is niet waar iemand een league mee opzet.
+  const tournaments = ((tourRes.data ?? []) as unknown as AssignRow[]).slice(0, 40)
 
   const comp = club.compliance ?? {}
   const c = (k: string, d: number) => Number(comp[k] ?? d)
@@ -286,6 +293,30 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
                 <Field label={t('settings.multiplier')} hint={t('settings.forSqrt')}>
                   <input type="number" step="0.5" name="multiplier" defaultValue={pn('multiplier', 10)} className={inputClass} />
                 </Field>
+                {/* Steilheid en inleg horen hier te staan en niet alleen in de
+                    database. Niet voor de volledigheid: `saveRankingConfig`
+                    bouwt de parameters opnieuw op uit dit formulier, dus een
+                    veld dat hier ontbreekt wordt gewist zodra iemand op
+                    bewaren klikt. Zie de opmerking in settingsActions.ts. */}
+                <Field label={t('settings.exponent')} hint={t('settings.exponentHint')}>
+                  <input
+                    type="number" step="0.05" min={0.5} max={1.5} name="exponent"
+                    defaultValue={pn('exponent', 0.5)} className={inputClass}
+                  />
+                </Field>
+                <Field label={t('settings.buyinRef')} hint={t('settings.buyinRefHint')}>
+                  <input
+                    type="number" step="1" min={0} name="buyin_ref"
+                    defaultValue={p.buyin_ref === undefined ? '' : pn('buyin_ref', 0)}
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label={t('settings.buyinWeight')} hint={t('settings.buyinWeightHint')}>
+                  <input
+                    type="number" step="0.05" min={0} max={1.5} name="buyin_weight"
+                    defaultValue={pn('buyin_weight', 0.5)} className={inputClass}
+                  />
+                </Field>
                 <Field label={t('settings.base')} hint={t('settings.forLinear')}>
                   <input type="number" step="1" name="base" defaultValue={pn('base', 100)} className={inputClass} />
                 </Field>
@@ -345,6 +376,43 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
           <SettingsForm action={saveSeason} title={t('settings.newSeason')} description={t('settings.newSeasonBody')}>
             {hidden({ club_id: club.id })}
             <SeasonFields season={null} rankings={rankings} t={t} />
+          </SettingsForm>
+
+          {/* Welke avond bij welk seizoen hoort. Het stond al in het
+              bewerkscherm van een tornooi, maar wie een league middenin de
+              kalender begint wil de lijst zien in plaats van zestig avonden
+              één voor één te openen. */}
+          <SettingsForm
+            action={saveSeasonTournaments}
+            title={t('settings.assign')}
+            description={t('settings.assignBody')}
+          >
+            {hidden()}
+            <SeasonAssign
+              tournaments={tournaments}
+              seasons={seasons}
+              locale={locale}
+              timezone={club.timezone}
+              currency={club.currency}
+              t={t}
+            />
+          </SettingsForm>
+
+          <SettingsForm
+            action={saveStandingsScope}
+            title={t('settings.scope')}
+            description={t('settings.scopeBody')}
+          >
+            {hidden({ id: club.id })}
+            <label className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                name="standings_seasons_only"
+                defaultChecked={club.standings_seasons_only}
+                className="size-4"
+              />
+              <span className="text-sm">{t('settings.seasonsOnly')}</span>
+            </label>
           </SettingsForm>
 
           {/* -------------------------------------------------- gedoogbeleid */}

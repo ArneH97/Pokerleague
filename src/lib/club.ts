@@ -55,6 +55,12 @@ export interface Club {
   opens_on: string | null
   /** Toont deze club namen aan buitenstaanders? Zie migratie 0023. */
   public_names: boolean
+  /**
+   * Eén competitie in plaats van drie lijstjes. Staat dit aan, dan toont het
+   * klassement alleen seizoenen — geen jaar- en geen maandstand. Voor een club
+   * die tot een vaste datum voor één prijs speelt.
+   */
+  standings_seasons_only: boolean
   /** Gedoogbeleid. Vorm staat in 0001_schema.sql; instelbaar per club. */
   compliance: Record<string, unknown> | null
 }
@@ -65,7 +71,7 @@ export const getClub = cache(async (slug: string): Promise<Club | null> => {
     .from('clubs')
     .select('id,slug,name,city,currency,timezone,locale,logo_url,mark_url,primary_color,settings,'
       + 'intro,address_line,maps_url,play_rhythm,contact_email,contact_phone,opens_on,custom_domain,'
-      + 'public_names,compliance')
+      + 'public_names,standings_seasons_only,compliance')
     .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle<Club>()

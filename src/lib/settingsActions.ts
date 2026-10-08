@@ -197,7 +197,24 @@ export async function saveRankingConfig(_prev: Result | null, fd: FormData): Pro
   const method = text(fd, 'method') ?? 'sqrt_ratio'
 
   let params: Record<string, unknown> = {}
-  if (method === 'sqrt_ratio' || method === 'pokerstars') {
+  if (method === 'sqrt_ratio') {
+    // `params` wordt hier opnieuw opgebouwd en niet samengevoegd met wat er
+    // stond. Dat betekent dat elk veld dat de database kent ook in dit
+    // formulier moet staan, anders wist een onschuldige bewaarklik de
+    // steilheid van de league. Vandaar dat exponent en de buy-inweging hier
+    // expliciet meekomen in plaats van stil te verdwijnen.
+    params = { multiplier: num(fd, 'multiplier', 10) }
+
+    const exponent = num(fd, 'exponent', 0.5)
+    if (exponent !== 0.5) params.exponent = Math.min(1.5, Math.max(0.5, exponent))
+
+    // Een ijkpunt van nul of leeg betekent: de inleg telt niet mee.
+    const ref = num(fd, 'buyin_ref', 0)
+    if (ref > 0) {
+      params.buyin_ref = ref
+      params.buyin_weight = Math.min(1.5, Math.max(0, num(fd, 'buyin_weight', 0.5)))
+    }
+  } else if (method === 'pokerstars') {
     params = { multiplier: num(fd, 'multiplier', 10) }
   } else if (method === 'linear') {
     params = {
@@ -255,6 +272,60 @@ export async function saveSeason(_prev: Result | null, fd: FormData): Promise<Re
     : await supabase.from('seasons').insert({ ...patch, club_id: clubId })
 
   if (error) return { ok: false, ...human(error.message) }
+  revalidatePath(`/c/${slug}`, 'layout')
+  return { ok: true }
+}
+
+/**
+ * Eén competitie of drie lijstjes.
+ *
+ * Een vlag en geen verwijdering. Zet hem na de league weer af en de jaarstand
+ * is er weer, met alles wat er intussen gespeeld is — er gaat niets verloren
+ * doordat een club een halfjaar voor één prijs speelt.
+ */
+export async function saveStandingsScope(_prev: Result | null, fd: FormData): Promise<Result> {
+  const slug = String(fd.get('slug'))
+  const id = String(fd.get('id'))
+
+  return save(slug, 'clubs', id, {
+    standings_seasons_only: fd.get('standings_seasons_only') === 'on',
+  })
+}
+
+/**
+ * Welke avonden bij welk seizoen horen.
+ *
+ * Het formulier stuurt per tornooi twee velden mee: wat er nu geselecteerd
+ * staat en wat het was. Alleen wat verschilt gaat naar de database, en dat is
+ * niet uit zuinigheid: `tournament_set_season` rekent de punten van een avond
+ * opnieuw door, en dat hoort niet te gebeuren voor zestig avonden waar
+ * niemand iets aan veranderd heeft.
+ */
+export async function saveSeasonTournaments(
+  _prev: Result | null, fd: FormData,
+): Promise<Result> {
+  const slug = String(fd.get('slug'))
+  const supabase = await createClient()
+
+  let veranderd = 0
+
+  for (const [key, waarde] of fd.entries()) {
+    if (!key.startsWith('season_for_')) continue
+    const tournamentId = key.slice('season_for_'.length)
+    const nu = String(waarde)
+    const was = String(fd.get(`was_for_${tournamentId}`) ?? '')
+    if (nu === was) continue
+
+    const { error } = await supabase.rpc('tournament_set_season', {
+      p_tournament_id: tournamentId,
+      p_season_id: nu === '' ? null : nu,
+    })
+    if (error) return { ok: false, ...human(error.message) }
+    veranderd += 1
+  }
+
+  if (veranderd === 0) return { ok: true }
+
   revalidatePath(`/c/${slug}`, 'layout')
   return { ok: true }
 }

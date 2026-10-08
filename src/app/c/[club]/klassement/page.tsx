@@ -64,13 +64,26 @@ interface RankingConfig {
 }
 
 /** De puntenformule van de club in één zin, in plaats van in de documentatie. */
-function explainPoints(cfg: RankingConfig | null, t: T): string[] {
+function explainPoints(cfg: RankingConfig | null, t: T, locale: string): string[] {
   if (!cfg) return []
   const p = (cfg.params ?? {}) as Record<string, number>
   const out: string[] = []
 
   if (cfg.method === 'sqrt_ratio') {
-    out.push(t('points.sqrt').replace('{mult}', String(p.multiplier ?? 10)))
+    // Met een exponent is het geen √plaats meer, en dan hoort er ook niet
+    // √plaats te staan: dit kadertje is het antwoord op "waarom heeft hij er
+    // meer dan ik".
+    const exp = Number(p.exponent ?? 0.5)
+    out.push(
+      exp === 0.5
+        ? t('points.sqrt').replace('{mult}', String(p.multiplier ?? 10))
+        : t('points.sqrtExp')
+          .replace('{mult}', String(p.multiplier ?? 10))
+          .replace('{exp}', exp.toLocaleString(`${locale}-BE`)),
+    )
+    if (Number(p.buyin_ref ?? 0) > 0) {
+      out.push(t('points.buyin').replace('{ref}', String(p.buyin_ref)))
+    }
   } else if (cfg.method === 'linear') {
     out.push(
       t('points.linear')
@@ -102,7 +115,10 @@ function examplePoints(cfg: RankingConfig): number {
   } else if (cfg.method === 'linear') {
     v = p.base ?? 100
   }
-  return Math.round((v + cfg.bonus_entry) * 100) / 100
+  // Hele punten, zoals de database ze bewaart. En bij plaats 1 doet de
+  // exponent niets, en bij de ijkinleg de weging niets — dus dit voorbeeld
+  // klopt ook met een league-telling, zolang het over plaats 1 gaat.
+  return Math.round(v + cfg.bonus_entry)
 }
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -144,11 +160,22 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
       <PublicStandings
         club={club}
         locale={(await visitorLocale()) ?? locale}
-        mode={p === 'year' ? 'year' : p === 'month' ? 'month' : 'all'}
+        mode={
+          club.standings_seasons_only ? 'season'
+            : p === 'year' ? 'year'
+              : p === 'month' ? 'month'
+                : 'all'
+        }
       />
     )
   }
-  const mode = one(q.p) === 'year' ? 'year' : one(q.p) === 'month' ? 'month' : 'season'
+
+  // Speelt de club één competitie, dan is er ook maar één soort klassement.
+  // De jaar- en maandstand bestaan nog in de database — dit is een instelling
+  // en geen verwijdering — maar ze staan niet in de weg.
+  const mode = club.standings_seasons_only
+    ? 'season'
+    : one(q.p) === 'year' ? 'year' : one(q.p) === 'month' ? 'month' : 'season'
 
   const [seasonRes, yearRes] = await Promise.all([
     supabase
@@ -221,7 +248,7 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
   // komen. Nul betekent: er is geen drempel, en dan hoort er ook niets over
   // gezegd te worden.
   const minVereist = rows.find((r) => (r.min_required ?? 0) > 0)?.min_required ?? 0
-  const explain = explainPoints(cfg, t)
+  const explain = explainPoints(cfg, t, locale)
 
   const monthName = (m: number) =>
     new Intl.DateTimeFormat(`${locale}-BE`, { month: 'long' }).format(new Date(2000, m - 1, 1))
@@ -243,17 +270,19 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
 
       {/* -------------------------------------------------------------- filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <Tabs
-          items={[
-            { href: `${base}?p=season`, label: t('standings.bySeason'), on: mode === 'season' },
-            { href: `${base}?p=year&y=${years[0]}`, label: t('standings.byYear'), on: mode === 'year' },
-            {
-              href: `${base}?p=month&y=${years[0]}&m=${new Date().getMonth() + 1}`,
-              label: t('standings.byMonth'),
-              on: mode === 'month',
-            },
-          ]}
-        />
+        {!club.standings_seasons_only && (
+          <Tabs
+            items={[
+              { href: `${base}?p=season`, label: t('standings.bySeason'), on: mode === 'season' },
+              { href: `${base}?p=year&y=${years[0]}`, label: t('standings.byYear'), on: mode === 'year' },
+              {
+                href: `${base}?p=month&y=${years[0]}&m=${new Date().getMonth() + 1}`,
+                label: t('standings.byMonth'),
+                on: mode === 'month',
+              },
+            ]}
+          />
+        )}
 
         {mode === 'season' && seasons.length > 1 && (
           <Chips
