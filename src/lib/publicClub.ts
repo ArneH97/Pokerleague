@@ -259,3 +259,40 @@ export async function getPublicSeasonRules(
     min_tournaments: Number(rij.min_tournaments ?? 0),
   }
 }
+
+export interface PublicPage {
+  slug: string
+  title: string
+  body: string
+  /** De taal die je werkelijk kreeg; anders dan gevraagd betekent terugval. */
+  locale: string
+  image_url: string | null
+  season_name: string | null
+  updated_at: string
+}
+
+/** Eén gepubliceerde clubpagina, in de gevraagde taal of een terugval. */
+export async function getPublicPage(
+  slug: string, pageSlug: string, locale: string,
+): Promise<PublicPage | null> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_public_page', {
+    p_club_slug: slug,
+    p_slug: pageSlug,
+    p_locale: locale,
+  })
+  return ((data ?? []) as unknown as PublicPage[])[0] ?? null
+}
+
+/** De gepubliceerde pagina's van een club, om naar te linken. */
+export async function getPublicPages(
+  slug: string, locale: string, seasonId?: string,
+): Promise<{ slug: string; title: string; season_id: string | null }[]> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_public_pages', {
+    p_club_slug: slug,
+    p_season_id: seasonId ?? null,
+    p_locale: locale,
+  })
+  return (data ?? []) as unknown as { slug: string; title: string; season_id: string | null }[]
+}

@@ -4,8 +4,8 @@ import type { Club } from '@/lib/club'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
 import { PointsExplainer } from '@/components/public/PointsExplainer'
 import {
-  getPublicSeasonRules, getPublicSeasonStandings, getPublicSeasons, getPublicStandings,
-  type PublicSeasonStanding,
+  getPublicPages, getPublicSeasonRules, getPublicSeasonStandings, getPublicSeasons,
+  getPublicStandings, type PublicSeasonStanding,
 } from '@/lib/publicClub'
 
 /**
@@ -49,6 +49,8 @@ export async function PublicStandings({
     ? await getPublicSeasonStandings(club.slug)
     : await getPublicStandings(club.slug, from, to)
   const rules = mode === 'season' ? await getPublicSeasonRules(club.slug) : null
+  // De eigen pagina's die bij dit seizoen horen — meestal het reglement.
+  const paginas = seizoen ? await getPublicPages(club.slug, locale, seizoen.id) : []
   const base = `/c/${club.slug}/klassement`
 
   const tabs = [
@@ -71,6 +73,19 @@ export async function PublicStandings({
         seizoen && (
           <div className="mb-4">
             <p className="text-lg font-semibold">{seizoen.name}</p>
+            {paginas.length > 0 && (
+              <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {paginas.map((pg) => (
+                  <Link
+                    key={pg.slug}
+                    href={`/c/${club.slug}/p/${pg.slug}`}
+                    className="text-[var(--brand)] underline-offset-4 hover:underline"
+                  >
+                    {pg.title} →
+                  </Link>
+                ))}
+              </p>
+            )}
             {seizoen.ends_on && (
               <p className="tnum text-sm text-[var(--text-faint)]">
                 {t('pub.until').replace(

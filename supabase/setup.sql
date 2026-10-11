@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql · 0053_mijn_tafel.sql · 0054_spelers_per_tafel.sql · 0055_tafelindeling.sql · 0056_live_blinds_en_stoelen.sql · 0057_plaats_schatten.sql · 0058_levels_tijdens_de_avond.sql · 0059_tornooi_verwijderen.sql · 0060_rebuy_zonder_slot.sql · 0061_league_punten.sql · 0062_stoel_na_rebuy.sql · 0063_buyin_en_seizoen.sql · 0064_bounty_telt_mee.sql · 0065_inzet_telt_de_bounty_mee.sql · 0066_puntenopbouw.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql · 0053_mijn_tafel.sql · 0054_spelers_per_tafel.sql · 0055_tafelindeling.sql · 0056_live_blinds_en_stoelen.sql · 0057_plaats_schatten.sql · 0058_levels_tijdens_de_avond.sql · 0059_tornooi_verwijderen.sql · 0060_rebuy_zonder_slot.sql · 0061_league_punten.sql · 0062_stoel_na_rebuy.sql · 0063_buyin_en_seizoen.sql · 0064_bounty_telt_mee.sql · 0065_inzet_telt_de_bounty_mee.sql · 0066_puntenopbouw.sql · 0067_clubpaginas.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -14990,6 +14990,223 @@ begin
       execute format('grant execute on function public.club_public_season_standings(text,uuid) to %I', r);
       execute format('grant execute on function public.club_public_player_season(text,uuid,uuid) to %I', r);
       execute format('grant execute on function public.club_public_season_rules(text,uuid) to %I', r);
+    end if;
+  end loop;
+end $$;
+
+-- =========================================================================
+-- 0067_clubpaginas.sql
+-- =========================================================================
+
+-- Pokerleague — eigen pagina's per club, drietalig
+--
+-- Een club heeft tekst die nergens past. Een leaguereglement, huisregels, een
+-- uitleg over het gedoogbeleid. Dat hoort niet in de code van het platform:
+-- dan moet er een drop en een push aan te pas komen om een komma te
+-- verzetten, en dan verandert niemand er ooit nog iets aan.
+--
+-- Dus een tabel. Een club maakt een pagina, vult hem in drie talen in, en hij
+-- staat op zijn eigen domein. Onzichtbaar tot hij hem publiceert.
+--
+-- **Waarom een pagina aan een seizoen mag hangen.** Het reglement van de
+-- Marrakech League is geen clubreglement — het geldt voor één competitie, van
+-- oktober tot eind februari. Hangt de pagina aan dat seizoen, dan kan het
+-- klassement van dat seizoen ernaar linken, en staat ze na februari niet meer
+-- in de weg bij de volgende league. `season_id` mag leeg blijven: dan is het
+-- een gewone clubpagina die altijd geldt.
+--
+-- **Waarom drie kolommen per taal en geen jsonb.** Een ontbrekende vertaling
+-- moet zichtbaar leeg zijn en niet een sleutel die er toevallig niet in zit.
+-- En zo kan je in het bewerkscherm gewoon drie velden naast elkaar zetten.
+
+create table if not exists club_pages (
+  id          uuid primary key default gen_random_uuid(),
+  club_id     uuid not null references clubs(id)   on delete cascade,
+  /** Optioneel: hoort deze pagina bij één seizoen? */
+  season_id   uuid references seasons(id) on delete set null,
+  /** Het stukje adres: /p/<slug>. Kleine letters, cijfers en streepjes. */
+  slug        text not null,
+  is_published boolean not null default false,
+  sort_order  int not null default 0,
+  /** Een afbeelding bovenaan, bijvoorbeeld de affiche van de league. */
+  image_url   text,
+
+  title_nl text, body_nl text,
+  title_fr text, body_fr text,
+  title_en text, body_en text,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint club_pages_slug_vorm check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  constraint club_pages_slug_uniek unique (club_id, slug)
+);
+
+create index if not exists club_pages_club_idx   on club_pages (club_id, sort_order);
+create index if not exists club_pages_season_idx on club_pages (season_id);
+
+comment on table club_pages is
+  'Eigen tekstpagina''s van een club, in drie talen. Hangt er een season_id aan, dan hoort de pagina bij dat seizoen en linkt het klassement ervan ernaar.';
+
+-- `updated_at` bijhouden in de database en niet in de server-actie: dan
+-- klopt hij ook als een pagina ooit via SQL bijgewerkt wordt, en dat gebeurt
+-- bij het inladen van een reglement.
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists club_pages_touch on club_pages;
+create trigger club_pages_touch
+  before update on club_pages
+  for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Rechten
+-- ---------------------------------------------------------------------------
+-- Lezen mag elke staf en elke speler van de club, ook ongepubliceerd: zo kan
+-- je nakijken hoe het eruitziet voor je het aanzet. Buitenstaanders lezen via
+-- club_public_page(), dat zelf op gepubliceerd filtert.
+
+alter table club_pages enable row level security;
+
+drop policy if exists club_pages_read  on club_pages;
+drop policy if exists club_pages_write on club_pages;
+
+create policy club_pages_read on club_pages
+  for select using (public.is_club_member(club_id) or public.is_club_player(club_id));
+
+create policy club_pages_write on club_pages
+  for all using (public.has_club_role(club_id, array['owner','admin']::club_role[]))
+  with check (public.has_club_role(club_id, array['owner','admin']::club_role[]));
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant select, insert, update, delete on club_pages to authenticated;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- De publieke kant
+-- ---------------------------------------------------------------------------
+-- Eén pagina ophalen, in de gevraagde taal, met terugval op wat er wél
+-- ingevuld is. Een bezoeker die Frans kiest en een pagina treft die alleen in
+-- het Nederlands bestaat, hoort die tekst te zien en geen leeg scherm — met
+-- een vermelding erbij dat de vertaling ontbreekt, zodat het niet lijkt alsof
+-- de club slordig Nederlands schrijft tegen een Franstalige.
+
+create or replace function public.club_public_page(
+  p_club_slug text,
+  p_slug      text,
+  p_locale    text default 'nl'
+)
+returns table (
+  slug        text,
+  title       text,
+  body        text,
+  /** De taal die je werkelijk krijgt. Anders dan gevraagd = terugval. */
+  locale      text,
+  image_url   text,
+  season_name text,
+  updated_at  timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with p as (
+    select cp.*, s.name as seizoen
+    from club_pages cp
+    join clubs c on c.id = cp.club_id
+    left join seasons s on s.id = cp.season_id
+    where c.slug = p_club_slug
+      and c.is_active
+      and cp.slug = p_slug
+      and cp.is_published
+  ),
+  gekozen as (
+    select
+      p.*,
+      case p_locale
+        when 'fr' then coalesce(nullif(p.title_fr, ''), nullif(p.title_nl, ''), p.title_en)
+        when 'en' then coalesce(nullif(p.title_en, ''), nullif(p.title_nl, ''), p.title_fr)
+        else           coalesce(nullif(p.title_nl, ''), nullif(p.title_en, ''), p.title_fr)
+      end as titel,
+      case p_locale
+        when 'fr' then coalesce(nullif(p.body_fr, ''), nullif(p.body_nl, ''), p.body_en)
+        when 'en' then coalesce(nullif(p.body_en, ''), nullif(p.body_nl, ''), p.body_fr)
+        else           coalesce(nullif(p.body_nl, ''), nullif(p.body_en, ''), p.body_fr)
+      end as tekst,
+      case p_locale
+        when 'fr' then case when nullif(p.body_fr, '') is not null then 'fr'
+                            when nullif(p.body_nl, '') is not null then 'nl' else 'en' end
+        when 'en' then case when nullif(p.body_en, '') is not null then 'en'
+                            when nullif(p.body_nl, '') is not null then 'nl' else 'fr' end
+        else           case when nullif(p.body_nl, '') is not null then 'nl'
+                            when nullif(p.body_en, '') is not null then 'en' else 'fr' end
+      end as taal
+    from p
+  )
+  select g.slug, g.titel, g.tekst, g.taal, g.image_url, g.seizoen, g.updated_at
+  from gekozen g
+  where g.tekst is not null;
+$$;
+
+comment on function public.club_public_page(text, text, text) is
+  'Eén gepubliceerde clubpagina in de gevraagde taal, met terugval op een taal die wél ingevuld is. De kolom locale zegt welke taal je werkelijk kreeg.';
+
+-- Welke pagina's er zijn, om naar te kunnen linken.
+
+create or replace function public.club_public_pages(
+  p_club_slug text,
+  p_season_id uuid default null,
+  p_locale    text default 'nl'
+)
+returns table (
+  slug      text,
+  title     text,
+  season_id uuid
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    cp.slug,
+    case p_locale
+      when 'fr' then coalesce(nullif(cp.title_fr, ''), nullif(cp.title_nl, ''), cp.title_en)
+      when 'en' then coalesce(nullif(cp.title_en, ''), nullif(cp.title_nl, ''), cp.title_fr)
+      else           coalesce(nullif(cp.title_nl, ''), nullif(cp.title_en, ''), cp.title_fr)
+    end,
+    cp.season_id
+  from club_pages cp
+  join clubs c on c.id = cp.club_id
+  where c.slug = p_club_slug
+    and c.is_active
+    and cp.is_published
+    and (p_season_id is null or cp.season_id = p_season_id)
+  order by cp.sort_order, cp.slug;
+$$;
+
+comment on function public.club_public_pages(text, uuid, text) is
+  'De gepubliceerde pagina''s van een club, eventueel alleen die van één seizoen, om naar te linken.';
+
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('grant execute on function public.club_public_page(text,text,text) to %I', r);
+      execute format('grant execute on function public.club_public_pages(text,uuid,text) to %I', r);
     end if;
   end loop;
 end $$;

@@ -329,3 +329,66 @@ export async function saveSeasonTournaments(
   revalidatePath(`/c/${slug}`, 'layout')
   return { ok: true }
 }
+
+// ---------------------------------------------------------------------------
+// Eigen pagina's van de club
+// ---------------------------------------------------------------------------
+
+/**
+ * Een pagina bewaren of aanmaken.
+ *
+ * De slug is het adres: /p/<slug>. Hij wordt hier schoongeveegd in plaats van
+ * geweigerd — iemand die "Reglement League" intikt bedoelt
+ * "reglement-league", en daar een foutmelding van maken helpt niemand. Komt
+ * er niets bruikbaars uit, dan pas een melding.
+ *
+ * Wat er niet gebeurt: de tekst filteren of opmaken. Die gaat als platte
+ * tekst de database in en wordt door PageBody als tekst getoond, nooit als
+ * HTML. Daar hoort geen tweede waarheid over te bestaan.
+ */
+export async function savePage(_prev: Result | null, fd: FormData): Promise<Result> {
+  const slug = String(fd.get('slug'))
+  const id = text(fd, 'id')
+  const clubId = String(fd.get('club_id'))
+
+  const ruw = text(fd, 'page_slug') ?? ''
+  const pageSlug = ruw
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  if (!pageSlug) return { ok: false, error: 'set.errPageSlug' }
+
+  const patch = {
+    slug: pageSlug,
+    season_id: text(fd, 'season_id'),
+    is_published: fd.get('is_published') === 'on',
+    sort_order: Math.round(num(fd, 'sort_order', 0)),
+    image_url: text(fd, 'image_url'),
+    title_nl: text(fd, 'title_nl'), body_nl: text(fd, 'body_nl'),
+    title_fr: text(fd, 'title_fr'), body_fr: text(fd, 'body_fr'),
+    title_en: text(fd, 'title_en'), body_en: text(fd, 'body_en'),
+  }
+
+  const supabase = await createClient()
+  const { error } = id
+    ? await supabase.from('club_pages').update(patch).eq('id', id)
+    : await supabase.from('club_pages').insert({ ...patch, club_id: clubId })
+
+  if (error) return { ok: false, ...human(error.message) }
+  revalidatePath(`/c/${slug}`, 'layout')
+  return { ok: true }
+}
+
+/** Een pagina weghalen. Alleen wie hem mocht bewerken. */
+export async function deletePage(_prev: Result | null, fd: FormData): Promise<Result> {
+  const slug = String(fd.get('slug'))
+  const id = text(fd, 'id')
+  if (!id) return { ok: false, error: 'common.error' }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('club_pages').delete().eq('id', id)
+  if (error) return { ok: false, ...human(error.message) }
+  revalidatePath(`/c/${slug}`, 'layout')
+  return { ok: true }
+}

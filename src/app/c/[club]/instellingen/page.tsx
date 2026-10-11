@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { PageFields, type PageRow } from '@/components/settings/PageFields'
 import { SeasonAssign, type AssignRow } from '@/components/settings/SeasonAssign'
 import { SettingsForm } from '@/components/settings/SettingsForm'
 import { Field, Notice, Page, PageHeader, SectionTitle, inputClass } from '@/components/ui'
@@ -9,7 +10,7 @@ import { translator } from '@/lib/i18n/dictionaries'
 import { clubLocale } from '@/lib/i18n/server'
 import {
   saveClubBasics, saveClubLook, saveClubPublic, saveCompliance,
-  savePayoutTemplate, saveRankingConfig, saveSeason, saveSeasonTournaments,
+  savePage, savePayoutTemplate, saveRankingConfig, saveSeason, saveSeasonTournaments,
   saveStandingsScope,
 } from '@/lib/settingsActions'
 import { createClient } from '@/lib/supabase/server'
@@ -89,7 +90,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
     )
   }
 
-  const [payoutRes, rankingRes, seasonRes, tourRes] = await Promise.all([
+  const [payoutRes, rankingRes, seasonRes, tourRes, pageRes] = await Promise.all([
     supabase.from('payout_templates').select('id,name,tiers,rounding')
       .eq('club_id', club.id).order('name').overrideTypes<PayoutRow[]>(),
     supabase.from('ranking_configs').select('id,name,method,params,bonus_per_ko,bonus_entry,count_best_n,min_tournaments')
@@ -97,6 +98,10 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
     supabase.from('seasons').select('id,name,starts_on,ends_on,ranking_config_id,is_active')
       .eq('club_id', club.id).order('starts_on', { ascending: false }).overrideTypes<SeasonRow[]>(),
     supabase.rpc('season_tournaments', { p_club_id: club.id }),
+    supabase.from('club_pages')
+      .select('id,slug,season_id,is_published,sort_order,image_url,'
+        + 'title_nl,body_nl,title_fr,body_fr,title_en,body_en')
+      .eq('club_id', club.id).order('sort_order').overrideTypes<PageRow[]>(),
   ])
 
   const payout = payoutRes.data?.[0] ?? null
@@ -107,6 +112,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
   // Veertig avonden terug is ruim een halve kalender; verder terug gaan maakt
   // het scherm onhanteerbaar en is niet waar iemand een league mee opzet.
   const tournaments = ((tourRes.data ?? []) as unknown as AssignRow[]).slice(0, 40)
+  const pages = pageRes.data ?? []
 
   const comp = club.compliance ?? {}
   const c = (k: string, d: number) => Number(comp[k] ?? d)
@@ -413,6 +419,30 @@ export default async function Page_({ params }: PageProps<'/c/[club]/instellinge
               />
               <span className="text-sm">{t('settings.seasonsOnly')}</span>
             </label>
+          </SettingsForm>
+
+          {/* --------------------------------------------- eigen pagina's */}
+          <SectionTitle>{t('set.pages')}</SectionTitle>
+
+          {pages.length === 0 && (
+            <p className="text-sm text-[var(--text-muted)]">{t('set.noPages')}</p>
+          )}
+
+          {pages.map((pg) => (
+            <SettingsForm
+              key={pg.id}
+              action={savePage}
+              title={pg.title_nl || pg.title_en || pg.title_fr || pg.slug}
+              description={`/p/${pg.slug}`}
+            >
+              {hidden({ id: pg.id, club_id: club.id })}
+              <PageFields page={pg} seasons={seasons} t={t} />
+            </SettingsForm>
+          ))}
+
+          <SettingsForm action={savePage} title={t('set.newPage')} description={t('set.pagesBody')}>
+            {hidden({ club_id: club.id })}
+            <PageFields page={null} seasons={seasons} t={t} />
           </SettingsForm>
 
           {/* -------------------------------------------------- gedoogbeleid */}

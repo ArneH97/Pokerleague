@@ -31,7 +31,9 @@ export async function PublicShell({
 }: {
   club: Club
   locale: Locale
-  active: 'home' | 'calendar' | 'standings'
+  /** Welk menu-item oplicht. Leeg op een eigen pagina van de club: die
+      hoort bij geen van de drie. */
+  active?: 'home' | 'calendar' | 'standings'
   children: React.ReactNode
   /** Zonder account tonen we geen menu-items die op een muur uitkomen. */
   signedIn?: boolean
