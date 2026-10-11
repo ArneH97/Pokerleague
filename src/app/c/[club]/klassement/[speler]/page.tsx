@@ -123,10 +123,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/klassement/
               {mij && mij.qualified === false && mij.min_required > 0 && (
                 <>
                   {' '}
-                  {t('standings.toGo').replace(
-                    '{n}', String(mij.min_required - mij.tournaments),
-                  )}
-                  .
+                  {t('bd.toGo').replace('{n}', String(mij.min_required - mij.tournaments))}
                 </>
               )}
             </p>
@@ -140,47 +137,120 @@ export default async function Page_({ params }: PageProps<'/c/[club]/klassement/
             {rijen.map((r, i) => {
               const weging = rules ? weightLabel(rules, r.stake_cents, locale) : null
               const eersteAfgestreepte = r.counted === false && rijen[i - 1]?.counted === true
+
+              // De opsplitsing wordt afgeleid van de punten die in de
+              // database staan, niet opnieuw uitgerekend. Zo telt ze altijd
+              // op tot wat er rechts staat — ook bij een avond die met een
+              // oudere telling is afgesloten.
+              const koPunten = rules ? r.knockouts * rules.bonus_per_ko : 0
+              const deelname = rules ? rules.bonus_entry : 0
+              const resultaat = Math.round(Number(r.points)) - deelname - koPunten
+
               return (
                 <li
                   key={r.tournament_id}
-                  className={`flex items-center gap-3 border-b border-[var(--line)] px-3 py-3 last:border-0 sm:px-4 ${
+                  className={`border-b border-[var(--line)] last:border-0 ${
                     r.counted ? '' : 'opacity-55'
                   } ${eersteAfgestreepte ? 'border-t-2 border-t-[var(--line-strong)]' : ''}`}
                 >
-                  <span
-                    aria-hidden
-                    className={`tnum flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                      r.place === 1
-                        ? 'bg-[color-mix(in_oklab,var(--brand)_18%,transparent)] text-[var(--brand)]'
-                        : 'bg-[var(--surface-2)] text-[var(--text-muted)]'
-                    }`}
-                  >
-                    {r.place}
-                  </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{r.tournament}</span>
-                    <span className="tnum block truncate text-xs text-[var(--text-faint)]">
-                      {datum.format(new Date(r.played_on))}
-                      {' · '}
-                      {t('bd.field').replace('{n}', String(r.entries))}
-                      {weging && <> · {t('bd.stake').replace('{n}', geld(r.stake_cents))} {weging}</>}
-                      {r.knockouts > 0 && rules && rules.bonus_per_ko > 0 && (
-                        <> · {r.knockouts} {t('standings.knockouts')}</>
-                      )}
-                    </span>
-                  </span>
-
-                  <span className="shrink-0 text-right">
-                    <span className="tnum block text-base font-semibold">
-                      {getal(Math.round(Number(r.points)))}
-                    </span>
-                    {!r.counted && (
-                      <span className="block text-[0.65rem] text-[var(--text-faint)]">
-                        {t('bd.dropped')}
+                  {/* Uitklapbaar en niet altijd open: vijftien avonden met
+                      elk vier regels eronder is geen overzicht meer. Met
+                      <details> werkt het ook zonder JavaScript. */}
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-3 hover:bg-[var(--surface-hover)] sm:px-4 [&::-webkit-details-marker]:hidden">
+                      <span
+                        aria-hidden
+                        className={`tnum flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                          r.place === 1
+                            ? 'bg-[color-mix(in_oklab,var(--brand)_18%,transparent)] text-[var(--brand)]'
+                            : 'bg-[var(--surface-2)] text-[var(--text-muted)]'
+                        }`}
+                      >
+                        {r.place}
                       </span>
-                    )}
-                  </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{r.tournament}</span>
+                        <span className="tnum block truncate text-xs text-[var(--text-faint)]">
+                          {datum.format(new Date(r.played_on))}
+                          {' · '}
+                          {t('bd.field').replace('{n}', String(r.entries))}
+                          {weging && (
+                            <> · {t('bd.stake').replace('{n}', geld(r.stake_cents))} {weging}</>
+                          )}
+                        </span>
+                      </span>
+
+                      <span className="shrink-0 text-right">
+                        <span className="tnum block text-base font-semibold">
+                          {getal(Math.round(Number(r.points)))}
+                        </span>
+                        {!r.counted && (
+                          <span className="block text-[0.65rem] text-[var(--text-faint)]">
+                            {t('bd.dropped')}
+                          </span>
+                        )}
+                      </span>
+
+                      <span
+                        aria-hidden
+                        className="shrink-0 text-xs text-[var(--text-faint)] transition-transform group-open:rotate-180"
+                      >
+                        ▾
+                      </span>
+                    </summary>
+
+                    {/* Waar dat getal vandaan komt. Resultaat eerst, want dat
+                        is waar het over gaat; de bonussen eronder omdat ze
+                        voor iedereen gelijk zijn. */}
+                    <dl className="mx-3 mb-3 space-y-1.5 border-t border-[var(--line)] pt-2.5 text-xs sm:mx-4 sm:ml-[3.25rem]">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="text-[var(--text-muted)]">
+                          {t('bd.result')}
+                          <span className="ml-1.5 text-[var(--text-faint)]">
+                            {t('bd.resultWhy')
+                              .replace('{p}', String(r.place))
+                              .replace('{n}', String(r.entries))}
+                            {weging && (
+                              <>
+                                {' · '}
+                                {t('bd.weightWhy')
+                                  .replace('{w}', weging.slice(1))
+                                  .replace('{geld}', geld(r.stake_cents))}
+                              </>
+                            )}
+                          </span>
+                        </dt>
+                        <dd className="tnum shrink-0 font-medium">{getal(resultaat)}</dd>
+                      </div>
+
+                      {deelname > 0 && (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <dt className="text-[var(--text-muted)]">{t('bd.entryPts')}</dt>
+                          <dd className="tnum shrink-0 font-medium">+{getal(deelname)}</dd>
+                        </div>
+                      )}
+
+                      {koPunten > 0 && (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <dt className="text-[var(--text-muted)]">
+                            {t('bd.koPts')}
+                            <span className="ml-1.5 text-[var(--text-faint)]">
+                              {r.knockouts} × {getal(rules?.bonus_per_ko ?? 0)}
+                            </span>
+                          </dt>
+                          <dd className="tnum shrink-0 font-medium">+{getal(koPunten)}</dd>
+                        </div>
+                      )}
+
+                      <div className="flex items-baseline justify-between gap-3 border-t border-[var(--line)] pt-1.5">
+                        <dt className="font-medium">{t('bd.sum')}</dt>
+                        <dd className="tnum shrink-0 font-semibold">
+                          {getal(Math.round(Number(r.points)))}
+                        </dd>
+                      </div>
+                    </dl>
+                  </details>
                 </li>
               )
             })}
