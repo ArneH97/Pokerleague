@@ -7,7 +7,7 @@
 -- Draait op een lege database; bestaande tabellen worden niet aangeraakt
 -- maar zullen wel een foutmelding geven.
 --
--- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql · 0053_mijn_tafel.sql · 0054_spelers_per_tafel.sql · 0055_tafelindeling.sql · 0056_live_blinds_en_stoelen.sql · 0057_plaats_schatten.sql · 0058_levels_tijdens_de_avond.sql · 0059_tornooi_verwijderen.sql · 0060_rebuy_zonder_slot.sql · 0061_league_punten.sql · 0062_stoel_na_rebuy.sql · 0063_buyin_en_seizoen.sql
+-- Onderdelen: 0001_schema.sql · 0002_functions.sql · 0003_rls.sql · 0004_realtime.sql · 0005_players.sql · 0006_structures.sql · 0007_public_rankings.sql · 0008_floor.sql · 0009_club_mark.sql · 0010_floor_email.sql · 0011_rls_recursion.sql · 0012_floor_undo_buyin.sql · 0013_entry_fees.sql · 0014_standings_period.sql · 0015_club_overview.sql · 0016_deal.sql · 0017_payouts.sql · 0018_deal_even.sql · 0019_round_euros.sql · 0020_stop_clock_on_finish.sql · 0021_payout_list.sql · 0022_whole_points.sql · 0023_public_club.sql · 0024_club_profile.sql · 0025_short_names.sql · 0026_player_accounts.sql · 0027_claim_from_metadata.sql · 0028_floor_find_by_email.sql · 0029_invite_mail.sql · 0030_player_locale.sql · 0031_my_club_stats.sql · 0032_invite_when_missing.sql · 0033_join_club.sql · 0034_players_platform.sql · 0035_onboarding.sql · 0036_registration_rules.sql · 0037_my_live.sql · 0038_claim_never_fails.sql · 0039_stale_session.sql · 0040_my_results_spend.sql · 0041_my_clubs_color.sql · 0042_platform_admin.sql · 0043_my_calendar.sql · 0044_inschrijven.sql · 0045_inschrijving_intrekken.sql · 0046_rsvp_kent_account.sql · 0047_zelf_inschrijven.sql · 0048_speler_verwijderen.sql · 0049_tornooi_bewerken.sql · 0050_rebuy_startstapel.sql · 0051_chips_in_spel.sql · 0052_stapels_bevriezen.sql · 0053_mijn_tafel.sql · 0054_spelers_per_tafel.sql · 0055_tafelindeling.sql · 0056_live_blinds_en_stoelen.sql · 0057_plaats_schatten.sql · 0058_levels_tijdens_de_avond.sql · 0059_tornooi_verwijderen.sql · 0060_rebuy_zonder_slot.sql · 0061_league_punten.sql · 0062_stoel_na_rebuy.sql · 0063_buyin_en_seizoen.sql · 0064_bounty_telt_mee.sql · 0065_inzet_telt_de_bounty_mee.sql · 0066_puntenopbouw.sql
 
 -- =========================================================================
 -- 0001_schema.sql
@@ -14085,4 +14085,911 @@ begin
     grant execute on function public.season_tournaments(uuid, date, date) to authenticated;
     grant execute on function public.tournament_set_season(uuid, uuid)    to authenticated;
   end if;
+end $$;
+
+-- =========================================================================
+-- 0064_bounty_telt_mee.sql
+-- =========================================================================
+
+-- Pokerleague — de bounties die je wint, tellen mee in wat je won
+--
+-- **Het probleem.** Op je eigen pagina staat per avond een netto: wat de
+-- avond opbracht min wat ze kostte. De kostenkant klopte volledig — inkoop,
+-- rebuys, add-ons, fee én het bountydeel van elke inkoop, want dat betaal je
+-- ook. De opbrengstkant telde alleen het prijzengeld uit de prijzenladder.
+--
+-- De bounties die je die avond ophaalde stonden er niet bij.
+--
+-- Dat is geen afrondingsverschil. Je betaalt de bounty bij het inkopen en je
+-- krijgt hem terug door mensen uit te schakelen; alleen de ene helft tellen
+-- maakt van elke bountyavond een slechtere avond dan ze was, en het meest bij
+-- de speler die het best speelde. Wie vier koppen pakte op een avond met
+-- twintig euro bounty, miste tachtig euro in zijn eigen overzicht.
+--
+-- **Waar het misging, en waar niet.** Het platformoverzicht in het beheer
+-- rekende al met prijzengeld plus bounty, en `season_standings` ook. Drie
+-- andere plekken niet:
+--
+--   my_results            je eigen pagina — het netto per avond
+--   club_member_overview  het ledenbestand — het saldo per speler
+--   club_standings_period je jaar- en maandklassement — de kolom prijzengeld
+--   my_club_stats         je cijfers per club
+--
+-- Dat de ene functie het wel deed en de andere niet, is precies hoe zoiets
+-- ontstaat: elke functie telde zijn eigen som op. Hierna betekent "gewonnen"
+-- overal hetzelfde — prijzengeld plus bounties — en staat het in de
+-- commentaar van elke functie zodat de volgende die erbij komt het ook doet.
+--
+-- `cashes` blijft wél op het prijzengeld alleen staan. In de prijzen eindigen
+-- is iets anders dan een kop pakken, en een speler die drie bounties won maar
+-- als twaalfde eindigde, is niet "in the money" geweest.
+
+-- ---------------------------------------------------------------------------
+-- 1. Je eigen pagina
+-- ---------------------------------------------------------------------------
+
+drop function if exists public.my_results();
+
+create or replace function public.my_results()
+returns table (
+  tournament_id uuid,
+  tournament    text,
+  club_name     text,
+  club_slug     text,
+  played_on     timestamptz,
+  place         int,
+  entries       int,
+  prize_cents   int,
+  /** De bounties die hij die avond ophaalde. Hoort bij wat de avond opbracht. */
+  bounty_cents  int,
+  spent_cents   int,
+  points        numeric,
+  knockouts     int
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    r.tournament_id, t.name, c.name, c.slug,
+    r.finished_at, r.position, r.entries_total,
+    r.prize_cents,
+    coalesce(r.bounty_cents, 0),
+    coalesce((
+      select sum(b.amount_cents + b.fee_cents + coalesce(b.bounty_cents, 0))::int
+      from buyins b
+      where b.tournament_id = r.tournament_id and b.player_id = r.player_id
+        and not b.is_void
+    ), 0),
+    r.points, r.knockouts
+  from tournament_results r
+  join players p     on p.id = r.player_id
+  join tournaments t on t.id = r.tournament_id
+  join clubs c       on c.id = t.club_id
+  where p.auth_user_id = auth.uid()
+  order by r.finished_at desc;
+$$;
+
+comment on function public.my_results() is
+  'Alle afgesloten sessies van de aangemelde speler. Opbrengst = prize_cents + bounty_cents; kost = de volledige som uit buyins, inkoop, rebuys, add-ons, fee en bounty. Niet-getelde inkopen (is_void) blijven erbuiten.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.my_results() to authenticated;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Je cijfers per club
+-- ---------------------------------------------------------------------------
+
+create or replace function public.my_club_stats(p_club_slug text default null)
+returns table (
+  club_slug     text,
+  club_name     text,
+  club_city     text,
+  logo_url      text,
+  tournaments   int,
+  points        numeric,
+  best_position int,
+  cashes        int,
+  knockouts     int,
+  prize_cents   bigint,
+  rank          int,
+  of_players    int,
+  last_played   date
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with me as (
+    select id from players
+    where auth_user_id = auth.uid() and merged_into_id is null
+  ),
+  mijn_clubs as (
+    select distinct t.club_id
+    from tournament_results r
+    join tournaments t on t.id = r.tournament_id
+    where r.player_id = (select id from me)
+  ),
+  agg as (
+    select
+      t.club_id,
+      r.player_id,
+      count(*)::int                                       as tournaments,
+      sum(r.points)                                       as points,
+      min(r.position)::int                                as best_position,
+      count(*) filter (where r.prize_cents > 0)::int      as cashes,
+      sum(r.knockouts)::int                               as knockouts,
+      -- Prijzengeld én bounties: zie de kop van deze migratie.
+      sum(r.prize_cents + coalesce(r.bounty_cents, 0))::bigint as prize_cents,
+      max((r.finished_at at time zone c.timezone)::date)  as last_played
+    from tournament_results r
+    join tournaments t on t.id = r.tournament_id
+    join clubs c       on c.id = t.club_id
+    where t.club_id in (select club_id from mijn_clubs)
+      and c.is_active
+      and t.player_visibility = 'public'
+      and t.status = 'finished'
+    group by t.club_id, r.player_id
+  ),
+  ranked as (
+    select
+      agg.*,
+      rank() over (partition by club_id order by points desc, best_position) as rnk,
+      count(*) over (partition by club_id)                                   as total
+    from agg
+  )
+  select
+    c.slug, c.name, c.city, c.logo_url,
+    a.tournaments, a.points, a.best_position, a.cashes, a.knockouts,
+    a.prize_cents, a.rnk::int, a.total::int, a.last_played
+  from ranked a
+  join clubs c on c.id = a.club_id
+  where a.player_id = (select id from me)
+    and (p_club_slug is null or c.slug = p_club_slug)
+  order by a.last_played desc nulls last
+$$;
+
+comment on function public.my_club_stats(text) is
+  'Per club waar de aangemelde speler resultaten heeft: zijn eigen cijfers en zijn plaats in dat klassement. prize_cents is prijzengeld plus bounties. Zonder slug alle clubs, met slug alleen die ene.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.my_club_stats(text) to authenticated;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 3. Het ledenbestand
+-- ---------------------------------------------------------------------------
+-- Alleen de ene som verandert. De rest van de functie blijft letterlijk wat
+-- ze was; ze staat hier in haar geheel omdat create or replace niet anders
+-- kan, niet omdat er meer aan veranderd is.
+
+create or replace function public.club_member_overview(p_club_id uuid)
+returns table (
+  player_id      uuid,
+  display_name   text,
+  username       text,
+  email          text,
+  no_email_reason text,
+  link_state     player_link_state,
+  joined_on      date,
+  entries        int,
+  last_played    timestamptz,
+  best_position  int,
+  cashes         int,
+  total_prize    int,
+  total_spent    int,
+  knockouts      int
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_service_context()
+     and not public.has_club_role(p_club_id, array['owner','admin','floor']::club_role[]) then
+    raise exception 'Geen rechten op het ledenbestand van deze club'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  return query
+  select
+    p.id,
+    p.display_name,
+    p.username,
+    p.email,
+    p.no_email_reason,
+    p.link_state,
+    cp.joined_on,
+    coalesce(st.entries, 0)::int,
+    st.last_played,
+    st.best_position::int,
+    coalesce(st.cashes, 0)::int,
+    coalesce(st.total_prize, 0)::int,
+    coalesce(sp.spent, 0)::int,
+    coalesce(st.knockouts, 0)::int
+  from club_players cp
+  join players p on p.id = cp.player_id
+  left join lateral (
+    select
+      count(*)                                        as entries,
+      max(r.finished_at)                              as last_played,
+      min(r.position)                                 as best_position,
+      count(*) filter (where r.prize_cents > 0)       as cashes,
+      -- Prijzengeld én bounties, zodat het saldo hiernaast klopt: de
+      -- bounty staat aan de kostenkant immers ook in de inleg.
+      sum(r.prize_cents + coalesce(r.bounty_cents, 0)) as total_prize,
+      sum(r.knockouts)                                as knockouts
+    from tournament_results r
+    where r.player_id = p.id and r.club_id = cp.club_id
+  ) st on true
+  left join lateral (
+    select sum(b.amount_cents + b.fee_cents + b.bounty_cents) as spent
+    from buyins b
+    where b.player_id = p.id and b.club_id = cp.club_id and not b.is_void
+  ) sp on true
+  where cp.club_id = p_club_id
+    and p.merged_into_id is null
+  order by st.last_played desc nulls last, p.display_name;
+end;
+$$;
+
+comment on function public.club_member_overview(uuid) is
+  'Het ledenbestand van één club met de cijfers per speler. total_prize is prijzengeld plus bounties, zodat het naast de inleg een echt saldo is. Alleen voor staf: er staan mailadressen in.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Het jaar- en maandklassement
+-- ---------------------------------------------------------------------------
+-- `season_standings` telde de bounties al mee. Dat de jaarstand ernaast dat
+-- niet deed, betekende dat dezelfde speler over dezelfde avonden twee
+-- verschillende bedragen kon hebben, afhankelijk van welk tabblad je aanklikt.
+
+create or replace function public.club_standings_period(
+  p_club_id uuid,
+  p_from    date,
+  p_to      date
+)
+returns table (
+  player_id      uuid,
+  display_name   text,
+  tournaments    int,
+  points         numeric,
+  best_position  int,
+  cashes         int,
+  total_prize    int,
+  knockouts      int
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_tz text;
+begin
+  select c.timezone into v_tz from clubs c where c.id = p_club_id;
+  if v_tz is null then
+    return;
+  end if;
+
+  if not public.is_service_context()
+     and not public.is_club_member(p_club_id)
+     and not public.is_club_player(p_club_id)
+  then
+    raise exception 'Geen rechten op het klassement van deze club'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  return query
+  select
+    r.player_id,
+    p.display_name,
+    count(*)::int                        as tournaments,
+    round(sum(r.points), 2)              as points,
+    min(r.position)::int                 as best_position,
+    count(*) filter (where r.prize_cents > 0)::int as cashes,
+    coalesce(sum(r.prize_cents + coalesce(r.bounty_cents, 0)), 0)::int as total_prize,
+    coalesce(sum(r.knockouts), 0)::int   as knockouts
+  from tournament_results r
+  join players p on p.id = r.player_id
+  where r.club_id = p_club_id
+    -- De datumgrenzen volgen de tijdzone van de club. Een tornooi dat om
+    -- half één 's nachts eindigt hoort bij de avond ervoor, niet bij de
+    -- volgende maand omdat de server in UTC staat.
+    and (r.finished_at at time zone v_tz)::date >= p_from
+    and (r.finished_at at time zone v_tz)::date <= p_to
+  group by r.player_id, p.display_name
+  order by points desc, best_position asc, p.display_name asc;
+end;
+$$;
+
+comment on function public.club_standings_period(uuid, date, date) is
+  'Klassement over een vrije periode (maand, jaar, ...). Telt álle resultaten in die periode; total_prize is prijzengeld plus bounties, net als bij season_standings(). Voor het seizoensklassement met de beste-N-regel: season_standings().';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.club_standings_period(uuid, date, date) to authenticated;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0065_inzet_telt_de_bounty_mee.sql
+-- =========================================================================
+
+-- Pokerleague — wat "de inleg" is bij een bountytornooi
+--
+-- Migratie 0063 liet de inleg meewegen in de league: een avond van vijftig
+-- euro telt zwaarder dan een van dertig. Als inleg nam die het bedrag dat
+-- naar de prijzenpot gaat, `buyin_cents`.
+--
+-- Bij een freezeout klopt dat. Bij een bountytornooi niet.
+--
+-- The Hunt bij Cutoff is twintig euro pot, twintig euro bounty en tien euro
+-- rake. Aan de deur betaal je vijftig. In de weging telde alleen die eerste
+-- twintig mee, en dus gold de duurste avond van de kalender als een
+-- goedkope: factor 0,82 tegenover een gewone avond van dertig. De winnaar
+-- kreeg 32 punten waar een €30-freezeout er 39 opleverde.
+--
+-- **Wat er nu meetelt: pot plus bounty.** Alles wat de spelers kunnen
+-- terugwinnen. De bounty is geen bijkomstigheid maar de helft van het spel —
+-- je betaalt hem bij het inkopen en je verdient hem terug door koppen te
+-- pakken, en wie hem niet pakt is hem kwijt aan wie hem wél pakt. Dat is
+-- precies wat inzet betekent.
+--
+-- **Wat niet meetelt: de rake.** Die gaat naar de club en komt nooit meer op
+-- tafel. Zou ze meewegen, dan maakte een club zijn eigen avonden zwaarder
+-- door zijn marge te verhogen, en daar hoort een klassement niet op te
+-- reageren.
+--
+-- Voor een freezeout verandert er niets: geen bounty, dus dezelfde inleg als
+-- voorheen. Alleen bountytornooien schuiven op, en alleen naar boven.
+--
+-- Let op: `pokerstars` als methode gebruikt hetzelfde bedrag in zijn
+-- logaritme. Ook daar is "wat er op het spel staat" de juiste lezing, en ook
+-- daar verandert er niets voor een freezeout.
+
+-- ---------------------------------------------------------------------------
+-- 1. Eén plek die zegt wat de inzet is
+-- ---------------------------------------------------------------------------
+-- Een functie en geen uitdrukking die op drie plaatsen herhaald wordt. Zo'n
+-- herhaling loopt uit elkaar zodra iemand er één aanpast, en dan rekent het
+-- afsluiten van een avond anders dan het herrekenen ervan.
+
+create or replace function public.stake_cents(
+  p_buyin  int,
+  p_bounty int,
+  p_mode   bounty_mode
+)
+returns int
+language sql
+immutable
+as $$
+  select coalesce(p_buyin, 0)
+       + case when p_mode = 'none' then 0 else coalesce(p_bounty, 0) end;
+$$;
+
+comment on function public.stake_cents(int, int, bounty_mode) is
+  'Wat er per inkoop op het spel staat: de prijzenpot plus de bounty, zonder rake. Dit is het bedrag waarmee de league-weging rekent.';
+
+-- ---------------------------------------------------------------------------
+-- 2. Bij het afsluiten van een avond
+-- ---------------------------------------------------------------------------
+-- Alleen de regel met `t.buyin_cents` verandert. De rest staat hier omdat
+-- create or replace de hele functie wil, niet omdat er meer aan veranderd is.
+
+create or replace function public.finalize_tournament(p_tournament_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t             tournaments%rowtype;
+  v_entries     int;
+  v_rc          ranking_configs%rowtype;
+  v_written     int := 0;
+  r             record;
+  v_prize       int;
+begin
+  select * into t from tournaments where id = p_tournament_id;
+  if not found then
+    raise exception 'Tornooi % bestaat niet', p_tournament_id;
+  end if;
+
+  if not public.is_service_context()
+     and not public.has_club_role(t.club_id, array['owner','admin','floor']::club_role[])
+  then
+    raise exception 'Geen rechten om dit tornooi af te sluiten'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  select count(distinct player_id) into v_entries
+  from tournament_players where tournament_id = p_tournament_id;
+
+  if v_entries = 0 then
+    return 0;
+  end if;
+
+  select rc.* into v_rc
+  from seasons s
+  join ranking_configs rc on rc.id = s.ranking_config_id
+  where s.id = t.season_id;
+
+  delete from tournament_results where tournament_id = p_tournament_id;
+
+  for r in
+    select tp.player_id,
+           tp.finish_position,
+           coalesce((select count(*) from eliminations e
+                     where e.eliminated_by_id = tp.id), 0)::int as knockouts,
+           coalesce((select sum(b.amount_cents + b.fee_cents + b.bounty_cents)
+                     from buyins b
+                     where b.tournament_player_id = tp.id and not b.is_void), 0)::int as invested,
+           coalesce((select sum(e.bounty_cents) from eliminations e
+                     where e.eliminated_by_id = tp.id), 0)::int as bounty_won
+    from tournament_players tp
+    where tp.tournament_id = p_tournament_id
+      and tp.finish_position is not null
+  loop
+    select coalesce(tp2.amount_cents, 0) into v_prize
+    from public.tournament_prizes(p_tournament_id) tp2
+    where tp2.place = r.finish_position;
+
+    insert into tournament_results (
+      club_id, tournament_id, season_id, player_id, position, entries_total,
+      prize_cents, bounty_cents, invested_cents, knockouts, points, finished_at
+    ) values (
+      t.club_id, p_tournament_id, t.season_id, r.player_id, r.finish_position, v_entries,
+      coalesce(v_prize, 0), r.bounty_won, r.invested, r.knockouts,
+      public.calc_points(
+        coalesce(v_rc.method, 'sqrt_ratio'),
+        coalesce(v_rc.params, '{}'::jsonb),
+        r.finish_position,
+        v_entries,
+        r.knockouts,
+        public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode),
+        coalesce(v_rc.bonus_per_ko, 0),
+        coalesce(v_rc.bonus_entry, 0)
+      ),
+      now()
+    );
+    v_written := v_written + 1;
+  end loop;
+
+  update tournaments set status = 'finished', ended_at = coalesce(ended_at, now())
+  where id = p_tournament_id;
+
+  return v_written;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 3. Bij het herrekenen van een seizoen
+-- ---------------------------------------------------------------------------
+
+create or replace function public.season_recompute_points(p_season_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  s        seasons%rowtype;
+  v_rc     ranking_configs%rowtype;
+  v_n      int := 0;
+  r        record;
+begin
+  select * into s from seasons where id = p_season_id;
+  if not found then
+    raise exception 'Seizoen bestaat niet';
+  end if;
+
+  if not public.is_service_context()
+     and not public.has_club_role(s.club_id, array['owner','admin']::club_role[]) then
+    raise exception 'Geen rechten' using errcode = 'insufficient_privilege';
+  end if;
+
+  if s.ranking_config_id is null then
+    raise exception 'Aan dit seizoen hangt geen puntentelling' using errcode = 'check_violation';
+  end if;
+  select * into v_rc from ranking_configs where id = s.ranking_config_id;
+
+  for r in
+    select res.id, res.position, res.entries_total, res.knockouts,
+           public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode) as inzet
+    from tournament_results res
+    join tournaments t on t.id = res.tournament_id
+    where res.season_id = p_season_id
+  loop
+    update tournament_results
+    set points = public.calc_points(
+          v_rc.method, v_rc.params, r.position, r.entries_total,
+          r.knockouts, r.inzet, v_rc.bonus_per_ko, v_rc.bonus_entry)
+    where id = r.id;
+    v_n := v_n + 1;
+  end loop;
+
+  return v_n;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 4. En bij het verzetten van een avond naar een ander seizoen
+-- ---------------------------------------------------------------------------
+
+create or replace function public.tournament_set_season(
+  p_tournament_id uuid,
+  p_season_id     uuid
+)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  t        tournaments%rowtype;
+  v_rc     ranking_configs%rowtype;
+  v_n      int := 0;
+  r        record;
+begin
+  select * into t from tournaments where id = p_tournament_id;
+  if not found then
+    raise exception 'Tornooi bestaat niet';
+  end if;
+
+  if not public.is_service_context()
+     and not public.has_club_role(t.club_id, array['owner','admin']::club_role[]) then
+    raise exception 'Geen rechten' using errcode = 'insufficient_privilege';
+  end if;
+
+  if p_season_id is not null
+     and not exists (select 1 from seasons s
+                     where s.id = p_season_id and s.club_id = t.club_id) then
+    raise exception 'Dat seizoen hoort niet bij deze club' using errcode = 'check_violation';
+  end if;
+
+  if t.season_id is not distinct from p_season_id then
+    return 0;
+  end if;
+
+  update tournaments set season_id = p_season_id where id = p_tournament_id;
+  update tournament_results set season_id = p_season_id where tournament_id = p_tournament_id;
+
+  if p_season_id is null then
+    return 0;
+  end if;
+
+  select rc.* into v_rc
+  from seasons s
+  join ranking_configs rc on rc.id = s.ranking_config_id
+  where s.id = p_season_id;
+
+  for r in
+    select res.id, res.position, res.entries_total, res.knockouts
+    from tournament_results res
+    where res.tournament_id = p_tournament_id
+  loop
+    update tournament_results
+    set points = public.calc_points(
+          coalesce(v_rc.method, 'sqrt_ratio'),
+          coalesce(v_rc.params, '{}'::jsonb),
+          r.position, r.entries_total, r.knockouts,
+          public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode),
+          coalesce(v_rc.bonus_per_ko, 0), coalesce(v_rc.bonus_entry, 0))
+    where id = r.id;
+    v_n := v_n + 1;
+  end loop;
+
+  return v_n;
+end;
+$$;
+
+comment on function public.calc_points(ranking_method, jsonb, int, int, int, int, numeric, numeric) is
+  'Punten voor één uitslag. p_buyin_cents is wat er per inkoop op het spel staat — pot plus bounty, zonder rake; zie stake_cents(). Bij sqrt_ratio bepaalt params.exponent hoe zwaar de plaats weegt en laten params.buyin_ref en params.buyin_weight die inzet meewegen tegenover een ijkpunt in euro.';
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.stake_cents(int, int, bounty_mode) to authenticated;
+  end if;
+end $$;
+
+-- =========================================================================
+-- 0066_puntenopbouw.sql
+-- =========================================================================
+
+-- Pokerleague — laten zien hoe iemand aan zijn punten komt
+--
+-- Een klassement met een prijs aan het eind roept één vraag op, en die wordt
+-- elke speelavond gesteld: waarom heeft hij er meer dan ik. Zolang het
+-- antwoord "dat rekent het systeem uit" is, is het klassement iets dat
+-- gebeurt in plaats van iets waar je voor speelt.
+--
+-- Dus: klik op een naam en je ziet zijn avonden, van best naar slechtst, met
+-- per avond wat die opleverde en waarom. En een streep onder de beste
+-- vijftien, want daaronder telt het niet meer mee.
+--
+-- Twee functies, allebei publiek leesbaar zoals de rest van `club_public_*`:
+-- de opbouw per speler, en de regels van het seizoen zodat het scherm de
+-- formule kan uitleggen in plaats van hem te herhalen in code. Dat laatste is
+-- het punt: staat de formule ook in de browser, dan drijft ze weg van wat de
+-- database doet, en dan legt het scherm iets uit dat niet meer waar is.
+--
+-- Geen prijzengeld in beide, net als in de rest van de publieke kant. Wat
+-- iemand won is een zaak tussen hem en de club.
+
+-- ---------------------------------------------------------------------------
+-- 1. De stand krijgt er een speler-id bij
+-- ---------------------------------------------------------------------------
+-- Zonder id kan je niet doorklikken, en doorklikken op een naam breekt zodra
+-- er twee Jans zijn. Het id geeft niets prijs wat de stand zelf niet al
+-- toont: dezelfde speler, dezelfde publieke naam, dezelfde cijfers.
+
+drop function if exists public.club_public_season_standings(text, uuid);
+
+create or replace function public.club_public_season_standings(
+  p_club_slug text,
+  p_season_id uuid default null
+)
+returns table (
+  player_id     uuid,
+  player_name   text,
+  tournaments   int,
+  counted       int,
+  points        numeric,
+  best_position int,
+  cashes        int,
+  knockouts     int,
+  qualified     boolean,
+  min_required  int
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_season uuid;
+  v_best_n int;
+  v_min    int;
+begin
+  v_season := p_season_id;
+  if v_season is null then
+    select s.id into v_season
+    from public.club_public_seasons(p_club_slug) s
+    limit 1;
+  end if;
+  if v_season is null then
+    return;
+  end if;
+
+  select rc.count_best_n, rc.min_tournaments
+    into v_best_n, v_min
+  from seasons s
+  join clubs c on c.id = s.club_id
+  left join ranking_configs rc on rc.id = s.ranking_config_id
+  where s.id = v_season and c.slug = p_club_slug and c.is_active;
+
+  if not found then
+    return;
+  end if;
+
+  return query
+  with zichtbaar as (
+    select r.*,
+           public.public_name(p.display_name, p.username, p.id,
+                              p.public_listing, p.public_profile, c.public_names) as naam,
+           row_number() over (partition by r.player_id order by r.points desc) as rn
+    from tournament_results r
+    join tournaments t on t.id = r.tournament_id
+    join clubs c       on c.id = t.club_id
+    join players p     on p.id = r.player_id
+    where r.season_id = v_season
+      and c.slug = p_club_slug
+      and c.is_active
+      and t.player_visibility = 'public'
+      and t.status = 'finished'
+  ),
+  agg as (
+    select z.player_id,
+           min(z.naam)                                                     as naam,
+           count(*)::int                                                   as tournaments,
+           count(*) filter (where v_best_n is null or z.rn <= v_best_n)::int as counted,
+           sum(z.points) filter (where v_best_n is null or z.rn <= v_best_n) as points,
+           min(z.position)::int                                            as best_position,
+           count(*) filter (where z.prize_cents > 0)::int                   as cashes,
+           sum(z.knockouts)::int                                           as knockouts
+    from zichtbaar z
+    group by z.player_id
+  )
+  select a.player_id, a.naam, a.tournaments, a.counted,
+         round(coalesce(a.points, 0), 0),
+         a.best_position, a.cashes, a.knockouts,
+         a.tournaments >= coalesce(v_min, 0),
+         coalesce(v_min, 0)
+  from agg a
+  order by 5 desc, a.best_position asc;
+end;
+$$;
+
+comment on function public.club_public_season_standings(text, uuid) is
+  'De stand van een seizoen voor de zaal: dezelfde beste-N-regel en drempel als aan de clubkant, met de naamregeling van de club en zonder prijzengeld. Zonder seizoen meegegeven het nieuwste met publieke uitslagen.';
+
+-- ---------------------------------------------------------------------------
+-- 2. De avonden van één speler, van best naar slechtst
+-- ---------------------------------------------------------------------------
+-- `counted` zegt of die avond binnen de beste N valt. De volgorde is die van
+-- de telling zelf — op punten, hoogste eerst — zodat de streep onder de
+-- vijftiende regel precies de streep is die de database trekt.
+
+create or replace function public.club_public_player_season(
+  p_club_slug text,
+  p_player_id uuid,
+  p_season_id uuid default null
+)
+returns table (
+  player_name   text,
+  tournament_id uuid,
+  tournament    text,
+  played_on     timestamptz,
+  /** `place` en niet `position`: dat laatste is een gereserveerd woord. */
+  place         int,
+  entries       int,
+  knockouts     int,
+  /** Wat er die avond per inkoop op het spel stond: pot plus bounty. */
+  stake_cents   int,
+  points        numeric,
+  /** Valt deze avond binnen de beste N van dit seizoen? */
+  counted       boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_season uuid;
+  v_best_n int;
+begin
+  v_season := p_season_id;
+  if v_season is null then
+    select s.id into v_season
+    from public.club_public_seasons(p_club_slug) s
+    limit 1;
+  end if;
+  if v_season is null then
+    return;
+  end if;
+
+  select rc.count_best_n into v_best_n
+  from seasons s
+  join clubs c on c.id = s.club_id
+  left join ranking_configs rc on rc.id = s.ranking_config_id
+  where s.id = v_season and c.slug = p_club_slug and c.is_active;
+
+  if not found then
+    return;
+  end if;
+
+  return query
+  with zichtbaar as (
+    select r.id, r.tournament_id, t.name as tornooi, r.finished_at,
+           r.position, r.entries_total, r.knockouts, r.points,
+           public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode) as inzet,
+           public.public_name(p.display_name, p.username, p.id,
+                              p.public_listing, p.public_profile, c.public_names) as naam,
+           row_number() over (order by r.points desc, r.finished_at desc) as rn
+    from tournament_results r
+    join tournaments t on t.id = r.tournament_id
+    join clubs c       on c.id = t.club_id
+    join players p     on p.id = r.player_id
+    where r.season_id = v_season
+      and r.player_id = p_player_id
+      and c.slug = p_club_slug
+      and c.is_active
+      and t.player_visibility = 'public'
+      and t.status = 'finished'
+  )
+  select z.naam, z.tournament_id, z.tornooi, z.finished_at,
+         z.position, z.entries_total, z.knockouts, z.inzet, z.points,
+         (v_best_n is null or z.rn <= v_best_n)
+  from zichtbaar z
+  order by z.rn;
+end;
+$$;
+
+comment on function public.club_public_player_season(text, uuid, uuid) is
+  'De avonden van één speler in een seizoen, van best naar slechtst, met per avond het veld, de inzet en de punten. counted zegt of die avond binnen de beste N valt. Zonder prijzengeld.';
+
+-- ---------------------------------------------------------------------------
+-- 3. De regels van het seizoen, zodat het scherm ze kan uitleggen
+-- ---------------------------------------------------------------------------
+-- Alleen de puntentelling en de twee drempels. Niet de hele ranking_config:
+-- daar hangt een club_id aan en een naam die de club voor zichzelf koos.
+
+create or replace function public.club_public_season_rules(
+  p_club_slug text,
+  p_season_id uuid default null
+)
+returns table (
+  season_id       uuid,
+  season_name     text,
+  starts_on       date,
+  ends_on         date,
+  method          text,
+  multiplier      numeric,
+  exponent        numeric,
+  buyin_ref       numeric,
+  buyin_weight    numeric,
+  bonus_entry     numeric,
+  bonus_per_ko    numeric,
+  count_best_n    int,
+  min_tournaments int
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_season uuid;
+begin
+  v_season := p_season_id;
+  if v_season is null then
+    select s.id into v_season
+    from public.club_public_seasons(p_club_slug) s
+    limit 1;
+  end if;
+  if v_season is null then
+    return;
+  end if;
+
+  return query
+  select s.id, s.name, s.starts_on, s.ends_on,
+         rc.method::text,
+         coalesce((rc.params->>'multiplier')::numeric, 10),
+         -- Dezelfde grenzen als calc_points, zodat het scherm niet iets
+         -- uitlegt wat de database vervolgens anders doet.
+         least(1.5, greatest(0.5, coalesce((rc.params->>'exponent')::numeric, 0.5))),
+         (rc.params->>'buyin_ref')::numeric,
+         least(1.5, greatest(0, coalesce((rc.params->>'buyin_weight')::numeric, 0.5))),
+         coalesce(rc.bonus_entry, 0),
+         coalesce(rc.bonus_per_ko, 0),
+         rc.count_best_n,
+         coalesce(rc.min_tournaments, 0)
+  from seasons s
+  join clubs c on c.id = s.club_id
+  left join ranking_configs rc on rc.id = s.ranking_config_id
+  where s.id = v_season and c.slug = p_club_slug and c.is_active;
+end;
+$$;
+
+comment on function public.club_public_season_rules(text, uuid) is
+  'De puntentelling van een seizoen in leesbare vorm, zodat een scherm kan uitleggen hoe de punten tot stand komen zonder de formule in code te herhalen.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Rechten
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('grant execute on function public.club_public_season_standings(text,uuid) to %I', r);
+      execute format('grant execute on function public.club_public_player_season(text,uuid,uuid) to %I', r);
+      execute format('grant execute on function public.club_public_season_rules(text,uuid) to %I', r);
+    end if;
+  end loop;
 end $$;

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ClubNav } from '@/components/ClubNav'
+import { PointsExplainer } from '@/components/public/PointsExplainer'
 import { AccountWall } from '@/components/public/AccountWall'
 import { PublicShell } from '@/components/public/PublicShell'
 import { PublicStandings } from '@/components/public/PublicStandings'
@@ -100,25 +101,6 @@ function explainPoints(cfg: RankingConfig | null, t: T, locale: string): string[
   if (cfg.bonus_per_ko > 0) out.push(t('points.bonusKo').replace('{n}', String(cfg.bonus_per_ko)))
   if (cfg.bonus_entry > 0) out.push(t('points.bonusEntry').replace('{n}', String(cfg.bonus_entry)))
   return out
-}
-
-/**
- * Wat één overwinning tegen twintig spelers oplevert. Dezelfde formule als
- * calc_points in de database — hier alleen om te tónen, nooit om iets mee te
- * berekenen dat bewaard wordt. De echte punten komen altijd van de server.
- */
-function examplePoints(cfg: RankingConfig): number {
-  const p = (cfg.params ?? {}) as Record<string, number>
-  let v = 0
-  if (cfg.method === 'sqrt_ratio' || cfg.method === 'pokerstars') {
-    v = (p.multiplier ?? 10) * Math.sqrt(20)
-  } else if (cfg.method === 'linear') {
-    v = p.base ?? 100
-  }
-  // Hele punten, zoals de database ze bewaart. En bij plaats 1 doet de
-  // exponent niets, en bij de ijkinleg de weging niets — dus dit voorbeeld
-  // klopt ook met een league-telling, zolang het over plaats 1 gaat.
-  return Math.round(v + cfg.bonus_entry)
 }
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -347,7 +329,20 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
                     <span style={i < 3 ? { color: 'var(--brand)' } : undefined}>{i + 1}</span>
                   </td>
                   <td className="px-4 py-2.5 font-medium">
-                    {r.display_name}
+                    {/* Doorklikken naar zijn puntenopbouw — dezelfde pagina
+                        die de spelers zien. Alleen bij een seizoen: buiten
+                        een seizoen is er geen beste-N en dus niets uit te
+                        leggen dat de rij niet al zegt. */}
+                    {mode === 'season' ? (
+                      <Link
+                        href={`${base}/${r.player_id}`}
+                        className="underline-offset-4 hover:text-[var(--brand)] hover:underline"
+                      >
+                        {r.display_name}
+                      </Link>
+                    ) : (
+                      r.display_name
+                    )}
                     {/* Wie nog onder de drempel zit, staat gewoon in de stand
                         en telt gewoon punten — hij dingt alleen nog niet mee
                         naar de prijs. Hem verbergen tot hij er is, zou het
@@ -386,25 +381,37 @@ export default async function Page_({ params, searchParams }: PageProps<'/c/[clu
       )}
 
       {/* Hoe de punten tot stand komen, in het scherm zelf. Anders is de
-          eerste vraag van elke speler "waarom heeft hij er meer dan ik". */}
-      {explain.length > 0 && (
+          eerste vraag van elke speler "waarom heeft hij er meer dan ik".
+          Hetzelfde kader als de spelers onder hun klassement zien, zodat
+          staf en zaal hetzelfde verhaal lezen. */}
+      {cfg && mode === 'season' && (
+        <PointsExplainer
+          rules={{
+            method: cfg.method,
+            multiplier: Number((cfg.params as Record<string, unknown>)?.multiplier ?? 10),
+            exponent: Number((cfg.params as Record<string, unknown>)?.exponent ?? 0.5),
+            buyin_ref: (cfg.params as Record<string, unknown>)?.buyin_ref === undefined
+              ? null
+              : Number((cfg.params as Record<string, unknown>).buyin_ref),
+            buyin_weight: Number((cfg.params as Record<string, unknown>)?.buyin_weight ?? 0.5),
+            bonus_entry: cfg.bonus_entry,
+            bonus_per_ko: cfg.bonus_per_ko,
+            count_best_n: cfg.count_best_n,
+            min_tournaments: minVereist,
+          }}
+          locale={locale}
+          t={t}
+          currency={club.currency}
+        />
+      )}
+
+      {explain.length > 0 && mode !== 'season' && (
         <div className="rounded-[var(--radius-lg)] border border-[var(--line)] p-4 text-sm">
           <p className="font-medium">{t('standings.howPoints')}</p>
           <p className="tnum mt-1.5 text-[var(--text-muted)]">{explain.join('   ')}</p>
-          {cfg && (
-            <p className="mt-1 text-xs text-[var(--text-faint)]">
-              {t('points.example')
-                .replace('{n}', '20')
-                .replace('{pts}', String(examplePoints(cfg)))}
-            </p>
-          )}
-          {cfg?.count_best_n && mode === 'season' && (
-            <p className="mt-1 text-xs text-[var(--text-faint)]">
-              {t('standings.bestNote').replace('{n}', String(cfg.count_best_n))}
-            </p>
-          )}
         </div>
       )}
+
     </Page>
   )
 }

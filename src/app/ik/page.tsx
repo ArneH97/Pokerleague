@@ -84,6 +84,8 @@ interface ResultRow {
   place: number
   entries: number
   prize_cents: number
+  /** De bounties die hij die avond ophaalde; zie migratie 0064. */
+  bounty_cents: number
   spent_cents: number
   points: number
   knockouts: number
@@ -202,7 +204,11 @@ export default async function Page() {
   // begin maar een foutmelding zonder tekst.
   if (!me.onboarded_at) redirect('/welkom')
 
-  const totalPrize = results.reduce((s, r) => s + Number(r.prize_cents ?? 0), 0)
+  // Gewonnen is prijzengeld plus bounties. De bounty die je bij het inkopen
+  // betaalt zit in spent_cents; alleen de ene helft tellen maakt van elke
+  // bountyavond een slechtere avond dan ze was. Zie migratie 0064.
+  const gewonnen = (r: ResultRow) => Number(r.prize_cents ?? 0) + Number(r.bounty_cents ?? 0)
+  const totalPrize = results.reduce((s, r) => s + gewonnen(r), 0)
   const totalSpent = results.reduce((s, r) => s + Number(r.spent_cents ?? 0), 0)
   const net = totalPrize - totalSpent
   const wins = results.filter((r) => r.place === 1).length
@@ -372,7 +378,7 @@ export default async function Page() {
             ) : (
               <ul className="overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)]">
                 {results.map((r) => {
-                  const rNet = Number(r.prize_cents ?? 0) - Number(r.spent_cents ?? 0)
+                  const rNet = gewonnen(r) - Number(r.spent_cents ?? 0)
                   return (
                     <li
                       key={r.tournament_id}
@@ -401,9 +407,9 @@ export default async function Page() {
                         >
                           {rNet > 0 ? '+' : ''}{formatMoney(rNet, 'EUR')}
                         </span>
-                        {Number(r.prize_cents) > 0 && (
+                        {gewonnen(r) > 0 && (
                           <span className="tnum hidden text-[0.65rem] text-[var(--text-faint)] sm:block">
-                            {formatMoney(Number(r.prize_cents), 'EUR')} {t('me.won').toLowerCase()}
+                            {formatMoney(gewonnen(r), 'EUR')} {t('me.won').toLowerCase()}
                           </span>
                         )}
                       </span>

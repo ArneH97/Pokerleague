@@ -33,6 +33,8 @@ export interface ChartRow {
   place: number
   entries: number
   prize_cents: number
+  /** De bounties die hij die avond won. Hoort bij de opbrengst; zie 0064. */
+  bounty_cents?: number
   spent_cents: number
 }
 
@@ -64,7 +66,7 @@ export function PlayerCharts({
     const prev = acc.length > 0 ? acc[acc.length - 1].net : 0
     acc.push({
       at: new Date(r.played_on),
-      net: prev + Number(r.prize_cents) - Number(r.spent_cents),
+      net: prev + Number(r.prize_cents) + Number(r.bounty_cents ?? 0) - Number(r.spent_cents),
     })
     return acc
   }, [])

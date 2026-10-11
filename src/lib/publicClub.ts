@@ -1,3 +1,4 @@
+import type { PointsRules } from '@/lib/points'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -118,6 +119,8 @@ export interface PublicSeason {
 }
 
 export interface PublicSeasonStanding extends PublicStanding {
+  /** Om op door te klikken naar zijn puntenopbouw. Zie migratie 0066. */
+  player_id: string
   /** Hoeveel van zijn avonden meetellen, als er een beste-N-regel is. */
   counted: number
   /** Haalt deze speler het minimum aantal avonden van het seizoen? */
@@ -188,4 +191,71 @@ export async function getPublicTournaments(
     .limit(limit)
     .overrideTypes<PublicTournament[]>()
   return data ?? []
+}
+
+/** Eén avond in de puntenopbouw van een speler. */
+export interface PlayerSeasonRow {
+  player_name: string
+  tournament_id: string
+  tournament: string
+  played_on: string
+  place: number
+  entries: number
+  knockouts: number
+  /** Wat er die avond per inkoop op het spel stond: pot plus bounty. */
+  stake_cents: number
+  points: number
+  /** Valt deze avond binnen de beste N van het seizoen? */
+  counted: boolean
+}
+
+/**
+ * Hoe één speler aan zijn punten kwam, van zijn beste avond naar zijn
+ * slechtste. De streep onder de beste N wordt door de database getrokken en
+ * niet hier — anders staat er een uitleg die niet klopt met de stand erboven.
+ */
+export async function getPublicPlayerSeason(
+  slug: string, playerId: string, seasonId?: string,
+): Promise<PlayerSeasonRow[]> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_public_player_season', {
+    p_club_slug: slug,
+    p_player_id: playerId,
+    p_season_id: seasonId ?? null,
+  })
+  return (data ?? []) as unknown as PlayerSeasonRow[]
+}
+
+/**
+ * De puntentelling van een seizoen, zodat het scherm ze kan uitleggen in
+ * plaats van de formule na te bouwen.
+ */
+export async function getPublicSeasonRules(
+  slug: string, seasonId?: string,
+): Promise<(PointsRules & { season_id: string; season_name: string;
+  starts_on: string; ends_on: string | null }) | null> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('club_public_season_rules', {
+    p_club_slug: slug,
+    p_season_id: seasonId ?? null,
+  })
+  const rij = ((data ?? []) as unknown as Record<string, unknown>[])[0]
+  if (!rij) return null
+  return {
+    season_id: String(rij.season_id),
+    season_name: String(rij.season_name),
+    starts_on: String(rij.starts_on),
+    ends_on: rij.ends_on === null ? null : String(rij.ends_on),
+    method: String(rij.method ?? 'sqrt_ratio'),
+    multiplier: Number(rij.multiplier ?? 10),
+    exponent: Number(rij.exponent ?? 0.5),
+    buyin_ref: rij.buyin_ref === null || rij.buyin_ref === undefined
+      ? null : Number(rij.buyin_ref),
+    buyin_weight: Number(rij.buyin_weight ?? 0.5),
+    bonus_entry: Number(rij.bonus_entry ?? 0),
+    bonus_per_ko: Number(rij.bonus_per_ko ?? 0),
+    count_best_n: rij.count_best_n === null || rij.count_best_n === undefined
+      ? null : Number(rij.count_best_n),
+    min_tournaments: Number(rij.min_tournaments ?? 0),
+  }
 }

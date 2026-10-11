@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { PublicShell } from '@/components/public/PublicShell'
 import type { Club } from '@/lib/club'
 import { translator, type Locale } from '@/lib/i18n/dictionaries'
+import { PointsExplainer } from '@/components/public/PointsExplainer'
 import {
-  getPublicSeasonStandings, getPublicSeasons, getPublicStandings,
+  getPublicSeasonRules, getPublicSeasonStandings, getPublicSeasons, getPublicStandings,
   type PublicSeasonStanding,
 } from '@/lib/publicClub'
 
@@ -47,6 +48,7 @@ export async function PublicStandings({
   const rows = mode === 'season'
     ? await getPublicSeasonStandings(club.slug)
     : await getPublicStandings(club.slug, from, to)
+  const rules = mode === 'season' ? await getPublicSeasonRules(club.slug) : null
   const base = `/c/${club.slug}/klassement`
 
   const tabs = [
@@ -60,13 +62,6 @@ export async function PublicStandings({
   const drempel = (rows as PublicSeasonStanding[])
     .find((r) => (r.min_required ?? 0) > 0)?.min_required ?? 0
 
-  // Hoeveel resultaten er meetellen, afgeleid uit de stand: het hoogste
-  // aantal meetellende avonden bij iemand die er meer gespeeld heeft. Zo komt
-  // de regel in het scherm zonder dat de puntentelling van de club publiek
-  // leesbaar hoeft te worden.
-  const besteN = (rows as PublicSeasonStanding[])
-    .filter((r) => r.counted !== undefined && r.counted < r.tournaments)
-    .reduce((m, r) => Math.max(m, r.counted), 0)
 
   return (
     <PublicShell club={club} locale={locale} active="standings">
@@ -140,7 +135,19 @@ export async function PublicStandings({
                   </td>
                   <td className="px-2 py-3 align-baseline">
                     <span className="block font-medium">
-                      <span className="truncate">{r.player_name}</span>
+                      {/* Doorklikken naar zijn puntenopbouw. Alleen in een
+                          seizoen: buiten een seizoen is er geen beste-N en
+                          dus niets uit te leggen dat de rij niet al zegt. */}
+                      {mode === 'season' && (r as PublicSeasonStanding).player_id ? (
+                        <Link
+                          href={`${base}/${(r as PublicSeasonStanding).player_id}`}
+                          className="underline-offset-4 hover:text-[var(--brand)] hover:underline"
+                        >
+                          {r.player_name}
+                        </Link>
+                      ) : (
+                        <span className="truncate">{r.player_name}</span>
+                      )}
                       {/* Wie nog onder de drempel zit staat gewoon in de
                           stand en telt gewoon punten — hij dingt alleen nog
                           niet mee voor de prijs. Hem verbergen tot hij er is,
@@ -174,15 +181,10 @@ export async function PublicStandings({
         </div>
       )}
 
-      {/* De beste-N-regel hoort erbij te staan, anders klopt de som niet met
-          wat iemand zelf uitrekent. Het getal leiden we af uit de stand zelf:
-          wie er al meer gespeeld heeft dan er meetellen, laat zien hoeveel er
-          meetellen. Heeft nog niemand dat, dan valt er ook niets uit te
-          leggen. */}
-      {mode === 'season' && besteN > 0 && (
-        <p className="mt-4 text-sm text-[var(--text-faint)]">
-          {t('standings.bestNote').replace('{n}', String(besteN))}
-        </p>
+      {/* Hoe de punten werken, onder de tabel. De formule komt uit de
+          database en niet uit code hier: zie PointsExplainer. */}
+      {mode === 'season' && rules && (
+        <PointsExplainer rules={rules} locale={locale} t={t} currency={club.currency} />
       )}
     </PublicShell>
   )

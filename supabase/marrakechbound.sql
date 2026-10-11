@@ -29,6 +29,10 @@
 -- goedkope avond zinloos te maken: wie alleen de dertig-eurotornooien speelt,
 -- blijft meedoen voor het pakket.
 --
+-- Als inzet geldt de pot plus de bounty, zonder rake — alles wat de spelers
+-- kunnen terugwinnen. The Hunt (€20 pot + €20 bounty + €10 rake) telt dus
+-- als een avond van veertig euro en niet van twintig. Zie migratie 0065.
+--
 -- Het veld telt mee via √N: een avond met dertig spelers is voor de winnaar
 -- een vijfde meer waard dan een avond met twintig — genoeg om drukke avonden
 -- te laten tellen, te weinig om één zondag de league te laten beslissen.
@@ -163,23 +167,29 @@ end $$;
 
 -- Welke avonden hangen er aan de league, en wat weegt elke avond?
 --
--- `weging` is de factor waarmee de inleg meetelt: 1,00 bij dertig euro, 1,29
--- bij vijftig. `winnaar_bij_20` is wat een overwinning tegen twintig spelers
--- op die avond oplevert. Kijk die kolom na: staat er bij een avond een
--- verrassend getal, dan staat de inleg in het tornooi anders dan je dacht —
--- de weging kijkt naar het bedrag dat naar de pot gaat, zonder rake.
+-- `inzet` is wat er per inkoop op het spel staat: de pot plus de bounty,
+-- zonder rake. `weging` is de factor die daaruit volgt — 1,00 bij dertig
+-- euro, 1,29 bij vijftig. `winnaar_bij_20` is wat een overwinning tegen
+-- twintig spelers op die avond oplevert.
+--
+-- Kijk die kolommen na. Staat er bij een avond een verrassend getal, dan
+-- staan de bedragen in dat tornooi anders dan je dacht.
 select
   to_char(t.scheduled_at, 'dd/mm/yyyy') as gepland,
   t.name                                 as tornooi,
   t.status,
   round(t.buyin_cents / 100.0, 2)        as inleg,
   round(t.fee_cents  / 100.0, 2)         as rake,
-  round(least(2.0, greatest(0.5,
-    sqrt((t.buyin_cents / 100.0) / 30))), 2)                              as weging,
+  round(public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode) / 100.0, 2)
+                                                                          as inzet,
+  round(least(2.0, greatest(0.5, sqrt(
+    (public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode) / 100.0) / 30))), 2)
+                                                                          as weging,
   public.calc_points('sqrt_ratio',
     jsonb_build_object('multiplier', 10, 'exponent', 0.75,
                        'buyin_ref', 30, 'buyin_weight', 0.5),
-    1, 20, 0, t.buyin_cents, 0, 3)                                        as winnaar_bij_20,
+    1, 20, 0, public.stake_cents(t.buyin_cents, t.bounty_cents, t.bounty_mode), 0, 3)
+                                                                          as winnaar_bij_20,
   (select count(*) from tournament_results r where r.tournament_id = t.id) as uitslagregels
 from tournaments t
 join seasons s on s.id = t.season_id
