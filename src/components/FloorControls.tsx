@@ -245,14 +245,27 @@ export function FloorControls({
           balkAan ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2">
+        <div className="mx-auto flex max-w-3xl items-center gap-1.5 px-3 py-2 sm:gap-2">
           <span className="tnum shrink-0 text-xl font-bold leading-none">
             {formatDuration(resolved.remainingMs)}
           </span>
+          {/* De blinds, niet het levelnummer. Op een telefoon past er één
+              ding naast de tijd en vijf knoppen, en de vraag aan tafel is
+              altijd "wat zijn de blinds" en nooit "welk level is het". Het
+              nummer en de ante komen erbij zodra er plaats is. */}
           <span className="min-w-0 flex-1 truncate text-xs leading-tight text-[var(--text-muted)]">
-            {resolved.level?.isBreak
-              ? breakLabel(resolved.level.label, t('clock.break'))
-              : `${t('clock.level')} ${playIdx} · ${formatBlinds(resolved.level)}`}
+            {resolved.level?.isBreak ? (
+              breakLabel(resolved.level.label, t('clock.break'))
+            ) : (
+              <>
+                <span className="hidden sm:inline">{t('clock.level')} {playIdx} · </span>
+                <span className="tnum">
+                  {(resolved.level?.smallBlind ?? 0).toLocaleString('nl-BE')}
+                  {' / '}
+                  {(resolved.level?.bigBlind ?? 0).toLocaleString('nl-BE')}
+                </span>
+              </>
+            )}
           </span>
           <BalkKnop
             label={t('floor.prevLevel')}
@@ -442,9 +455,23 @@ export function FloorControls({
         />
       </section>
 
-      {/* Het spelersbeheer staat onder de klok en niet op een aparte pagina:
-          aan de deur en aan tafel gebeurt alles door elkaar, en wisselen van
-          scherm midden in een level is precies wanneer je iets vergeet. */}
+      {/* De tafelindeling, meteen onder de klok. Dit is het hoofdbeeld: wie
+          zit waar, wie staat kort, wie moet verhuizen — en vanaf hier open je
+          met één tik alles wat je met een speler kan doen. */}
+      <SeatingPanel
+        tournamentId={tournamentId}
+        seatsPerTable={tournament.seats_per_table}
+        ctx={sheetCtx}
+        bigBlind={resolved.level?.bigBlind ?? 0}
+        finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
+      />
+
+      {/* Het spelersbeheer, onder de tafels.
+          Het stond bovenaan toen er nog geen tafelweergave was. Nu die er is,
+          is dát het beeld waar de floor de avond door naar kijkt — hij ziet
+          de zaal voor zich en tikt aan wie er voor hem staat. De lijst blijft
+          nodig om iemand te zóeken, om in te schrijven en om de kassa bij te
+          houden, maar dat zijn handelingen en geen uitzicht. Dus: eronder. */}
       <FloorPlayers
         tournamentId={tournamentId}
         clubId={tournament.club_id}
@@ -459,16 +486,6 @@ export function FloorControls({
         expectedChips={expectedChips}
         countsFrozenAt={tournament.counts_frozen_at}
         clubLocale={club?.locale ?? 'nl'}
-      />
-
-      {/* De tafelindeling. Dichtgeklapt tot je hem nodig hebt: aan de deur
-          gaat het over inschrijven, de indeling komt erna. */}
-      <SeatingPanel
-        tournamentId={tournamentId}
-        seatsPerTable={tournament.seats_per_table}
-        ctx={sheetCtx}
-        bigBlind={resolved.level?.bigBlind ?? 0}
-        finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
       />
 
       {/* De blindstructuur van deze avond. Aanpasbaar terwijl er gespeeld
@@ -555,7 +572,7 @@ function BalkKnop({
       title={label}
       onClick={onClick}
       disabled={disabled}
-      className={`tnum h-10 min-w-10 shrink-0 rounded-lg px-2 text-sm font-medium leading-none transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${
+      className={`tnum h-9 min-w-9 shrink-0 rounded-lg px-1.5 text-sm font-medium leading-none transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 sm:h-10 sm:min-w-10 sm:px-2 ${
         primair
           ? 'bg-[var(--brand)] text-[var(--on-brand)] hover:brightness-110'
           : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'

@@ -55,22 +55,23 @@ interface SpelerRij {
   rebuys_used: number
   bounties_won: number
   prereg_bonus: number
-  players: { display_name: string } | null
+  chip_count_by: string | null
+  chip_count_updated_at: string | null
+  players: { display_name: string; email: string | null } | null
 }
 
-interface Move {
-  tournament_player_id: string
-  name: string
-  from_table: number | null
-  from_seat: number | null
-  to_table: number
-  to_seat: number
-}
-
+/**
+ * Wat de databank van de indeling vindt.
+ *
+ * `moves` komt nog mee uit `seating_proposal` maar wordt niet meer gebruikt:
+ * sinds het verzetten helemaal bij de floor ligt, is alleen `kind` en de
+ * tafel die opgebroken kan worden nog van belang. Het veld blijft in de vorm
+ * staan omdat de functie het nu eenmaal teruggeeft.
+ */
 interface Proposal {
   kind: 'none' | 'balance' | 'break'
   break_table?: number
-  moves: Move[]
+  moves: unknown[]
 }
 
 interface Tafel {
@@ -121,7 +122,7 @@ export function SeatingPanel({
       supabase.rpc('seating_proposal', { p_tournament_id: tournamentId }),
       supabase
         .from('tournament_players')
-        .select('id,status,chip_count,finish_position,table_no,seat_no,reentries_used,rebuys_used,bounties_won,prereg_bonus,players(display_name)')
+        .select('id,status,chip_count,finish_position,table_no,seat_no,reentries_used,rebuys_used,bounties_won,prereg_bonus,chip_count_by,chip_count_updated_at,players(display_name,email)')
         .eq('tournament_id', tournamentId)
         .in('status', ['active', 'registered'])
         .overrideTypes<SpelerRij[]>(),
@@ -140,6 +141,9 @@ export function SeatingPanel({
       rebuysUsed: r.rebuys_used,
       bountiesWon: r.bounties_won,
       preregBonus: r.prereg_bonus ?? 0,
+      email: r.players?.email ?? null,
+      chipCountBy: r.chip_count_by,
+      chipCountAt: r.chip_count_updated_at,
     })))
   }, [supabase, tournamentId])
 
@@ -184,6 +188,21 @@ export function SeatingPanel({
       : a
   ), { id: null, chips: -1 }).id
 
+  /**
+   * Naar een andere tafel.
+   *
+   * Vegen werkt op een telefoon en nergens anders. Aan de floor staat ook een
+   * laptop, en daar is er geen gebaar om mee te wisselen — dan blijven alleen
+   * de puntjes over, en die zijn vijf pixels hoog. Vandaar twee pijlen die
+   * altijd staan: op een muis is dat de hele bediening, op een duim een extra.
+   */
+  function naarTafel(index: number) {
+    const el = document.getElementById(`tafelstrook-${tournamentId}`)
+    if (!el) return
+    const i = Math.min(Math.max(index, 0), Math.max(tafels.length - 1, 0))
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  }
+
   async function zetNeer(tableNo: number, seatNo: number) {
     if (!opgepakt) return
     const wie = opgepakt
@@ -192,6 +211,8 @@ export function SeatingPanel({
       p_tournament_player_id: wie.id, p_table_no: tableNo, p_seat_no: seatNo,
     }))
   }
+
+  const hier = Math.max(0, tafels.findIndex((x) => x.no === (huidig?.no ?? 1)))
 
   const sheetPlayer = sheetId === null ? null : mee.find((p) => p.id === sheetId) ?? null
 
@@ -209,7 +230,9 @@ export function SeatingPanel({
     )
   }
 
-  const heeftVoorstel = voorstel !== null && voorstel.kind !== 'none' && voorstel.moves.length > 0
+  // De databank rekent nog steeds uit of het scheef staat; we gebruiken dat
+  // alleen niet meer om iemand te verzetten.
+  const heeftMelding = voorstel !== null && voorstel.kind !== 'none'
 
   return (
     <section className="space-y-3 rounded-xl border border-[var(--line)] p-4">
@@ -259,39 +282,39 @@ export function SeatingPanel({
         </div>
       )}
 
-      {/* Het voorstel. Nooit uitgevoerd zonder dat je hier drukt, en je kan
-          het altijd links laten liggen en zelf iemand verzetten. */}
-      {heeftVoorstel && (
+      {/* Een melding, geen voorstel.
+          Hier stond een lijstje "deze man van tafel 1 naar tafel 2" met een
+          knop eronder die het uitvoerde. Dat las handig en was het niet: één
+          tik verzette iemand die net de big blind betaald had, en dat merk je
+          pas als hij aan de andere tafel meteen weer moet betalen. Zo'n
+          beslissing hoort bij de floor, die de hand ziet en de knoppen kent.
+          Wat de databank wél goed kan is tellen — dus dat is wat er staat:
+          waar het scheef zit en hoeveel. Wie er verhuist, kies jij. */}
+      {heeftMelding && (
         <div className="rounded-lg border border-[color-mix(in_oklab,var(--warn)_35%,transparent)] bg-[color-mix(in_oklab,var(--warn)_8%,transparent)] p-3">
           <p className="text-sm font-medium text-[var(--warn)]">
             {voorstel.kind === 'break'
               ? t('seat.proposeBreak').replace('{n}', String(voorstel.break_table ?? ''))
               : t('seat.proposeBalance')}
           </p>
-          <ul className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
-            {voorstel.moves.map((m) => (
-              <li key={m.tournament_player_id} className="tnum">
-                {m.name} · {t('seat.from')} {m.from_table}
-                {m.from_seat !== null ? `.${m.from_seat}` : ''} → {t('seat.to')} {m.to_table}.{m.to_seat}
-              </li>
+          {/* De bezetting per tafel. Eén regel die zegt waar het scheef zit,
+              in plaats van drie regels die zeggen wie er moet lopen. */}
+          <p className="tnum mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+            {tafels.filter((x) => x.isOpen).map((x) => (
+              <span key={x.no}>
+                {t('seat.table')} {x.no}:{' '}
+                {x.stoelen.filter((y) => y.tournament_player_id !== null).length}
+              </span>
             ))}
-          </ul>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void run(() => supabase.rpc('floor_apply_moves', {
-                p_tournament_id: tournamentId, p_moves: voorstel.moves,
-              }))}
-              className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-[var(--on-brand)] transition hover:brightness-110 disabled:opacity-40"
-            >
-              {t('seat.apply')}
-            </button>
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
+            {t('seat.youDecide')}
+          </p>
+          <div className="mt-2.5">
             <Klein onClick={() => setVoorstel({ kind: 'none', moves: [] })} disabled={busy}>
               {t('seat.ignore')}
             </Klein>
           </div>
-          <p className="mt-2 text-xs text-[var(--text-faint)]">{t('seat.overrideHint')}</p>
         </div>
       )}
 
@@ -325,21 +348,32 @@ export function SeatingPanel({
             )}
             {tafels.length > 1 && (
               <div className="ml-auto flex items-center gap-1.5">
-                {tafels.map((x) => (
+                <Pijl
+                  label={t('seat.prevTable')}
+                  disabled={hier <= 0}
+                  onClick={() => naarTafel(hier - 1)}
+                >
+                  ←
+                </Pijl>
+                {tafels.map((x, i) => (
                   <button
                     key={x.no}
                     type="button"
                     aria-current={x.no === (huidig?.no ?? 1) ? 'true' : 'false'}
                     aria-label={`${t('seat.table')} ${x.no}`}
-                    onClick={() => {
-                      const el = document.getElementById(`tafelstrook-${tournamentId}`)
-                      if (el) el.scrollTo({ left: tafels.indexOf(x) * el.clientWidth, behavior: 'smooth' })
-                    }}
+                    onClick={() => naarTafel(i)}
                     className={`h-1.5 w-5 rounded-full transition ${
                       x.no === (huidig?.no ?? 1) ? 'bg-[var(--brand)]' : 'bg-[var(--line-strong)]'
                     }`}
                   />
                 ))}
+                <Pijl
+                  label={t('seat.nextTable')}
+                  disabled={hier >= tafels.length - 1}
+                  onClick={() => naarTafel(hier + 1)}
+                >
+                  →
+                </Pijl>
               </div>
             )}
           </div>
@@ -408,6 +442,25 @@ export function SeatingPanel({
         />
       )}
     </section>
+  )
+}
+
+/** Een pijl naast de puntjes. Groot genoeg voor een duim, klein genoeg om
+ *  niet met de tafelnaam te concurreren. */
+function Pijl({
+  children, label, onClick, disabled,
+}: { children: React.ReactNode; label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className="size-8 shrink-0 rounded-lg border border-[var(--line-strong)] text-sm leading-none transition active:scale-95 hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-30"
+    >
+      {children}
+    </button>
   )
 }
 

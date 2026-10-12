@@ -101,6 +101,8 @@ export function FloorPlayers({
   const [earlyOffer, setEarlyOffer] = useState<{ tpId: string; naam: string } | null>(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
+  /** Staat de lijst open. Dichtgeklapt werk je vanuit de tafels. */
+  const [lijstOpen, setLijstOpen] = useState(true)
   const [dealOpen, setDealOpen] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
   /** Waar de zojuist toegevoegde speler zou kunnen zitten. */
@@ -289,8 +291,8 @@ export function FloorPlayers({
       // maar meteen boeken. Mislukt het, dan staat de melding in de balk en
       // kan de floor het alsnog via het spelerspaneel.
       if (early) {
-        await run(() => supabase.rpc('floor_set_prereg_bonus', {
-          p_tournament_player_id: nieuw, p_on: true,
+        await run(() => supabase.rpc('floor_grant_prereg_bonus', {
+          p_tournament_player_id: nieuw,
         }))
       } else {
         biedEarlyAan(nieuw, name)
@@ -302,8 +304,8 @@ export function FloorPlayers({
 
   async function kenEarlyToe(tpId: string) {
     setEarlyOffer(null)
-    await run(() => supabase.rpc('floor_set_prereg_bonus', {
-      p_tournament_player_id: tpId, p_on: true,
+    await run(() => supabase.rpc('floor_grant_prereg_bonus', {
+      p_tournament_player_id: tpId,
     }))
   }
 
@@ -377,14 +379,24 @@ export function FloorPlayers({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
+      {/* De kop is tegelijk de klep. Sinds de tafels bovenaan staan is deze
+          lijst niet meer het uitzicht maar het opzoekwerk — en dan hoort ze
+          weg te kunnen. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setLijstOpen((v) => !v)}
+          className="flex items-center gap-1.5 rounded-lg text-sm uppercase tracking-widest text-[var(--text-faint)] transition hover:text-[var(--text)]"
+        >
+          <span aria-hidden className={`text-[0.7rem] transition-transform ${lijstOpen ? 'rotate-90' : ''}`}>
+            ▶
+          </span>
           {t('players.title')}
-        </h2>
+        </button>
         <div className="flex items-center gap-3">
           {/* Op naam om iemand te vinden, op chips om te zien wie er kort
               staat. Twee vragen, twee volgordes. */}
-          {players.length > 1 && (
+          {players.length > 1 && lijstOpen && (
             <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] p-0.5">
               {(['name', 'chips'] as const).map((k) => (
                 <button
@@ -567,11 +579,13 @@ export function FloorPlayers({
           {players.length > 6 && (
             <input
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              // Zoeken terwijl de lijst dicht staat zou niets doen. Eén
+              // teken is genoeg om hem open te klappen.
+              onChange={(e) => { setFilter(e.target.value); if (e.target.value) setLijstOpen(true) }}
               placeholder={t('players.filter')}
               autoComplete="off"
               name="speler-filter"
-              className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)]"
+              className="min-w-0 flex-1 basis-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--brand)] sm:basis-0"
             />
           )}
           <button
@@ -768,8 +782,14 @@ export function FloorPlayers({
         <p className="text-sm text-[var(--danger)]">{error}</p>
       )}
 
-      {/* --------------------------------------------------------- aan tafel */}
-      {players.length === 0 ? (
+      {/* --------------------------------------------------------- aan tafel
+          Eén regel per speler. Het mailadres en de herkomst van de stapel
+          stonden hier ook, en dat maakte van elke speler een blokje van twee
+          regels; met dertien man scrol je dan een half scherm voorbij om
+          iemand te vinden. Die twee staan nu in het paneel, waar je ze leest
+          als je met díe speler bezig bent. Wat hier overblijft is wat je
+          scant: naam, plaats, stapel. */}
+      {lijstOpen && (players.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--line-strong)] p-8 text-center">
           <p className="font-medium">{t('players.none')}</p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">{t('players.noneBody')}</p>
@@ -777,120 +797,90 @@ export function FloorPlayers({
       ) : (
         <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
           {visibleActive.map((p) => (
-            <li key={p.id} className="px-3 py-2.5">
-              {/* Op een telefoon krijgt de naam een eigen regel en staan de
-                  stapel en de knoppen eronder. Zetten we alles op één regel,
-                  dan blijft er van "Jean-Baptiste Vandenbroucke" precies "J…"
-                  over — en de naam is het enige waarmee je de juiste man
-                  uitschakelt. Vanaf een tablet past het wel naast elkaar. */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <button
-                  type="button"
-                  disabled={busy || finished}
-                  onClick={() => setSheetId(p.id)}
-                  className="min-w-0 flex-1 basis-full rounded-lg text-left sm:basis-0 disabled:cursor-default"
-                >
-                  <span className="flex flex-wrap items-center gap-x-2">
-                    <span className="truncate font-medium">{p.name}</span>
-                    {/* Zonder mailadres kan je hem volgend seizoen niet
-                        terugvinden. Hier staan zodat je het na de avond
-                        alsnog kan aanvullen. */}
-                    {p.email === null && (
-                      <span className="rounded px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-[var(--warn)] ring-1 ring-[color-mix(in_oklab,var(--warn)_35%,transparent)]">
-                        {t('players.noEmailBadge')}
-                      </span>
-                    )}
-                    {/* Waar hij zit. Naast de naam en niet onderaan: als
-                        iemand vraagt waar hij moet gaan zitten, is dit het
-                        antwoord, en dan wil je niet twee regels lezen. */}
-                    {p.tableNo !== null && p.seatNo !== null && (
-                      <span className="tnum rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-[var(--brand)] ring-1 ring-[color-mix(in_oklab,var(--brand)_35%,transparent)]">
-                        T{p.tableNo}·{p.seatNo}
-                      </span>
-                    )}
-                    {p.reentriesUsed + p.rebuysUsed > 0 && (
-                      <span className="text-xs text-[var(--text-faint)]">
-                        {p.reentriesUsed + p.rebuysUsed}× {t('players.rebuy')}
-                      </span>
-                    )}
-                    {p.bountiesWon > 0 && (
-                      <span className="text-xs text-[var(--brand)]">
-                        {p.bountiesWon} {t('players.knockouts')}
-                      </span>
-                    )}
+            <li key={p.id} className="flex items-center gap-2 px-2.5 py-1.5">
+              <button
+                type="button"
+                disabled={busy || finished}
+                onClick={() => setSheetId(p.id)}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left disabled:cursor-default"
+              >
+                {/* Waar hij zit, vóór de naam. Vraagt iemand waar hij moet
+                    zitten, dan is dit het antwoord, en het staat in dezelfde
+                    kolom bij iedereen zodat je het kan aflezen zonder lezen. */}
+                <span className="tnum w-11 shrink-0 text-[0.65rem] font-medium text-[var(--brand)]">
+                  {p.tableNo !== null && p.seatNo !== null ? `T${p.tableNo}·${p.seatNo}` : ''}
+                </span>
+                <span className="truncate text-sm font-medium">{p.name}</span>
+                {p.email === null && (
+                  <span
+                    title={t('players.noEmailBadge')}
+                    className="shrink-0 text-[0.7rem] text-[var(--warn)]"
+                  >
+                    ✉
                   </span>
-                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-[var(--text-faint)]">
-                    {p.email && <span className="truncate">{p.email}</span>}
-                    <Herkomst door={p.chipCountBy} wanneer={p.chipCountAt} nu={nu} t={t} />
-                  </span>
-                </button>
-
-                <ChipInput
-                  value={p.chipCount ?? 0}
-                  disabled={busy || finished}
-                  label={t('players.chips')}
-                  onCommit={(v) => void setChips(p.id, v)}
-                />
-
-                {/* Eén knop, en alles zit erin. Vroeger stonden hier "Geld"
-                    en "Uitschakelen" naast elkaar en klapte er een derde rij
-                    onder de speler open; dat las op een laptop en niet in een
-                    zaal. Het paneel komt van onderen op, binnen duimbereik,
-                    en de hele rij is aanklikbaar — op een telefoon mik je op
-                    de naam en niet op een knopje van twaalf pixels. */}
-                {!finished && (
-                  <Small onClick={() => setSheetId(p.id)} active={sheetId === p.id} disabled={busy}>
-                    {t('players.actions')}
-                  </Small>
                 )}
-              </div>
+                {p.reentriesUsed + p.rebuysUsed > 0 && (
+                  <span className="tnum shrink-0 text-[0.7rem] text-[var(--text-faint)]">
+                    {p.reentriesUsed + p.rebuysUsed}×
+                  </span>
+                )}
+                {p.bountiesWon > 0 && (
+                  <span className="tnum shrink-0 text-[0.7rem] text-[var(--brand)]">
+                    {p.bountiesWon} KO
+                  </span>
+                )}
+              </button>
+
+              <ChipInput
+                value={p.chipCount ?? 0}
+                disabled={busy || finished}
+                label={t('players.chips')}
+                onCommit={(v) => void setChips(p.id, v)}
+              />
+
+              {!finished && (
+                <Small onClick={() => setSheetId(p.id)} active={sheetId === p.id} disabled={busy}
+                  label={t('players.actions')}>
+                  <span className="hidden sm:inline">{t('players.actions')}</span>
+                  <span className="sm:hidden" aria-hidden>⋯</span>
+                </Small>
+              )}
             </li>
           ))}
 
           {/* ------------------------------------------------- uitgeschakeld */}
           {visibleOut.length > 0 && (
-            <li className="bg-[var(--surface-2)] px-3 py-1.5 text-xs uppercase tracking-widest text-[var(--text-faint)]">
+            <li className="bg-[var(--surface-2)] px-2.5 py-1 text-[0.65rem] uppercase tracking-widest text-[var(--text-faint)]">
               {t('players.eliminated')}
             </li>
           )}
           {visibleOut.map((p) => (
-            <li key={p.id} className="px-3 py-2.5 text-[var(--text-muted)]">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                {/* Plaats en naam horen bij elkaar en blijven samen op één
-                    regel; de knoppen zakken eronder zodra ze er niet meer
-                    naast passen. */}
-                <button
-                  type="button"
-                  disabled={busy || finished}
-                  onClick={() => setSheetId(p.id)}
-                  className="flex min-w-0 flex-1 basis-full items-center gap-3 rounded-lg text-left sm:basis-0 disabled:cursor-default"
-                >
-                  <span className="tnum w-8 shrink-0 text-right font-semibold text-[var(--text-faint)]">
-                    {p.finishPosition ?? '—'}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate line-through decoration-[var(--line-strong)]">
-                      {p.name}
-                    </span>
-                    {p.email && (
-                      <span className="block truncate text-xs text-[var(--text-faint)]">
-                        {p.email}
-                      </span>
-                    )}
-                  </span>
-                </button>
-                {!finished && (
-                  <Small onClick={() => setSheetId(p.id)} active={sheetId === p.id} disabled={busy}>
-                    {t('players.actions')}
-                  </Small>
-                )}
-              </div>
+            <li key={p.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[var(--text-muted)]">
+              <button
+                type="button"
+                disabled={busy || finished}
+                onClick={() => setSheetId(p.id)}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left disabled:cursor-default"
+              >
+                <span className="tnum w-11 shrink-0 text-right text-[0.7rem] font-semibold text-[var(--text-faint)]">
+                  {p.finishPosition ?? '—'}
+                </span>
+                <span className="truncate text-sm line-through decoration-[var(--line-strong)]">
+                  {p.name}
+                </span>
+              </button>
+              {!finished && (
+                <Small onClick={() => setSheetId(p.id)} active={sheetId === p.id} disabled={busy}
+                  label={t('players.actions')}>
+                  <span className="hidden sm:inline">{t('players.actions')}</span>
+                  <span className="sm:hidden" aria-hidden>⋯</span>
+                </Small>
+              )}
             </li>
           ))}
         </ul>
-      )}
-
-      {hiddenCount > 0 && (
+      ))}
+      {lijstOpen && hiddenCount > 0 && (
         <button
           type="button"
           onClick={() => setFilter('')}
@@ -1172,44 +1162,11 @@ function NewPlayerForm({
  *
  * Bij elke toetsaanslag opslaan zou betekenen dat "20000" onderweg even
  * "2", "20", "200" is — en dat staat dan zo op het zaalscherm.
- */
-/**
- * Wie deze stapel intikte, en hoe lang geleden.
  *
- * Aan het einde van de avond is dat het verschil tussen een getal waarop je
- * een deal kan bouwen en een getal dat iemand twintig minuten geleden op zijn
- * gsm gokte. De databank houdt het allang bij; het stond alleen nergens.
- *
- * Alleen minuten, geen seconden en geen exacte tijdstippen: je wil weten of
- * het vers is, niet hoe vers precies.
+ * Wie de stapel zette en hoe lang geleden stond hier ooit naast. Dat is naar
+ * het spelerspaneel verhuisd: het is iets wat je over één speler wil weten,
+ * niet iets wat je over dertien regels heen leest.
  */
-function Herkomst({
-  door, wanneer, nu, t,
-}: {
-  door: string | null
-  wanneer: string | null
-  nu: Date
-  t: ReturnType<typeof useT>
-}) {
-  if (door === null || wanneer === null) {
-    return <span className="italic">{t('players.chipsNever')}</span>
-  }
-
-  const minuten = Math.max(0, Math.round((nu.getTime() - Date.parse(wanneer)) / 60_000))
-  const geleden = minuten < 1
-    ? t('players.chipsJustNow')
-    : minuten < 60
-      ? t('players.chipsMinutesAgo').replace('{n}', String(minuten))
-      : t('players.chipsHoursAgo').replace('{n}', String(Math.floor(minuten / 60)))
-
-  const speler = door === 'player'
-  return (
-    <span className={speler ? 'text-[var(--warn)]' : ''}>
-      {speler ? t('players.chipsByPlayer') : t('players.chipsByFloor')} · {geleden}
-    </span>
-  )
-}
-
 function ChipInput({
   value, disabled, label, onCommit,
 }: {
@@ -1236,7 +1193,7 @@ function ChipInput({
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-      className="tnum w-24 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-right text-sm outline-none focus:border-[var(--brand)] disabled:opacity-45"
+      className="tnum w-[4.5rem] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1.5 text-right text-sm outline-none focus:border-[var(--brand)] disabled:opacity-45 sm:w-24 sm:px-2.5"
     />
   )
 }
@@ -1257,19 +1214,22 @@ function Primary({
 }
 
 function Small({
-  children, onClick, disabled, danger, active,
+  children, onClick, disabled, danger, active, label,
 }: {
   children: React.ReactNode
   onClick?: () => void
   disabled?: boolean
   danger?: boolean
   active?: boolean
+  /** Voor een knop die op een smal scherm alleen een teken toont. */
+  label?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      {...(label ? { 'aria-label': label, title: label } : {})}
       className={`rounded-lg px-2.5 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
           ? 'border border-[color-mix(in_oklab,var(--danger)_45%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_12%,transparent)]'

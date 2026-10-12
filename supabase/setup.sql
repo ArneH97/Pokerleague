@@ -15921,12 +15921,23 @@ end $$;
 -- met de hand chips bijtikken, wat de boekhouding van "chips in spel" stilletjes
 -- laat scheeflopen.
 --
--- Vandaar een schakelaar, in beide richtingen. Hij boekt de bonus op dezelfde
--- drie plaatsen als de trigger: de stapel van de speler, het aantal chips dat
--- zijn inkoop op tafel legde, en een teller die zegt hoeveel bonus hij
--- werkelijk kreeg. Die laatste is nieuw en is de kern: zonder vastlegging wéét
--- je achteraf niet of de bonus er al in zit, en dan geeft twee keer drukken
--- twee keer chips.
+-- Vandaar een knop die hem toekent. Hij boekt de bonus op dezelfde drie
+-- plaatsen als de trigger: de stapel van de speler, het aantal chips dat zijn
+-- inkoop op tafel legde, en een teller die zegt hoeveel bonus hij werkelijk
+-- kreeg. Die laatste is nieuw en is de kern: zonder vastlegging wéét je
+-- achteraf niet of de bonus er al in zit, en dan geeft twee keer drukken twee
+-- keer chips.
+--
+-- **In één richting, en alleen bij de eerste inkoop.** Weghalen kan niet. Een
+-- bonus is geen schakelaar maar een gegeven feit: de chips liggen op tafel,
+-- er is al mee gespeeld, en ze er een half uur later weer afnemen laat de
+-- stapel van die man niet meer kloppen met wat er voor hem ligt. Verkeerd
+-- toegekend? Dan is de uitweg dezelfde als bij elke andere misser aan de
+-- kassa: de inschrijving intrekken en opnieuw doen.
+--
+-- En de bonus hoort bij de eerste inkoop. Wie al een rebuy of een addon
+-- gekocht heeft, krijgt hem niet meer — tegen die tijd is "hij begon met
+-- 45.000" geen waarheid meer die je nog kan boeken.
 --
 -- **2. Een inschrijving intrekken kon geld van iemand anders afpakken.**
 -- `floor_remove_entry` haalt een deelname helemaal weg; dat is de knop voor de
@@ -15951,7 +15962,7 @@ alter table tournament_players
   add column if not exists prereg_bonus int not null default 0;
 
 comment on column public.tournament_players.prereg_bonus is
-  'Hoeveel bonuschips deze deelname kreeg voor een voorinschrijving. Gezet door de trigger bij het inschrijven, of door floor_set_prereg_bonus. 0 = geen bonus gekregen.';
+  'Hoeveel bonuschips deze deelname kreeg voor een voorinschrijving. Gezet door de trigger bij het inschrijven, of door floor_grant_prereg_bonus. 0 = geen bonus gekregen.';
 
 -- ---------------------------------------------------------------------------
 -- 2. De trigger legt vast wat hij gaf
@@ -16010,11 +16021,17 @@ where t.id = tp.tournament_id
   );
 
 -- ---------------------------------------------------------------------------
--- 3. De schakelaar
+-- 3. De knop
 -- ---------------------------------------------------------------------------
+-- Een eerdere versie van dit bestand had een schakelaar met twee richtingen.
+-- Die gaat eruit. Staat ze al in een databank omdat deze migratie eerder
+-- gedraaid is, dan ruimt deze regel haar op — opnieuw draaien mag dus.
+
+drop function if exists public.floor_set_prereg_bonus(uuid, boolean);
+
 
 /**
- * De voorinschrijfbonus aan- of uitzetten voor één deelname.
+ * De voorinschrijfbonus toekennen aan één deelname.
  *
  * Drie plaatsen, in deze volgorde, en alle drie zijn nodig:
  *
@@ -16024,13 +16041,16 @@ where t.id = tp.tournament_id
  *     stapel op het zaalscherm achter op de werkelijkheid;
  *   * `prereg_bonus` — zodat twee keer drukken niet twee keer chips geeft.
  *
- * Weigert op een afgelopen avond, op een speler die er al uit ligt, en op een
- * avond zonder bonus. Dat laatste is geen formaliteit: nul chips bijtellen en
- * "gedaan" antwoorden zou de floor laten denken dat er iets gebeurd is.
+ * Weigert op een afgelopen avond, op een speler die er al uit ligt, op een
+ * avond zonder bonus, en zodra er een tweede inkoop op zijn naam staat. Dat
+ * laatste is de regel "enkel bij de eerste buy-in": daarna verandert de bonus
+ * niets meer aan hoe die man begonnen is, en boek je alleen nog losse chips in
+ * het spel.
+ *
+ * Er is met opzet geen weg terug. Zie de kop van dit bestand.
  */
-create or replace function public.floor_set_prereg_bonus(
-  p_tournament_player_id uuid,
-  p_on                   boolean
+create or replace function public.floor_grant_prereg_bonus(
+  p_tournament_player_id uuid
 )
 returns int
 language plpgsql
@@ -16041,7 +16061,7 @@ declare
   tp      tournament_players%rowtype;
   t       tournaments%rowtype;
   v_buyin uuid;
-  v_delta int;
+  v_extra int;
 begin
   select * into tp from tournament_players where id = p_tournament_player_id;
   if not found then
@@ -16070,19 +16090,23 @@ begin
   end if;
 
   -- Al goed? Dan is er niets te doen, en dat is geen fout. Twee toestellen die
-  -- tegelijk op hetzelfde vinkje drukken horen niet in een melding te eindigen.
-  if p_on and tp.prereg_bonus > 0 then
+  -- tegelijk op dezelfde knop drukken horen niet in een melding te eindigen.
+  if tp.prereg_bonus > 0 then
     return tp.prereg_bonus;
   end if;
-  if not p_on and tp.prereg_bonus = 0 then
-    return 0;
+
+  -- Enkel bij de eerste inkoop.
+  select count(*) into v_extra
+  from buyins
+  where tournament_player_id = tp.id
+    and not is_void
+    and kind <> 'buyin';
+
+  if v_extra > 0 then
+    raise exception 'Deze speler kocht al opnieuw in. De early bird hoort bij zijn eerste inkoop.'
+      using errcode = 'check_violation';
   end if;
 
-  v_delta := case when p_on then t.prereg_bonus_stack else -tp.prereg_bonus end;
-
-  -- De eerste inkoop van deze deelname. `order by` en niet `limit 1` op goed
-  -- geluk: bij een re-entry staan er meerdere, en de bonus hoort bij de
-  -- eerste.
   select b.id into v_buyin
   from buyins b
   where b.tournament_player_id = tp.id
@@ -16092,22 +16116,22 @@ begin
   limit 1;
 
   update tournament_players
-  set chip_count   = greatest(0, coalesce(chip_count, t.starting_stack) + v_delta),
-      prereg_bonus = case when p_on then t.prereg_bonus_stack else 0 end
+  set chip_count   = coalesce(chip_count, t.starting_stack) + t.prereg_bonus_stack,
+      prereg_bonus = t.prereg_bonus_stack
   where id = tp.id;
 
   if v_buyin is not null then
     update buyins
-    set chips_delta = greatest(0, coalesce(chips_delta, 0) + v_delta)
+    set chips_delta = coalesce(chips_delta, 0) + t.prereg_bonus_stack
     where id = v_buyin;
   end if;
 
-  return case when p_on then t.prereg_bonus_stack else 0 end;
+  return t.prereg_bonus_stack;
 end;
 $$;
 
-comment on function public.floor_set_prereg_bonus(uuid, boolean) is
-  'Zet de bonus voor voorinschrijven aan of uit voor één deelname. Boekt de chips op de stapel én op de inkoop, zodat "chips in spel" blijft kloppen. Geeft terug hoeveel bonus de speler nu heeft.';
+comment on function public.floor_grant_prereg_bonus(uuid) is
+  'Kent de bonus voor voorinschrijven toe aan één deelname. Boekt de chips op de stapel én op de inkoop, zodat "chips in spel" blijft kloppen. Alleen bij de eerste inkoop, en onomkeerbaar. Geeft terug hoeveel bonus de speler nu heeft.';
 
 -- ---------------------------------------------------------------------------
 -- 4. Een deelname weghalen mag geen bounty van iemand anders opeten
@@ -16220,8 +16244,8 @@ comment on function public.floor_remove_entry(uuid) is
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
-    revoke all on function public.floor_set_prereg_bonus(uuid, boolean) from public;
-    grant execute on function public.floor_set_prereg_bonus(uuid, boolean)
+    revoke all on function public.floor_grant_prereg_bonus(uuid) from public;
+    grant execute on function public.floor_grant_prereg_bonus(uuid)
       to authenticated, service_role;
   end if;
 end $$;

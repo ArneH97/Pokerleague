@@ -40,6 +40,12 @@ export interface SheetPlayer {
   bountiesWon: number
   /** Hoeveel bonuschips hij kreeg voor een voorinschrijving. 0 = geen. */
   preregBonus: number
+  /** Zijn mailadres, of null als hij er geen gaf. */
+  email?: string | null
+  /** Wie zijn stapel het laatst zette: 'floor', 'player', of niemand. */
+  chipCountBy?: string | null
+  /** Wanneer dat gebeurde. */
+  chipCountAt?: string | null
 }
 
 /**
@@ -177,11 +183,16 @@ export function PlayerSheet({
         role="dialog"
         aria-modal="true"
         aria-label={player.name}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border-t border-[var(--line-strong)] bg-[var(--surface)] px-4 pb-safe pt-2 shadow-[0_-18px_40px_-12px_#000]"
+        /* Op een telefoon een blad dat van onderen opkomt; op een scherm met
+           een muis een venster in het midden. Dat is geen smaak: een blad
+           onderaan een breed scherm laat je met je ogen naar beneden springen
+           terwijl je cursor bovenin staat, en het ziet eruit als een telefoon
+           die per ongeluk in een laptop zit. Dezelfde knoppen, andere plaats. */
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--line-strong)] border-b-0 bg-[var(--surface)] px-4 pb-safe pt-2 shadow-[0_-18px_40px_-12px_#000] sm:bottom-auto sm:top-1/2 sm:max-h-[86dvh] sm:-translate-y-1/2 sm:rounded-2xl sm:border-b sm:pb-4 sm:shadow-[0_24px_60px_-20px_#000]"
       >
         {/* Het greepje. Het sleept niets — het zegt dat dit ding van onderen
             komt en dat je het naar beneden mag denken. */}
-        <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--line-strong)]" />
+        <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--line-strong)] sm:hidden sm:mb-0" />
 
         <div className="flex items-baseline gap-2.5">
           <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">{player.name}</h2>
@@ -189,7 +200,25 @@ export function PlayerSheet({
             {plek}
           </span>
         </div>
-        <p className="mb-3 mt-0.5 min-h-[1.1rem] text-xs text-[var(--text-faint)]">{onder}</p>
+        <p className="mt-0.5 min-h-[1.1rem] text-xs text-[var(--text-faint)]">{onder}</p>
+        {/* Het mailadres en de herkomst van de stapel stonden in de lijst en
+            maakten elke rij twee regels hoog. Ze horen hier: je kijkt ernaar
+            als je met déze speler bezig bent, niet terwijl je de lijst
+            afscant. */}
+        <p className="mb-3 flex flex-wrap items-center gap-x-2 text-xs text-[var(--text-faint)]">
+          {player.email
+            ? <span className="truncate">{player.email}</span>
+            : <span className="text-[var(--warn)]">{t('players.noEmailBadge')}</span>}
+          {player.chipCountAt && (
+            <span className={player.chipCountBy === 'player' ? 'text-[var(--warn)]' : ''}>
+              {player.chipCountBy === 'player'
+                ? t('players.chipsByPlayer')
+                : t('players.chipsByFloor')}
+              {' · '}
+              {geleden(player.chipCountAt, t)}
+            </span>
+          )}
+        </p>
 
         {fout && (
           <p className="mb-3 rounded-lg border border-[color-mix(in_oklab,var(--danger)_35%,transparent)] bg-[color-mix(in_oklab,var(--danger)_10%,transparent)] p-2.5 text-sm text-[var(--danger)]">
@@ -282,26 +311,30 @@ export function PlayerSheet({
               />
 
               {/* ------------------------------------------------ early bird
-                  Altijd binnen bereik en niet alleen bij het inschrijven. Wie
-                  vooraf mailde dat hij komt, wie vorige week al op de lijst
-                  stond, wie het aan de toog zei: dat zijn allemaal mensen die
-                  de bonus horen te krijgen, en dat weet je soms pas als hij
-                  al zit. De knop boekt de chips ook op de inkoop, zodat de
-                  gemiddelde stapel in de zaal blijft kloppen. */}
-              {!uit && ctx.preregBonusStack > 0 && (
+                  Binnen bereik en niet alleen bij het inschrijven. Wie vooraf
+                  mailde dat hij komt, wie vorige week al op de lijst stond,
+                  wie het aan de toog zei: dat zijn allemaal mensen die de
+                  bonus horen te krijgen, en soms weet je dat pas als hij al
+                  zit. De knop boekt de chips ook op de inkoop, zodat de
+                  gemiddelde stapel in de zaal blijft kloppen.
+
+                  Eén richting, en hij verdwijnt zodra hij gegeven is. Chips
+                  die al op tafel liggen en waarmee gespeeld is, neem je niet
+                  meer terug; en de bonus hoort bij de eerste inkoop, dus na
+                  een rebuy weigert de databank hem sowieso. Verkeerd gedaan?
+                  Dan is het de inschrijving intrekken en opnieuw. */}
+              {!uit && ctx.preregBonusStack > 0 && player.preregBonus === 0
+                && inkopen === 0 && (
                 <Actie
                   breed
                   disabled={busy}
-                  onClick={() => void run(() => supabase.rpc('floor_set_prereg_bonus', {
+                  onClick={() => void run(() => supabase.rpc('floor_grant_prereg_bonus', {
                     p_tournament_player_id: player.id,
-                    p_on: player.preregBonus === 0,
                   }), false)}
-                  label={player.preregBonus > 0 ? t('sheet.earlyOff') : t('sheet.earlyOn')}
-                  sub={player.preregBonus > 0
-                    ? t('sheet.earlyOffSub').replace('{n}', player.preregBonus.toLocaleString('nl-BE'))
-                    : t('sheet.earlyOnSub')
-                        .replace('{n}', ctx.preregBonusStack.toLocaleString('nl-BE'))
-                        .replace('{totaal}', (ctx.startingStack + ctx.preregBonusStack).toLocaleString('nl-BE'))}
+                  label={t('sheet.earlyOn')}
+                  sub={t('sheet.earlyOnSub')
+                    .replace('{n}', ctx.preregBonusStack.toLocaleString('nl-BE'))
+                    .replace('{totaal}', (ctx.startingStack + ctx.preregBonusStack).toLocaleString('nl-BE'))}
                 />
               )}
 
@@ -403,6 +436,17 @@ export function PlayerSheet({
       </div>
     </>
   )
+}
+
+/**
+ * "9 min geleden". Alleen de orde van grootte: je wil weten of een stapel vers
+ * is, niet hoe vers precies.
+ */
+function geleden(wanneer: string, t: ReturnType<typeof useT>): string {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(wanneer)) / 60_000))
+  if (m < 1) return t('players.chipsJustNow')
+  if (m < 60) return t('players.chipsMinutesAgo').replace('{n}', String(m))
+  return t('players.chipsHoursAgo').replace('{n}', String(Math.floor(m / 60)))
 }
 
 /**

@@ -49,8 +49,8 @@ begin
   perform set_config('request.jwt.claim.sub', v_baas::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
-  assert public.floor_set_prereg_bonus(v_tp, true) = 5000,
-    'de schakelaar hoort de gegeven bonus terug te geven';
+  assert public.floor_grant_prereg_bonus(v_tp) = 5000,
+    'de knop hoort de gegeven bonus terug te geven';
 
   select chip_count, prereg_bonus into v_chips, v_bonus
   from tournament_players where id = v_tp;
@@ -62,21 +62,18 @@ begin
 
   -- Twee keer drukken mag niet twee keer geven. Dit is de hele reden dat er
   -- een kolom bij moest.
-  perform public.floor_set_prereg_bonus(v_tp, true);
+  perform public.floor_grant_prereg_bonus(v_tp);
   select chip_count into v_chips from tournament_players where id = v_tp;
-  assert v_chips = 45000, format('twee keer aanzetten gaf %s in plaats van 45000', v_chips);
-  assert public.chips_in_play(v_t) = 45000, 'twee keer aanzetten telde dubbel in chips in spel';
-  raise notice 'OK  twee keer aanzetten geeft niet twee keer chips';
+  assert v_chips = 45000, format('twee keer drukken gaf %s in plaats van 45000', v_chips);
+  assert public.chips_in_play(v_t) = 45000, 'twee keer drukken telde dubbel in chips in spel';
+  raise notice 'OK  twee keer drukken geeft niet twee keer chips';
 
-  -- En terug uit, voor wie het per ongeluk aanvinkte.
-  assert public.floor_set_prereg_bonus(v_tp, false) = 0,
-    'uitzetten hoort 0 terug te geven';
-  select chip_count, prereg_bonus into v_chips, v_bonus
-  from tournament_players where id = v_tp;
-  assert v_chips = 40000, format('na het uitzetten hoort 40000, kreeg %s', v_chips);
-  assert v_bonus = 0, format('na het uitzetten hoort bonus 0, stond %s', v_bonus);
-  assert public.chips_in_play(v_t) = 40000, 'chips in spel zakte niet mee bij het uitzetten';
-  raise notice 'OK  de bonus gaat er ook weer af, op alle drie de plaatsen';
+  -- Er is geen weg terug, en dat hoort ook zo te blijven: de oude schakelaar
+  -- met twee richtingen mag niet meer bestaan.
+  assert not exists (
+    select 1 from pg_proc where proname = 'floor_set_prereg_bonus'
+  ), 'de schakelaar met twee richtingen staat er nog';
+  raise notice 'OK  de bonus kan niet meer weggehaald worden';
 
   -- Wie vooraf inschreef krijgt hem van de trigger, en de schakelaar weet dat.
   insert into players (display_name, email, link_state)
@@ -93,11 +90,11 @@ begin
   assert v_bonus = 5000, format('de trigger hoort de bonus vast te leggen, stond %s', v_bonus);
   raise notice 'OK  de trigger legt vast wat hij geeft';
 
-  perform public.floor_set_prereg_bonus(v_tp2, true);
+  perform public.floor_grant_prereg_bonus(v_tp2);
   select chip_count into v_chips from tournament_players where id = v_tp2;
   assert v_chips = 45000,
-    format('de schakelaar gaf een voorinschrijver nog eens chips: %s', v_chips);
-  raise notice 'OK  de schakelaar telt niet bovenop wat de trigger al gaf';
+    format('de knop gaf een voorinschrijver nog eens chips: %s', v_chips);
+  raise notice 'OK  de knop telt niet bovenop wat de trigger al gaf';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -108,8 +105,7 @@ do $$
 declare
   v_club uuid; v_t uuid; v_tz uuid;
   v_baas uuid := gen_random_uuid();
-  v_tp uuid; v_tp_zonder uuid;
-  v_fout text;
+  v_tp uuid; v_tp_zonder uuid; v_tp_rebuy uuid; v_tp_addon uuid;
 begin
   -- Vorig blok liet zijn aanmelding in de transactie staan; die hoort hier
   -- niet te gelden. Leeg betekent servercontext, zoals een migratie.
@@ -146,20 +142,42 @@ begin
 
   -- Een avond zonder bonus hoort het te zeggen in plaats van niets te doen.
   begin
-    perform public.floor_set_prereg_bonus(v_tp_zonder, true);
-    assert false, 'een avond zonder bonus liet de schakelaar toch toe';
+    perform public.floor_grant_prereg_bonus(v_tp_zonder);
+    assert false, 'een avond zonder bonus liet de knop toch toe';
   exception when check_violation then
-    raise notice 'OK  een avond zonder bonus weigert de schakelaar';
+    raise notice 'OK  een avond zonder bonus weigert de knop';
   end;
 
   -- Iemand die eruit ligt: zijn chips tellen niet meer mee, dus chips bijgeven
   -- zou alleen het totaal vervuilen.
   perform public.floor_eliminate(v_tp, null);
   begin
-    perform public.floor_set_prereg_bonus(v_tp, true);
+    perform public.floor_grant_prereg_bonus(v_tp);
     assert false, 'een uitgeschakelde speler kreeg toch bonuschips';
   exception when check_violation then
     raise notice 'OK  een uitgeschakelde speler krijgt geen bonus meer';
+  end;
+
+  -- Enkel bij de eerste inkoop: wie al opnieuw inkocht is te laat.
+  v_tp_rebuy := public.floor_add_entry(v_t, null, 'Al Ingekocht',
+                                 format('ebn3-%s@test.be', substr(gen_random_uuid()::text, 1, 8)));
+  perform public.floor_rebuy(v_tp_rebuy, 'rebuy');
+  begin
+    perform public.floor_grant_prereg_bonus(v_tp_rebuy);
+    assert false, 'een speler met een rebuy kreeg de early bird alsnog';
+  exception when check_violation then
+    raise notice 'OK  na een tweede inkoop kan de early bird niet meer';
+  end;
+
+  -- En een addon telt net zo goed als tweede inkoop.
+  v_tp_addon := public.floor_add_entry(v_t, null, 'Addon Gekocht',
+                                 format('ebn4-%s@test.be', substr(gen_random_uuid()::text, 1, 8)));
+  perform public.floor_rebuy(v_tp_addon, 'addon');
+  begin
+    perform public.floor_grant_prereg_bonus(v_tp_addon);
+    assert false, 'een speler met een addon kreeg de early bird alsnog';
+  exception when check_violation then
+    raise notice 'OK  een addon sluit de early bird ook uit';
   end;
 end $$;
 
