@@ -78,6 +78,7 @@ export function DealPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [exAequo, setExAequo] = useState<boolean | null>(null)
 
   const load = useCallback(async () => {
     const [ladder, open] = await Promise.all([
@@ -126,6 +127,21 @@ export function DealPanel({
   // één stapel verkeerd is, schuift het geld, en dan is de waarschuwing
   // precies wat je nodig hebt: ga kijken, en beslis zelf of je het zo laat.
   const canProceed = totalCounted > 0
+
+  // Samen eerste worden.
+  //
+  // Krijgt iedereen in de deal hetzelfde bedrag, dan is er geen eerste en
+  // geen tweede: ze zijn samen eerste, en dat hoort ook zo in het klassement
+  // te staan. Een ICM-deal verdeelt ongelijk omdat de stapels ongelijk zijn,
+  // en dan is de volgorde wél gespeeld — vandaar dat het vinkje de
+  // gelijkheid van de bedragen volgt en niet altijd aanstaat.
+  //
+  // De floor kan het overrulen: er zijn tafels die om acht uur 's avonds
+  // iets afspreken dat geen formule kent.
+  const bedragen = seats.map((x) => amounts[x.id] ?? 0)
+  const gelijkeBedragen = bedragen.length >= 2
+    && bedragen.every((b) => b > 0 && b === bedragen[0])
+  const samenEerste = exAequo ?? gelijkeBedragen
 
   const result = useMemo(
     () => computeDeal(seats.map((s) => ({ ...s, chips: counts[s.id] ?? 0 })), remaining),
@@ -275,7 +291,10 @@ export function DealPanel({
     setBusy(true)
     // Eerst de gekozen bedragen vastleggen, dan pas afsluiten.
     if (!(await saveDeal())) { setBusy(false); return }
-    const { error: err } = await supabase.rpc('deal_accept', { p_tournament_id: tournamentId })
+    const { error: err } = await supabase.rpc('deal_accept', {
+      p_tournament_id: tournamentId,
+      p_ex_aequo: samenEerste,
+    })
     if (err) { setError(dbMessage(err, t)); setBusy(false); return }
     setBusy(false)
     onClose()
@@ -634,6 +653,21 @@ export function DealPanel({
               ● {t('deal.custom')} — {seats.map((s) => formatMoney(amounts[s.id] ?? 0, currency)).join(' · ')}
             </p>
           )}
+
+          <label className="mt-4 flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={samenEerste}
+              onChange={(e) => setExAequo(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0"
+            />
+            <span className="text-sm">
+              {t('deal.exAequo').replace('{n}', String(seats.length))}
+              <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                {samenEerste ? t('deal.exAequoOn') : t('deal.exAequoOff')}
+              </span>
+            </span>
+          </label>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button

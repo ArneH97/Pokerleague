@@ -645,6 +645,10 @@ const nl = {
   'deal.whichHint':
     'Er staan meerdere voorstellen op het zaalscherm. Kies welke er uitbetaald wordt; dat bedrag komt in de uitslag.',
   'deal.confirmAgreed': 'Afsluiten op',
+  'deal.exAequo': 'Deze {n} spelers eindigen samen eerste',
+  'deal.exAequoOn': 'Ze krijgen dezelfde plaats en delen de punten van de plaatsen die ze samen bezetten.',
+  'deal.exAequoOff': 'De volgorde wordt bepaald door de fichestapels, zoals bij een gewone afsluiting.',
+  'bd.shared': 'gedeelde {van}e tot {tot}e plaats',
   'deal.total': 'Totaal',
   'deal.mismatch': 'De bedragen tellen niet op tot wat er te verdelen valt.',
   'deal.difference': 'Verschil',
@@ -1891,6 +1895,10 @@ const fr: Record<Key, string> = {
   'deal.whichHint':
     'Plusieurs propositions sont à l’écran. Choisissez celle qui sera payée ; ce montant figurera dans le classement.',
   'deal.confirmAgreed': 'Clôturer sur',
+  'deal.exAequo': 'Ces {n} joueurs terminent premiers ex aequo',
+  'deal.exAequoOn': 'Ils reçoivent la même place et se partagent les points des places qu’ils occupent ensemble.',
+  'deal.exAequoOff': 'L’ordre suit les tapis, comme lors d’une clôture normale.',
+  'bd.shared': '{van}e à {tot}e place partagée',
   'deal.total': 'Total',
   'deal.mismatch': 'Les montants ne correspondent pas à ce qu’il y a à partager.',
   'deal.difference': 'Écart',
@@ -3129,6 +3137,10 @@ const en: Record<Key, string> = {
   'deal.whichHint':
     'More than one proposal is on the hall screen. Pick the one being paid out; that is the amount that goes into the result.',
   'deal.confirmAgreed': 'Finish on',
+  'deal.exAequo': 'These {n} players finish joint first',
+  'deal.exAequoOn': 'They get the same place and share the points for the places they occupy together.',
+  'deal.exAequoOff': 'The order follows the chip stacks, as in a normal finish.',
+  'bd.shared': 'shared {van}th to {tot}th place',
   'deal.total': 'Total',
   'deal.mismatch': 'The amounts do not add up to what there is to share.',
   'deal.difference': 'Difference',

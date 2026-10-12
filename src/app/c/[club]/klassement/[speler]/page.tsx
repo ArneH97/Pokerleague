@@ -142,6 +142,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/klassement/
               // database staan, niet opnieuw uitgerekend. Zo telt ze altijd
               // op tot wat er rechts staat — ook bij een avond die met een
               // oudere telling is afgesloten.
+              const gedeeld = Math.max(Number(r.shared_with ?? 1), 1)
               const koPunten = rules ? r.knockouts * rules.bonus_per_ko : 0
               const deelname = rules ? rules.bonus_entry : 0
               const resultaat = Math.round(Number(r.points)) - deelname - koPunten
@@ -167,6 +168,7 @@ export default async function Page_({ params }: PageProps<'/c/[club]/klassement/
                         }`}
                       >
                         {r.place}
+                        {gedeeld > 1 && <span className="text-[0.6rem]">=</span>}
                       </span>
 
                       <span className="min-w-0 flex-1">
@@ -208,9 +210,17 @@ export default async function Page_({ params }: PageProps<'/c/[club]/klassement/
                         <dt className="text-[var(--text-muted)]">
                           {t('bd.result')}
                           <span className="ml-1.5 text-[var(--text-faint)]">
-                            {t('bd.resultWhy')
-                              .replace('{p}', String(r.place))
-                              .replace('{n}', String(r.entries))}
+                            {/* Een gedeelde plaats hoort erbij te staan.
+                                Anders staan er drie keer 34 punten bij een
+                                eerste plaats waar 48 hoort, en klopt de
+                                uitleg niet met het getal ernaast. */}
+                            {gedeeld > 1
+                              ? t('bd.shared')
+                                .replace('{van}', String(r.place))
+                                .replace('{tot}', String(r.place + gedeeld - 1))
+                              : t('bd.resultWhy')
+                                .replace('{p}', String(r.place))
+                                .replace('{n}', String(r.entries))}
                             {weging && (
                               <>
                                 {' · '}

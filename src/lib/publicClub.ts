@@ -200,6 +200,8 @@ export interface PlayerSeasonRow {
   tournament: string
   played_on: string
   place: number
+  /** Met hoeveel spelers die plaats gedeeld werd. 1 is een gewone plaats. */
+  shared_with: number
   entries: number
   knockouts: number
   /** Wat er die avond per inkoop op het spel stond: pot plus bounty. */
