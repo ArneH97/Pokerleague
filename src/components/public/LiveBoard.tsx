@@ -158,10 +158,14 @@ export function LiveBoard({
           label={t('clock.prizePool')}
           value={formatMoney(clock.prize_pool_cents, clock.currency)}
         />
+        {/* Het aantal big blinds staat hier even groot als het aantal
+            fiches. Wie op zijn telefoon de stand volgt, rekent niet zelf
+            38.500 om naar "zesentwintig blinds" — dat is nu net het getal
+            waar het om gaat. */}
         <Tile
           label={t('clock.avgStack')}
           value={avg.toLocaleString('nl-BE')}
-          sub={bb > 0 ? `${Math.round(avg / bb)} bb` : undefined}
+          {...(bb > 0 ? { sterk: `${Math.round(avg / bb)} bb` } : {})}
         />
         <Tile label={t('pub.rebuys')} value={`${clock.rebuys}`} />
       </section>
@@ -227,11 +231,22 @@ export function LiveBoard({
   )
 }
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Tile({
+  label, value, sub, sterk,
+}: {
+  label: string
+  value: string
+  sub?: string
+  /** Een tweede getal dat even hard meetelt, in de accentkleur. */
+  sterk?: string
+}) {
   return (
     <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
       <p className="text-[0.65rem] uppercase tracking-[0.18em] text-[var(--text-faint)]">{label}</p>
       <p className="tnum mt-1 text-2xl font-semibold leading-tight">{value}</p>
+      {sterk && (
+        <p className="tnum text-lg font-semibold leading-tight text-[var(--brand)]">{sterk}</p>
+      )}
       {sub && <p className="text-xs text-[var(--text-faint)]">{sub}</p>}
     </div>
   )

@@ -45,6 +45,11 @@ const ZELFDE = new Set([
   // drie, en dan weet niemand meer waar het over gaat.
   'players.early',
   'sheet.earlyBadge',
+  // "Break" is aan elke tafel in België het woord voor de onderbreking in het
+  // schema, ook aan een Franstalige. En het moet verschillen van "pauzeren",
+  // want dat is de klok stilzetten — iets heel anders.
+  'struct.addBreak',
+  'struct.addBreakRow',
 ])
 
 test('elke taal kent elke sleutel', () => {

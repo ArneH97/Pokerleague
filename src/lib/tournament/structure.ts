@@ -57,7 +57,7 @@ export function generateLadder(hours: number, minutesPerLevel = 20): EditorLevel
       minutes: minutesPerLevel,
     }))
     if ((i + 1) % 4 === 0 && i + 1 < wanted) {
-      out.push(makeLevel({ isBreak: true, label: 'Pauze', minutes: 10 }))
+      out.push(makeLevel({ isBreak: true, label: 'Break', minutes: 10 }))
     }
     const n = nextBlinds(bb)
     sb = n.sb

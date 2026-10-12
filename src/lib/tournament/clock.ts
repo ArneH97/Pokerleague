@@ -411,7 +411,12 @@ export function breakLabel(label: string | null | undefined, fallback: string): 
 
 export function formatBlinds(level: BlindLevel | null): string {
   if (!level) return '—'
-  if (level.isBreak) return level.label ?? 'Pauze'
+  // Via breakLabel en niet via het ruwe label: een structuur die ooit in het
+  // Nederlands is gemaakt heeft "Pauze" opgeslagen staan, en dat woord botst
+  // aan de floor met de knop "Pauzeren" — dat is de klok stilzetten en niet
+  // de onderbreking in het schema. In de zaal heet dat ding een break, in
+  // alle drie de talen.
+  if (level.isBreak) return breakLabel(level.label, 'Break')
   const base = `${level.smallBlind.toLocaleString('nl-BE')} / ${level.bigBlind.toLocaleString('nl-BE')}`
   return level.ante > 0 ? `${base} (ante ${level.ante.toLocaleString('nl-BE')})` : base
 }

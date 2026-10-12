@@ -255,7 +255,9 @@ test('weergave', () => {
 
   assert.equal(formatBlinds(levels[0]), '25 / 50')
   assert.equal(formatBlinds(levels[3]), '100 / 200 (ante 25)')
-  assert.equal(formatBlinds(levels[2]), 'Pauze')
+  // Een opgeslagen "Pauze" hoort als break op het scherm te komen: in de
+  // zaal is "pauze" de stilgezette klok en "break" de onderbreking.
+  assert.equal(formatBlinds(levels[2]), 'Break')
   assert.equal(formatBlinds(null), '—')
 
   assert.equal(averageStack(210_000, 21), 10_000)

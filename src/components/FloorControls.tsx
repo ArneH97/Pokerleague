@@ -8,7 +8,7 @@ import { StructurePanel } from '@/components/StructurePanel'
 import type { SheetContext } from '@/components/PlayerSheet'
 import { createClient } from '@/lib/supabase/client'
 import {
-  resolveClock, levelsForClock, formatDuration, formatBlinds, breakLabel,
+  resolveClock, levelsForClock, formatDuration, formatBlinds, breakLabel, averageStack,
   start, pause, resume, nextLevel, prevLevel, adjustTime, normalise,
   type ClockState,
 } from '@/lib/tournament/clock'
@@ -187,6 +187,23 @@ export function FloorControls({
 
   // Het ijkpunt waartegen de floor zijn telling aan de finaletafel afzet.
   const expectedChips = expectedChipsInPlay(tournament, stats)
+
+  /**
+   * De gemiddelde stapel, in fiches én in big blinds.
+   *
+   * De vraag die de floor het vaakst krijgt is niet "hoeveel fiches" maar
+   * "hoe diep zitten we". 38.500 zegt pas iets als je weet dat de big blind
+   * op 1.500 staat; 26 bb zegt het meteen. Vandaar allebei, en het aantal
+   * blinds even groot als het aantal fiches in plaats van als voetnoot —
+   * anders staat het er wel, maar lees je het niet.
+   *
+   * Tijdens een break staat de big blind op nul. Dan is er geen verhouding om
+   * te tonen en blijft alleen het aantal fiches staan.
+   */
+  const avg = averageStack(expectedChips, stats.playersLeft)
+  const avgBb = resolved.level && resolved.level.bigBlind > 0
+    ? avg / resolved.level.bigBlind
+    : null
 
   // Hoeveel tafels er open horen te staan. Nog geen indeling — dat komt —
   // maar wél het getal waar je aan de deur naar kijkt terwijl de zaal
@@ -396,7 +413,7 @@ export function FloorControls({
         </p>
       )}
 
-      <section className="grid grid-cols-3 gap-3 text-center">
+      <section className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
         <Tile
           label={t('clock.playersLeft')}
           value={`${stats.playersLeft} / ${stats.entriesTotal}`}
@@ -405,6 +422,11 @@ export function FloorControls({
                   .replace('{n}', String(tafels))
                   .replace('{m}', String(tournament.seats_per_table)) }
             : {})}
+        />
+        <Tile
+          label={t('clock.avgStack')}
+          value={avg.toLocaleString('nl-BE')}
+          {...(avgBb !== null ? { sterk: `${formatBb(avgBb)} bb` } : {})}
         />
         <Tile label={t('floor.entries')} value={String(stats.entriesTotal)} />
         <Tile
@@ -544,11 +566,35 @@ function BalkKnop({
   )
 }
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/** Onder de tien big blinds is één cijfer na de komma zinvol, daarboven niet. */
+function formatBb(v: number): string {
+  if (!Number.isFinite(v) || v <= 0) return '0'
+  return v < 10 ? v.toFixed(1).replace('.', ',') : String(Math.round(v))
+}
+
+function Tile({
+  label, value, sub, sterk,
+}: {
+  label: string
+  value: string
+  sub?: string
+  /**
+   * Een tweede getal dat even hard meetelt als het eerste, in de accentkleur.
+   * Voor het aantal big blinds onder de gemiddelde stapel: dat is geen
+   * voetnoot bij het cijfer maar de vertaling ervan naar de taal waarin aan
+   * tafel gedacht wordt.
+   */
+  sterk?: string
+}) {
   return (
     <div className="rounded-xl border border-[var(--line)] p-4">
       <p className="text-xs uppercase tracking-widest text-[var(--text-faint)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {sterk && (
+        <p className="tnum mt-0.5 text-lg font-semibold leading-tight text-[var(--brand)]">
+          {sterk}
+        </p>
+      )}
       {sub && <p className="mt-0.5 text-xs text-[var(--text-faint)]">{sub}</p>}
     </div>
   )

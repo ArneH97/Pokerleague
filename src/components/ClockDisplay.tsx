@@ -480,10 +480,14 @@ export function ClockDisplay({ tournamentId }: { tournamentId: string }) {
           <Stat
             label={t('clock.avgStack')}
             value={avg.toLocaleString('nl-BE')}
-            // Het aantal big blinds zegt een speler meer dan het aantal chips:
-            // twintig bb is kort, honderd bb is diep. Bij een pauze staat de
-            // big blind op nul, dus dan tonen we niets.
-            sub={bigBlind > 0 ? `${formatBb(avg / bigBlind)} bb` : undefined}
+            // Het aantal big blinds zegt een speler meer dan het aantal
+            // chips: twintig bb is kort, honderd bb is diep. Het stond hier
+            // als voetnoot van anderhalve procent schermhoogte — op een tv
+            // aan de andere kant van de zaal las niemand dat. Nu even zwaar
+            // als het aantal chips, in de accentkleur. Bij een break staat de
+            // big blind op nul en valt het weg.
+            subStrong={bigBlind > 0 ? `${formatBb(avg / bigBlind)} bb` : undefined}
+            accent={accent}
           />
           {tillBreak !== null && (
             <Stat
@@ -781,11 +785,13 @@ function LevelPips({
  * "32.6…" is er geen.
  */
 function Stat({
-  label, value, sub, big, accent, highlight,
+  label, value, sub, subStrong, big, accent, highlight,
 }: {
   label: string
   value: string
   sub?: string
+  /** Een tweede getal dat even hard meetelt, in de accentkleur. */
+  subStrong?: string
   big?: boolean
   accent?: string
   /** Kleurt het vak op zonder het groter te maken. Voor iets dat even telt. */
@@ -812,6 +818,14 @@ function Stat({
       >
         {value}
       </p>
+      {subStrong && (
+        <p
+          className="tnum font-bold leading-tight"
+          style={{ fontSize: 'min(3.2vh, 2.3vw)', color: accent ?? '#fbbf24' }}
+        >
+          {subStrong}
+        </p>
+      )}
       {sub && <p className="tnum text-[1.6vh] text-[var(--text-faint)]">{sub}</p>}
     </div>
   )
