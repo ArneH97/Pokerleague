@@ -31,6 +31,8 @@ export interface FloorPlayer {
   /** Waar hij zit. Null zolang hij nog geen plaats heeft. */
   tableNo: number | null
   seatNo: number | null
+  /** Hoeveel bonuschips hij kreeg voor een voorinschrijving. 0 = geen. */
+  preregBonus: number
 }
 
 export interface ClubMember {
@@ -61,6 +63,7 @@ interface Row {
   chip_count_updated_at: string | null
   table_no: number | null
   seat_no: number | null
+  prereg_bonus: number
   players: { display_name: string; email: string | null } | null
 }
 
@@ -82,7 +85,7 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
       supabase
         .from('tournament_players')
         .select(
-          'id,player_id,status,chip_count,finish_position,reentries_used,rebuys_used,bounties_won,registered_at,chip_count_by,chip_count_updated_at,table_no,seat_no,players(display_name,email)',
+          'id,player_id,status,chip_count,finish_position,reentries_used,rebuys_used,bounties_won,registered_at,chip_count_by,chip_count_updated_at,table_no,seat_no,prereg_bonus,players(display_name,email)',
         )
         .eq('tournament_id', tournamentId)
         .overrideTypes<Row[]>(),
@@ -121,6 +124,7 @@ export function useFloorPlayers(tournamentId: string, clubId: string) {
         chipCountAt: r.chip_count_updated_at,
         tableNo: r.table_no,
         seatNo: r.seat_no,
+        preregBonus: r.prereg_bonus ?? 0,
       })),
     )
     setMembers(

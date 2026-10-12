@@ -43,6 +43,11 @@ export interface TournamentRow {
   counts_frozen_at: string | null
   /** Hoeveel spelers er maximaal aan één tafel zitten. */
   seats_per_table: number
+  /**
+   * Extra chips voor wie vooraf inschreef. 0 betekent geen bonus, en dan
+   * verdwijnt het vinkje aan de deur ook — zie migratie 0044 en 0069.
+   */
+  prereg_bonus_stack: number
 }
 
 export interface BlindLevelRow {

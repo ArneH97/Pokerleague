@@ -41,6 +41,20 @@
   --warn:          #fcd34d;
   --ok:            #6ee7b7;
 
+  /**
+   * De pokertafel.
+   *
+   * Eigen tokens en geen hergebruik van `--surface`: een tafel is geen vlak
+   * in het scherm maar een voorwerp in de zaal, en ze hoort er ook zo uit te
+   * zien. Een club die ooit blauw vilt legt, verzet deze drie waarden en de
+   * rest van de huid blijft staan.
+   */
+  --felt:          #16342d;
+  --felt-licht:    #1d473c;
+  --felt-donker:   #0e2320;
+  --rail:          #2a1d15;
+  --rail-licht:    #3d2b1f;
+
   --radius:        0.875rem;
   --radius-lg:     1.25rem;
 }

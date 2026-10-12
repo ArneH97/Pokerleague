@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FloorPlayers } from '@/components/FloorPlayers'
 import { SeatingPanel } from '@/components/SeatingPanel'
 import { StructurePanel } from '@/components/StructurePanel'
+import type { SheetContext } from '@/components/PlayerSheet'
 import { createClient } from '@/lib/supabase/client'
 import {
   resolveClock, levelsForClock, formatDuration, formatBlinds, breakLabel,
@@ -36,13 +37,44 @@ export function FloorControls({
   backHref: string
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const { tournament, club, levels: planned, stats, loading, error, live, reload } = useTournament(tournamentId)
+  const {
+    tournament, club, levels: planned, stats, prizes, loading, error, live, reload,
+  } = useTournament(tournamentId)
   const { nowMs, nowIso } = useServerTime()
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const t = useT()
   const rolledRef = useRef<number | null>(null)
   useTicker(250)
+
+  /**
+   * De klokbalk.
+   *
+   * De grote klok staat bovenaan, en dat is juist: daar kijk je naar als je
+   * het scherm opent. Maar de rest van de avond sta je onderin — bij de
+   * spelers, bij de tafels — en dan is "even een minuut bijzetten" een reis
+   * naar boven en terug. Op een telefoon is dat een halve meter scrollen met
+   * iemand die voor je staat te wachten.
+   *
+   * Dus: zodra de grote klok uit beeld is, komt er bovenaan een smalle balk
+   * met dezelfde knoppen. Eerder niet — twee klokken tegelijk op één scherm
+   * is precies het soort dubbel dat ervoor zorgt dat je op de verkeerde drukt.
+   */
+  const klokRef = useRef<HTMLElement | null>(null)
+  const [balkAan, setBalkAan] = useState(false)
+
+  useEffect(() => {
+    const el = klokRef.current
+    if (!el) return
+    const waarnemer = new IntersectionObserver(
+      ([stuk]) => setBalkAan(!stuk.isIntersecting),
+      // Pas als er echt niets meer van te zien is. Een klok die half in beeld
+      // staat lees je nog; dan hoort er geen tweede bij te komen.
+      { threshold: 0.2 },
+    )
+    waarnemer.observe(el)
+    return () => waarnemer.disconnect()
+  }, [loading])
 
   // Zit de klok aan het laatste level van de structuur, dan komen er levels
   // bij in hetzelfde ritme. Zonder dat loopt een tornooi dat uitloopt vast op
@@ -163,8 +195,95 @@ export function FloorControls({
     ? Math.ceil(stats.playersLeft / tournament.seats_per_table)
     : 0
 
+  /**
+   * Alles wat het spelerspaneel van deze avond moet weten.
+   *
+   * Eén keer hier samengesteld en daarna doorgegeven aan de spelerslijst én de
+   * tafelweergave. Dat is het punt: het paneel gaat uit twee schermen open, en
+   * als elk scherm zijn eigen idee heeft van wat een rebuy kost, dan staat er
+   * op de ene tik een ander bedrag dan op de andere.
+   */
+  const sheetCtx: SheetContext = {
+    maxReentries: tournament.max_reentries,
+    bountyMode: tournament.bounty_mode,
+    startingStack: tournament.starting_stack,
+    preregBonusStack: tournament.prereg_bonus_stack,
+    currency: club?.currency ?? 'EUR',
+    rebuyCents: entryPriceCents(tournament, 'rebuy').total,
+    addonCents: entryPriceCents(tournament, 'addon').total,
+    prizes,
+    playersLeft: stats.playersLeft,
+    entriesTotal: stats.entriesTotal,
+  }
+
   return (
     <Shell back={back}>
+      {/* Vast bovenaan en niet meescrollend: een knop die wegglijdt terwijl je
+          ernaar reikt is erger dan geen knop. Hij ligt onder het
+          spelerspaneel (z-30 tegen z-40), zodat hij niet door de waas heen
+          prikt wanneer dat openstaat. */}
+      <div
+        aria-hidden={!balkAan}
+        className={`fixed inset-x-0 top-0 z-30 border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bg)_92%,black)] pt-safe backdrop-blur transition-opacity ${
+          balkAan ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      >
+        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2">
+          <span className="tnum shrink-0 text-xl font-bold leading-none">
+            {formatDuration(resolved.remainingMs)}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs leading-tight text-[var(--text-muted)]">
+            {resolved.level?.isBreak
+              ? breakLabel(resolved.level.label, t('clock.break'))
+              : `${t('clock.level')} ${playIdx} · ${formatBlinds(resolved.level)}`}
+          </span>
+          <BalkKnop
+            label={t('floor.prevLevel')}
+            disabled={busy || resolved.levelIdx === 0}
+            onClick={() => apply(prevLevel(state, levels, nowMs(), nowIso()))}
+          >
+            ←
+          </BalkKnop>
+          <BalkKnop
+            label={t('floor.minusMinute')}
+            disabled={busy}
+            onClick={() => apply(adjustTime(state, levels, -60_000, nowMs(), nowIso()))}
+          >
+            −1
+          </BalkKnop>
+          {/* Een teken en geen woord: "Mettre en pause" past niet naast vier
+              andere knoppen op een telefoon van 390 pixels, en dit teken staat
+              op elke afstandsbediening ter wereld. De naam staat in het
+              voorleeslabel. */}
+          <BalkKnop
+            primair
+            label={neverStarted ? t('floor.start') : running ? t('floor.pause') : t('floor.resume')}
+            disabled={busy || (neverStarted && levels.length === 0)}
+            onClick={() => apply(
+              neverStarted ? start(nowIso())
+                : running ? pause(state, levels, nowMs())
+                  : resume(state, nowIso()),
+            )}
+          >
+            {running ? '❚❚' : '▶'}
+          </BalkKnop>
+          <BalkKnop
+            label={t('floor.plusMinute')}
+            disabled={busy}
+            onClick={() => apply(adjustTime(state, levels, 60_000, nowMs(), nowIso()))}
+          >
+            +1
+          </BalkKnop>
+          <BalkKnop
+            label={t('floor.nextLevel')}
+            disabled={busy || resolved.levelIdx >= levels.length - 1}
+            onClick={() => apply(nextLevel(state, levels, nowMs(), nowIso()))}
+          >
+            →
+          </BalkKnop>
+        </div>
+      </div>
+
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
@@ -192,7 +311,7 @@ export function FloorControls({
         </div>
       </header>
 
-      <section className="rounded-2xl bg-[var(--surface)] p-6 text-center">
+      <section ref={klokRef} className="rounded-2xl bg-[var(--surface)] p-6 text-center">
         <p className="text-sm uppercase tracking-widest text-[var(--text-faint)]">
           {resolved.level?.isBreak
             ? breakLabel(resolved.level.label, t('clock.break'))
@@ -307,17 +426,10 @@ export function FloorControls({
       <FloorPlayers
         tournamentId={tournamentId}
         clubId={tournament.club_id}
-        bountyMode={tournament.bounty_mode}
-        maxReentries={tournament.max_reentries}
+        ctx={sheetCtx}
         finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
-        startingStack={tournament.starting_stack}
         money={{
-          // Wat de speler werkelijk moet neertellen: pot plus rake plus
-          // bounty. Vroeger stond hier alleen de pot, en telde de floor de
-          // rake er zelf bij — elke keer opnieuw, in een lawaaiige zaal.
           buyinCents: tournament.buyin_cents,
-          rebuyCents: entryPriceCents(tournament, 'rebuy').total,
-          addonCents: entryPriceCents(tournament, 'addon').total,
           currency: club?.currency ?? 'EUR',
         }}
         potCents={stats.prizePoolCents}
@@ -332,6 +444,8 @@ export function FloorControls({
       <SeatingPanel
         tournamentId={tournamentId}
         seatsPerTable={tournament.seats_per_table}
+        ctx={sheetCtx}
+        bigBlind={resolved.level?.bigBlind ?? 0}
         finished={tournament.status === 'finished' || tournament.status === 'cancelled'}
       />
 
@@ -386,6 +500,41 @@ function Button({
       disabled={disabled}
       className={`rounded-xl px-4 py-4 text-base font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
         primary
+          ? 'bg-[var(--brand)] text-[var(--on-brand)] hover:brightness-110'
+          : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Eén knop in de klokbalk.
+ *
+ * Minstens 40 pixels in het vierkant, ook al staat er maar "−1" op: dat is de
+ * ondergrens waarop een duim in een donkere zaal raakt wat hij bedoelt. De
+ * naam staat in `aria-label` en in `title`, zodat het teken op het scherm kort
+ * kan blijven zonder dat iemand moet raden wat het doet.
+ */
+function BalkKnop({
+  children, label, onClick, disabled, primair,
+}: {
+  children: React.ReactNode
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  primair?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={`tnum h-10 min-w-10 shrink-0 rounded-lg px-2 text-sm font-medium leading-none transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${
+        primair
           ? 'bg-[var(--brand)] text-[var(--on-brand)] hover:brightness-110'
           : 'border border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
       }`}

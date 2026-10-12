@@ -40,6 +40,11 @@ const ZELFDE = new Set([
   // Pokerjargon. Aan een Vlaamse of Waalse tafel zegt iedereen "push or
   // fold"; er een vertaling van maken maakt het onduidelijker, niet duidelijker.
   'live.critical',
+  // "Early bird" staat zo op de affiche, in alle drie de talen. De bonus
+  // heeft die naam; hem in het Frans "lève-tôt" noemen maakt van één begrip
+  // drie, en dan weet niemand meer waar het over gaat.
+  'players.early',
+  'sheet.earlyBadge',
 ])
 
 test('elke taal kent elke sleutel', () => {

@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { PokerTable } from '@/components/PokerTable'
+import { PlayerSheet, type SheetContext, type SheetPlayer } from '@/components/PlayerSheet'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/i18n/context'
 import { dbMessage } from '@/lib/dbMessage'
@@ -24,6 +26,12 @@ import { dbMessage } from '@/lib/dbMessage'
  * Twee tikken in plaats van slepen, met opzet. Slepen op een telefoon in een
  * volle zaal is een gok; twee keer tikken werkt met één hand en met een
  * scherm dat je half ziet.
+ *
+ * 4. **Een stoel aantikken opent de speler.** Dat is de kortste weg van "wie
+ *    zit daar" naar "doe iets met hem": rebuy, addon, verzetten, uitschakelen.
+ *    Verzetten begint dus in het paneel en niet met een tik op de stoel —
+ *    anders betekent dezelfde tik twee dingen, en dan pak je iemand op terwijl
+ *    je zijn stapel wilde bijstellen.
  */
 
 interface PlanRow {
@@ -34,6 +42,20 @@ interface PlanRow {
   tournament_player_id: string | null
   display_name: string | null
   chip_count: number | null
+}
+
+interface SpelerRij {
+  id: string
+  status: string
+  chip_count: number | null
+  finish_position: number | null
+  table_no: number | null
+  seat_no: number | null
+  reentries_used: number
+  rebuys_used: number
+  bounties_won: number
+  prereg_bonus: number
+  players: { display_name: string } | null
 }
 
 interface Move {
@@ -59,23 +81,39 @@ interface Tafel {
 }
 
 export function SeatingPanel({
-  tournamentId, seatsPerTable, finished,
+  tournamentId, seatsPerTable, finished, ctx, bigBlind = 0,
 }: {
   tournamentId: string
   seatsPerTable: number
   finished: boolean
+  /** Wat het spelerspaneel van deze avond moet weten; zie PlayerSheet. */
+  ctx: SheetContext
+  /** Om stapels ook in blinds te tonen. Nul laat ze weg. */
+  bigBlind?: number
 }) {
   const supabase = useMemo(() => createClient(), [])
   const t = useT()
 
   const [plan, setPlan] = useState<PlanRow[]>([])
   const [voorstel, setVoorstel] = useState<Proposal | null>(null)
-  const [zonderStoel, setZonderStoel] = useState<{ id: string; name: string }[]>([])
+  /**
+   * De deelnemers die nog meespelen, met alles wat het paneel nodig heeft.
+   *
+   * Ruimer dan wat deze lijst strikt vraagt — hij toont alleen wie nog geen
+   * stoel heeft — maar het scheelt een tweede rondje naar de server op het
+   * moment dat de floor een stoel aantikt. Een paneel dat een tiende seconde
+   * leeg opengaat, voelt stuk.
+   */
+  const [mee, setMee] = useState<SheetPlayer[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   /** Wie er opgepakt is en op de volgende stoel gaat die je aantikt. */
   const [opgepakt, setOpgepakt] = useState<{ id: string; name: string } | null>(null)
+  /** Welke tafel in beeld staat. */
+  const [tafelNo, setTafelNo] = useState(1)
+  /** Wiens paneel open staat. Alleen het id; de rest komt uit de verse lijst. */
+  const [sheetId, setSheetId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const [planRes, voorRes, zonderRes] = await Promise.all([
@@ -83,18 +121,29 @@ export function SeatingPanel({
       supabase.rpc('seating_proposal', { p_tournament_id: tournamentId }),
       supabase
         .from('tournament_players')
-        .select('id,players(display_name)')
+        .select('id,status,chip_count,finish_position,table_no,seat_no,reentries_used,rebuys_used,bounties_won,prereg_bonus,players(display_name)')
         .eq('tournament_id', tournamentId)
-        .is('table_no', null)
         .in('status', ['active', 'registered'])
-        .overrideTypes<{ id: string; players: { display_name: string } | null }[]>(),
+        .overrideTypes<SpelerRij[]>(),
     ])
     setPlan((planRes.data ?? []) as unknown as PlanRow[])
     setVoorstel((voorRes.data ?? null) as unknown as Proposal | null)
-    setZonderStoel(
-      (zonderRes.data ?? []).map((r) => ({ id: r.id, name: r.players?.display_name ?? '—' })),
-    )
+    setMee((zonderRes.data ?? []).map((r) => ({
+      id: r.id,
+      name: r.players?.display_name ?? '—',
+      status: r.status,
+      chipCount: r.chip_count,
+      finishPosition: r.finish_position,
+      tableNo: r.table_no,
+      seatNo: r.seat_no,
+      reentriesUsed: r.reentries_used,
+      rebuysUsed: r.rebuys_used,
+      bountiesWon: r.bounties_won,
+      preregBonus: r.prereg_bonus ?? 0,
+    })))
   }, [supabase, tournamentId])
+
+  const zonderStoel = mee.filter((p) => p.tableNo === null)
 
   useEffect(() => {
     if (!open) return
@@ -123,6 +172,18 @@ export function SeatingPanel({
     tafel.stoelen.push(r)
   }
 
+  // Welke tafel je op dit moment ziet. Hij volgt het vegen; de puntjes
+  // boven de tafel zetten hem.
+  const huidig = tafels.find((x) => x.no === tafelNo) ?? tafels[0]
+
+  // De grootste stapel van het hele veld, niet van deze tafel: wie aan de
+  // leiding staat, staat aan de leiding waar hij ook zit.
+  const leiderId = plan.reduce<{ id: string | null; chips: number }>((a, r) => (
+    r.tournament_player_id !== null && (r.chip_count ?? 0) > a.chips
+      ? { id: r.tournament_player_id, chips: r.chip_count ?? 0 }
+      : a
+  ), { id: null, chips: -1 }).id
+
   async function zetNeer(tableNo: number, seatNo: number) {
     if (!opgepakt) return
     const wie = opgepakt
@@ -131,6 +192,8 @@ export function SeatingPanel({
       p_tournament_player_id: wie.id, p_table_no: tableNo, p_seat_no: seatNo,
     }))
   }
+
+  const sheetPlayer = sheetId === null ? null : mee.find((p) => p.id === sheetId) ?? null
 
   if (finished) return null
 
@@ -232,83 +295,96 @@ export function SeatingPanel({
         </div>
       )}
 
-      {/* De tafels. */}
+      {/* De tafels, elk op volle breedte en met vegen ertussen.
+          Eén tafel per scherm in plaats van drie lijstjes onder elkaar: zo
+          blijft elke stoel groot genoeg om met een duim te raken, ook met
+          tien stoelen aan tafel. */}
       {tafels.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">{t('seat.noTables')}</p>
       ) : (
-        <div className="space-y-3">
-          {tafels.map((tafel) => {
-            const bezet = tafel.stoelen.filter((s) => s.tournament_player_id !== null).length
-            return (
-              <div key={tafel.no} className={tafel.isOpen ? '' : 'opacity-45'}>
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">
-                    {t('seat.table')} {tafel.no}
-                    <span className="ml-2 text-xs font-normal text-[var(--text-faint)]">
-                      {bezet} / {tafel.seats}
-                      {!tafel.isOpen && ` · ${t('seat.closed')}`}
-                    </span>
-                  </p>
-                  {tafel.isOpen && bezet === 0 && (
-                    <Klein
-                      onClick={() => void run(() => supabase.rpc('floor_close_table', {
-                        p_tournament_id: tournamentId, p_table_no: tafel.no,
-                      }))}
-                      disabled={busy}
-                    >
-                      {t('seat.closeTable')}
-                    </Klein>
-                  )}
-                </div>
-
-                {/* Eén kolom op een telefoon. Twee kolommen paste er wel op,
-                    maar kapte elke naam af tot "Jean-B…" — en de naam is net
-                    waar je op zoekt als iemand vraagt waar hij moet zitten. */}
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {tafel.stoelen.map((s) => {
-                    const leeg = s.tournament_player_id === null
-                    const dezeOpgepakt = opgepakt?.id === s.tournament_player_id
-                    return (
-                      <button
-                        key={s.seat_no}
-                        type="button"
-                        disabled={busy || !tafel.isOpen}
-                        onClick={() => {
-                          if (opgepakt) return void zetNeer(tafel.no, s.seat_no)
-                          if (!leeg) {
-                            setOpgepakt({
-                              id: s.tournament_player_id as string,
-                              name: s.display_name ?? '—',
-                            })
-                          }
-                        }}
-                        className={`flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition disabled:opacity-40 ${
-                          dezeOpgepakt
-                            ? 'border-[var(--brand)] bg-[color-mix(in_oklab,var(--brand)_18%,transparent)]'
-                            : leeg
-                              ? 'border-dashed border-[var(--line)] text-[var(--text-faint)] hover:bg-[var(--surface-hover)]'
-                              : 'border-[var(--line-strong)] hover:bg-[var(--surface-hover)]'
-                        }`}
-                      >
-                        <span className="tnum w-5 shrink-0 text-xs text-[var(--text-faint)]">
-                          {s.seat_no}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">
-                          {leeg ? (opgepakt ? t('seat.placeHere') : t('seat.free')) : s.display_name}
-                        </span>
-                        {!leeg && s.chip_count !== null && (
-                          <span className="tnum shrink-0 text-xs text-[var(--text-faint)]">
-                            {s.chip_count.toLocaleString('nl-BE')}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
+        <>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">
+              {t('seat.table')} {huidig?.no ?? 1}
+              <span className="tnum ml-2 text-xs font-normal text-[var(--text-faint)]">
+                {huidig ? huidig.stoelen.filter((x) => x.tournament_player_id !== null).length : 0}
+                {' / '}{huidig?.seats ?? seatsPerTable}
+                {huidig && !huidig.isOpen && ` · ${t('seat.closed')}`}
+              </span>
+            </p>
+            {huidig && huidig.isOpen
+              && huidig.stoelen.every((x) => x.tournament_player_id === null) && (
+              <Klein
+                onClick={() => void run(() => supabase.rpc('floor_close_table', {
+                  p_tournament_id: tournamentId, p_table_no: huidig.no,
+                }))}
+                disabled={busy}
+              >
+                {t('seat.closeTable')}
+              </Klein>
+            )}
+            {tafels.length > 1 && (
+              <div className="ml-auto flex items-center gap-1.5">
+                {tafels.map((x) => (
+                  <button
+                    key={x.no}
+                    type="button"
+                    aria-current={x.no === (huidig?.no ?? 1) ? 'true' : 'false'}
+                    aria-label={`${t('seat.table')} ${x.no}`}
+                    onClick={() => {
+                      const el = document.getElementById(`tafelstrook-${tournamentId}`)
+                      if (el) el.scrollTo({ left: tafels.indexOf(x) * el.clientWidth, behavior: 'smooth' })
+                    }}
+                    className={`h-1.5 w-5 rounded-full transition ${
+                      x.no === (huidig?.no ?? 1) ? 'bg-[var(--brand)]' : 'bg-[var(--line-strong)]'
+                    }`}
+                  />
+                ))}
               </div>
-            )
-          })}
-        </div>
+            )}
+          </div>
+
+          <div
+            id={`tafelstrook-${tournamentId}`}
+            onScroll={(e) => {
+              const el = e.currentTarget
+              const i = Math.round(el.scrollLeft / el.clientWidth)
+              const volgende = tafels[Math.min(Math.max(i, 0), tafels.length - 1)]
+              if (volgende && volgende.no !== tafelNo) setTafelNo(volgende.no)
+            }}
+            className="-mx-1 flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {tafels.map((tafel) => (
+              <div
+                key={tafel.no}
+                className={`flex w-full shrink-0 snap-center flex-col px-1 ${
+                  tafel.isOpen ? '' : 'opacity-45'
+                }`}
+              >
+                <PokerTable
+                  seats={tafel.stoelen.map((x) => ({
+                    seatNo: x.seat_no,
+                    tournamentPlayerId: x.tournament_player_id,
+                    name: x.display_name,
+                    chipCount: x.chip_count,
+                  }))}
+                  pickedId={opgepakt?.id ?? null}
+                  bigBlind={bigBlind}
+                  leaderId={leiderId}
+                  disabled={busy || !tafel.isOpen}
+                  labelFree={t('seat.free')}
+                  placeHere={t('seat.placeHere')}
+                  onSeat={(seatNo, tpId) => {
+                    // Heb je iemand op de hand, dan is elke tik een zetje.
+                    // Anders opent de stoel de speler die erop zit.
+                    if (opgepakt) return void zetNeer(tafel.no, seatNo)
+                    if (tpId) setSheetId(tpId)
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <p className="text-xs leading-relaxed text-[var(--text-faint)]">
@@ -316,6 +392,21 @@ export function SeatingPanel({
           ? t('seat.pickedUp').replace('{n}', opgepakt.name)
           : t('seat.hint').replace('{n}', String(seatsPerTable))}
       </p>
+
+      {/* Hetzelfde paneel als in de spelerslijst. Het doet zijn eigen
+          aanroepen, dus deze weergave hoeft niets te weten van rebuys of
+          uitbetalingen — alleen wanneer ze opnieuw moet laden. */}
+      {sheetPlayer && (
+        <PlayerSheet
+          player={sheetPlayer}
+          ctx={ctx}
+          others={mee.filter((o) => o.id !== sheetPlayer.id && o.status !== 'eliminated')
+            .map((o) => ({ id: o.id, name: o.name }))}
+          onClose={() => setSheetId(null)}
+          onChanged={load}
+          onMove={(id, name) => setOpgepakt({ id, name })}
+        />
+      )}
     </section>
   )
 }

@@ -61,10 +61,31 @@ export function usePayouts(tournamentId: string) {
     return next
   }, [supabase, tournamentId])
 
+  /**
+   * Eén keer ophalen was genoeg zolang er maar één scherm was dat
+   * uitschakelde. Dat klopt niet meer: aan de floor liggen twee telefoons en
+   * een laptop, en sinds het spelerspaneel ook uit de tafelweergave opengaat
+   * kan de uitschakeling van ergens anders komen dan van de lijst die de
+   * kassalijst verversde. Dan stond er geld open dat op geen enkel scherm te
+   * zien was.
+   *
+   * Vandaar: luisteren op de deelnemers van dit tornooi. Elke uitschakeling,
+   * elk terugdraaien en elke rebuy raakt die rijen, en dat is precies het
+   * moment waarop de kassalijst kan veranderen.
+   */
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
-  }, [load])
+
+    const channel = supabase
+      .channel(`payouts:${tournamentId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tournament_players', filter: `tournament_id=eq.${tournamentId}` },
+        () => void load())
+      .subscribe()
+
+    return () => { void supabase.removeChannel(channel) }
+  }, [supabase, tournamentId, load])
 
   const markPaid = useCallback(async (tpId: string, paid: boolean) => {
     const { error: err } = await supabase.rpc('floor_mark_paid', {

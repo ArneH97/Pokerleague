@@ -5,8 +5,8 @@ import { DealPanel } from '@/components/DealPanel'
 import { RsvpChecklist } from '@/components/RsvpChecklist'
 import { PayoutList, InTheMoneyNotice } from '@/components/PayoutList'
 import { PayoutPanel } from '@/components/PayoutPanel'
+import { PlayerSheet, type SheetContext } from '@/components/PlayerSheet'
 import { createClient } from '@/lib/supabase/client'
-import { formatMoney } from '@/lib/types'
 import { useFloorPlayers } from '@/lib/useFloorPlayers'
 import { usePayouts, type PayoutRow } from '@/lib/usePayouts'
 import { useT } from '@/lib/i18n/context'
@@ -32,16 +32,17 @@ import { dbMessage } from '@/lib/dbMessage'
  *    Twee kolommen paste er wel op maar kapte elke naam af, en een half
  *    afgekapte naam is precies wat je niet wil op het moment dat je iemand
  *    moet uitschakelen.
- * 3. Geldknoppen niet naast "Uitschakelen". Eén misser aan een volle tafel
- *    kost anders twintig euro in de pot die niemand betaald heeft.
+ * 3. **Eén paneel per speler, niet drie rijen onder elkaar.** De geldknoppen,
+ *    de vraag wie hem eruit speelde en de bevestiging bij het weghalen zaten
+ *    elk op een andere plaats in de lijst, en die lijst verschoof terwijl je
+ *    keek. Nu gaat er één paneel van onderen op met alles wat je met díe
+ *    speler kan — binnen duimbereik, en je ziet wiens paneel open staat.
  */
 export function FloorPlayers({
   tournamentId,
   clubId,
-  bountyMode,
-  maxReentries,
+  ctx,
   finished,
-  startingStack,
   money,
   potCents,
   entriesClosed,
@@ -51,24 +52,17 @@ export function FloorPlayers({
 }: {
   tournamentId: string
   clubId: string
-  /** 'none' betekent: geen vraag naar wie er uitschakelde. */
-  bountyMode: string
-  maxReentries: number
-  finished: boolean
-  /** Bedragen op de knoppen zetten: je ziet wát je boekt voor je klikt. */
   /**
-   * Wat de speler aan de kassa betaalt, per soort inkoop en inclusief rake en
-   * bounty. Uitgerekend door `entryPriceCents`, dezelfde verdeling als de
-   * databank boekt — zodat het bedrag op de knop en het bedrag in de kassa
-   * niet uit elkaar kunnen lopen.
+   * Wat het spelerspaneel van deze avond moet weten: de prijzen van een
+   * inkoop, de regels, de ladder. Eén keer samengesteld in het floorscherm,
+   * zodat de tafelweergave en deze lijst niet elk hun eigen versie krijgen
+   * van wat een rebuy kost.
    */
-  /** De startstapel van deze avond, zonder voorinschrijfbonus. */
-  startingStack: number
+  ctx: SheetContext
+  finished: boolean
   money: {
     /** De inleg zelf, voor de prijzenberekening. */
     buyinCents: number
-    rebuyCents: number
-    addonCents: number
     currency: string
   }
   /** Prijzenpot en of de inkopen al gesloten zijn; voor het prijzengeldpaneel. */
@@ -101,10 +95,10 @@ export function FloorPlayers({
     { playerId: string; name: string; isMember: boolean } | null
   >(null)
 
-  const [openMoney, setOpenMoney] = useState<string | null>(null)
-  const [killing, setKilling] = useState<string | null>(null)
-  /** Wie er op het punt staat helemaal uit het tornooi te verdwijnen. */
-  const [removing, setRemoving] = useState<string | null>(null)
+  /** Wiens paneel open staat. Alleen het id: de rest komt uit de verse lijst. */
+  const [sheetId, setSheetId] = useState<string | null>(null)
+  /** Wie net toegevoegd is en de early bird nog kan krijgen. */
+  const [earlyOffer, setEarlyOffer] = useState<{ tpId: string; naam: string } | null>(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'chips'>('name')
   const [dealOpen, setDealOpen] = useState(false)
@@ -242,6 +236,19 @@ export function FloorPlayers({
     if (sug) setStoelVoorstel({ tpId, naam, tafel: sug.table_no, stoel: sug.seat_no })
   }
 
+  /**
+   * De early bird aanbieden aan wie net toegevoegd is.
+   *
+   * Niet meteen geven en niet vragen vóór het toevoegen: wie vooraf inschreef
+   * krijgt hem automatisch van de databank, en dan hoort er geen vraag te
+   * komen. De balk verschijnt dus alleen voor wie hem ná het toevoegen nog
+   * niet heeft — één tik, of je negeert hem en hij gaat weg bij de volgende
+   * speler.
+   */
+  function biedEarlyAan(tpId: string, naam: string) {
+    if (ctx.preregBonusStack > 0) setEarlyOffer({ tpId, naam })
+  }
+
   async function addExisting(playerId: string) {
     closeAdd()
     const naam = members.find((m) => m.playerId === playerId)?.name ?? ''
@@ -253,12 +260,16 @@ export function FloorPlayers({
       nieuw = res.data as unknown as string | null
       return res
     })
-    if (nieuw) await stelStoelVoor(nieuw, naam)
+    if (nieuw) {
+      biedEarlyAan(nieuw, naam)
+      await stelStoelVoor(nieuw, naam)
+    }
     nudgeInvites()
   }
 
   async function addNew(
     name: string, email: string | null, reason: string | null, locale: string,
+    early: boolean,
   ) {
     closeAdd()
     let nieuw: string | null = null
@@ -273,8 +284,27 @@ export function FloorPlayers({
       nieuw = res.data as unknown as string | null
       return res
     })
-    if (nieuw) await stelStoelVoor(nieuw, name)
+    if (nieuw) {
+      // Het vinkje stond al aan bij het inschrijven, dus hier geen vraag meer
+      // maar meteen boeken. Mislukt het, dan staat de melding in de balk en
+      // kan de floor het alsnog via het spelerspaneel.
+      if (early) {
+        await run(() => supabase.rpc('floor_set_prereg_bonus', {
+          p_tournament_player_id: nieuw, p_on: true,
+        }))
+      } else {
+        biedEarlyAan(nieuw, name)
+      }
+      await stelStoelVoor(nieuw, name)
+    }
     nudgeInvites()
+  }
+
+  async function kenEarlyToe(tpId: string) {
+    setEarlyOffer(null)
+    await run(() => supabase.rpc('floor_set_prereg_bonus', {
+      p_tournament_player_id: tpId, p_on: true,
+    }))
   }
 
   async function zetOpVoorgesteldeStoel() {
@@ -284,18 +314,24 @@ export function FloorPlayers({
     await run(() => supabase.rpc('floor_seat_next', { p_tournament_player_id: v.tpId }))
   }
 
-  async function eliminate(tpId: string, byId: string | null) {
-    setKilling(null)
-    await run(() => supabase.rpc('floor_eliminate', {
-      p_tournament_player_id: tpId, p_by_tournament_player_id: byId,
-    }))
-    // Viel deze man in het geld, dan hoort de floor dat nú te weten en niet
-    // pas als de speler er zelf naar vraagt. De server bepaalt zowel de
-    // eindplaats als het bedrag, dus we vragen het gewoon opnieuw op en
-    // kijken of hij op de uitbetaallijst verschenen is.
+  /**
+   * Na elke handeling uit het spelerspaneel.
+   *
+   * Viel deze man in het geld, dan hoort de floor dat nú te weten en niet pas
+   * als de speler er zelf naar vraagt. De server bepaalt zowel de eindplaats
+   * als het bedrag, dus we vragen de kassalijst gewoon opnieuw op en kijken of
+   * hij erop verschenen is. Werd hij teruggedraaid, dan verdwijnt de melding
+   * om dezelfde reden.
+   */
+  async function naPaneel(tpId: string) {
+    await reload()
     const rows = await payouts.reload()
     const hit = rows.find((r) => r.tournamentPlayerId === tpId && !r.paidAt)
-    if (hit) setInTheMoney(hit)
+    if (hit) {
+      setInTheMoney(hit)
+    } else if (inTheMoney?.tournamentPlayerId === tpId) {
+      setInTheMoney(null)
+    }
   }
 
   async function markPaid(tpId: string, paid: boolean) {
@@ -303,24 +339,6 @@ export function FloorPlayers({
     await payouts.markPaid(tpId, paid)
     if (paid && inTheMoney?.tournamentPlayerId === tpId) setInTheMoney(null)
     setBusy(false)
-  }
-
-  async function rebuy(tpId: string, kind: 'reentry' | 'rebuy' | 'addon') {
-    setOpenMoney(null)
-    await run(() => supabase.rpc('floor_rebuy', {
-      p_tournament_player_id: tpId, p_kind: kind,
-    }))
-  }
-
-  async function undo(tpId: string) {
-    await run(() => supabase.rpc('floor_undo_elimination', { p_tournament_player_id: tpId }))
-    if (inTheMoney?.tournamentPlayerId === tpId) setInTheMoney(null)
-    await payouts.reload()
-  }
-
-  async function undoBuyin(tpId: string) {
-    setOpenMoney(null)
-    await run(() => supabase.rpc('floor_undo_last_buyin', { p_tournament_player_id: tpId }))
   }
 
   /**
@@ -335,19 +353,6 @@ export function FloorPlayers({
     }))
   }
 
-  /**
-   * De verkeerde man toegevoegd. Niet uitschakelen — dat maakt hem eerste in
-   * een tornooi waar hij niet in hoort — maar weghalen, met zijn inkoop erbij.
-   * De server weigert het zodra er echt geld mee gemoeid is.
-   */
-  async function removeEntry(tpId: string) {
-    setRemoving(null)
-    setOpenMoney(null)
-    await run(() => supabase.rpc('floor_remove_entry', { p_tournament_player_id: tpId }))
-    if (inTheMoney?.tournamentPlayerId === tpId) setInTheMoney(null)
-    await payouts.reload()
-  }
-
   async function setChips(tpId: string, value: number) {
     await run(() => supabase.from('tournament_players')
       .update({ chip_count: value }).eq('id', tpId))
@@ -358,6 +363,13 @@ export function FloorPlayers({
     await run(() => supabase.rpc('floor_finish_tournament', { p_tournament_id: tournamentId }))
     await payouts.reload()
   }
+
+  // Wiens paneel open staat, uit de lijst die net ververst is. Verdwijnt die
+  // speler — ingetrokken, of door een ander toestel weggehaald — dan gaat het
+  // paneel vanzelf dicht in plaats van op een lege rij te blijven staan.
+  const sheetPlayer = sheetId === null
+    ? null
+    : players.find((p) => p.id === sheetId) ?? null
 
   if (loading) {
     return <p className="text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
@@ -464,6 +476,32 @@ export function FloorPlayers({
           </div>
         </div>
       )}
+
+      {/* Net toegevoegd en nog zonder bonus: één tik en hij heeft hem.
+          Hier en niet in het inschrijfscherm, want bij een bestaande speler
+          gaat dat met één tik uit de zoeklijst — daar hoort geen vinkje
+          tussen te komen voor de man die gewoon elke zondag komt. */}
+      {earlyOffer && (() => {
+        const wie = players.find((p) => p.id === earlyOffer.tpId)
+        if (wie && wie.preregBonus > 0) return null
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color-mix(in_oklab,var(--brand)_35%,transparent)] bg-[color-mix(in_oklab,var(--brand)_10%,transparent)] px-4 py-3">
+            <p className="min-w-0 text-sm">
+              {t('players.earlyOffer')
+                .replace('{naam}', earlyOffer.naam)
+                .replace('{n}', ctx.preregBonusStack.toLocaleString('nl-BE'))}
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <Primary onClick={() => void kenEarlyToe(earlyOffer.tpId)} disabled={busy}>
+                {t('players.earlyYes')}
+              </Primary>
+              <Small onClick={() => setEarlyOffer(null)} disabled={busy}>
+                {t('players.earlyNo')}
+              </Small>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Bovenaan, want dit is het enige wat op dat moment telt. */}
       {inTheMoney && (
@@ -714,7 +752,10 @@ export function FloorPlayers({
           busy={busy}
           clubLocale={clubLocale}
           onCancel={closeAdd}
-          onSubmit={(name, email, reason, locale) => void addNew(name, email, reason, locale)}
+          earlyBonus={ctx.preregBonusStack}
+          startingStack={ctx.startingStack}
+          onSubmit={(name, email, reason, locale, early) =>
+            void addNew(name, email, reason, locale, early)}
         />
       )}
 
@@ -743,7 +784,12 @@ export function FloorPlayers({
                   over — en de naam is het enige waarmee je de juiste man
                   uitschakelt. Vanaf een tablet past het wel naast elkaar. */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="min-w-0 flex-1 basis-full sm:basis-0">
+                <button
+                  type="button"
+                  disabled={busy || finished}
+                  onClick={() => setSheetId(p.id)}
+                  className="min-w-0 flex-1 basis-full rounded-lg text-left sm:basis-0 disabled:cursor-default"
+                >
                   <span className="flex flex-wrap items-center gap-x-2">
                     <span className="truncate font-medium">{p.name}</span>
                     {/* Zonder mailadres kan je hem volgend seizoen niet
@@ -777,7 +823,7 @@ export function FloorPlayers({
                     {p.email && <span className="truncate">{p.email}</span>}
                     <Herkomst door={p.chipCountBy} wanneer={p.chipCountAt} nu={nu} t={t} />
                   </span>
-                </span>
+                </button>
 
                 <ChipInput
                   value={p.chipCount ?? 0}
@@ -786,116 +832,18 @@ export function FloorPlayers({
                   onCommit={(v) => void setChips(p.id, v)}
                 />
 
+                {/* Eén knop, en alles zit erin. Vroeger stonden hier "Geld"
+                    en "Uitschakelen" naast elkaar en klapte er een derde rij
+                    onder de speler open; dat las op een laptop en niet in een
+                    zaal. Het paneel komt van onderen op, binnen duimbereik,
+                    en de hele rij is aanklikbaar — op een telefoon mik je op
+                    de naam en niet op een knopje van twaalf pixels. */}
                 {!finished && (
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Small
-                      onClick={() => setOpenMoney(openMoney === p.id ? null : p.id)}
-                      disabled={busy}
-                      active={openMoney === p.id}
-                    >
-                      {t('players.money')}
-                    </Small>
-                    <span className="mx-0.5 h-6 w-px bg-[var(--line)]" aria-hidden />
-                    <Small
-                      danger
-                      onClick={() => (bountyMode === 'none'
-                        ? void eliminate(p.id, null)
-                        : setKilling(killing === p.id ? null : p.id))}
-                      disabled={busy}
-                    >
-                      {t('players.eliminate')}
-                    </Small>
-                  </div>
+                  <Small onClick={() => setSheetId(p.id)} active={sheetId === p.id} disabled={busy}>
+                    {t('players.actions')}
+                  </Small>
                 )}
               </div>
-
-              {openMoney === p.id && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 rounded-lg bg-[var(--surface-2)] p-2.5">
-                  {/* Op = op. De club stelt bij het aanmaken in hoeveel
-                      rebuys er per speler mogen; is dat aantal bereikt, dan
-                      gaat de knop op slot in plaats van dat de databank het
-                      pas weigert nadat je geklikt hebt. */}
-                  {/* Wat er met de stapel gebeurt, staat op de knop.
-                      Een rebuy zet de stapel op de startstapel — hij telt er
-                      niet bij op. Dat is juist bij een blutte speler, maar het
-                      is ook de handeling waarmee je per ongeluk de chipleader
-                      terugzet naar 40.000. Er staat geen slot meer op (dat
-                      weigerde precies de spelers die vooraf inschreven), dus
-                      het bedrag én de stapel horen zichtbaar te zijn vóór je
-                      drukt in plaats van erna. */}
-                  <Small
-                    onClick={() => void rebuy(p.id, 'rebuy')}
-                    disabled={busy || p.reentriesUsed + p.rebuysUsed >= maxReentries}
-                  >
-                    {t('players.rebuy')} {formatMoney(money.rebuyCents, money.currency)}
-                    {p.chipCount !== null && p.chipCount !== startingStack && (
-                      <span className="tnum ml-1.5 text-xs text-[var(--text-faint)]">
-                        {p.chipCount.toLocaleString('nl-BE')} → {startingStack.toLocaleString('nl-BE')}
-                      </span>
-                    )}
-                  </Small>
-                  {p.reentriesUsed + p.rebuysUsed >= maxReentries && (
-                    <span className="text-xs text-[var(--text-faint)]">
-                      {t('players.rebuyLimit')}
-                    </span>
-                  )}
-                  <Small onClick={() => void rebuy(p.id, 'addon')} disabled={busy}>
-                    {t('players.addon')}{' '}
-                    {formatMoney(money.addonCents, money.currency)}
-                  </Small>
-                  <Small onClick={() => void undoBuyin(p.id)} disabled={busy}>
-                    ↩ {t('players.undoBuyin')}
-                  </Small>
-                  {/* Hier en niet naast "Uitschakelen": dit is de knop voor de
-                      verkeerde man, en die staat één klik verder weg dan de
-                      knop die je de hele avond nodig hebt. */}
-                  <Small
-                    danger
-                    onClick={() => setRemoving(removing === p.id ? null : p.id)}
-                    disabled={busy}
-                  >
-                    {t('players.remove')}
-                  </Small>
-                  <Small onClick={() => setOpenMoney(null)} disabled={busy}>
-                    {t('players.close')}
-                  </Small>
-                </div>
-              )}
-
-              {removing === p.id && (
-                <RemoveConfirm
-                  t={t}
-                  busy={busy}
-                  onYes={() => void removeEntry(p.id)}
-                  onNo={() => setRemoving(null)}
-                />
-              )}
-
-              {/* Bij een bountytornooi is de vraag wie hem eruit speelde geen
-                  detail: daar hangt geld aan vast. Vandaar deze rij, en niet
-                  een venster dat je eerst moet wegklikken. */}
-              {killing === p.id && (
-                <div className="mt-2.5 rounded-lg bg-[var(--surface-2)] p-2.5">
-                  <p className="mb-2 text-xs uppercase tracking-widest text-[var(--text-faint)]">
-                    {t('players.eliminatedBy')}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {active
-                      .filter((o) => o.id !== p.id)
-                      .map((o) => (
-                        <Small key={o.id} onClick={() => void eliminate(p.id, o.id)} disabled={busy}>
-                          {o.name}
-                        </Small>
-                      ))}
-                    <Small onClick={() => void eliminate(p.id, null)} disabled={busy}>
-                      {t('players.nobody')}
-                    </Small>
-                    <Small onClick={() => setKilling(null)} disabled={busy}>
-                      {t('common.cancel')}
-                    </Small>
-                  </div>
-                </div>
-              )}
             </li>
           ))}
 
@@ -911,7 +859,12 @@ export function FloorPlayers({
                 {/* Plaats en naam horen bij elkaar en blijven samen op één
                     regel; de knoppen zakken eronder zodra ze er niet meer
                     naast passen. */}
-                <span className="flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-0">
+                <button
+                  type="button"
+                  disabled={busy || finished}
+                  onClick={() => setSheetId(p.id)}
+                  className="flex min-w-0 flex-1 basis-full items-center gap-3 rounded-lg text-left sm:basis-0 disabled:cursor-default"
+                >
                   <span className="tnum w-8 shrink-0 text-right font-semibold text-[var(--text-faint)]">
                     {p.finishPosition ?? '—'}
                   </span>
@@ -925,44 +878,13 @@ export function FloorPlayers({
                       </span>
                     )}
                   </span>
-                </span>
+                </button>
                 {!finished && (
-                  <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    {/* Ook hier staat er gewoon "Rebuy". Dat het intern een
-                        re-entry is — hij was uitgeschakeld en komt terug met
-                        een verse stack — hoeft de floor niet te weten; de
-                        situatie bepaalt dat al. */}
-                    {p.reentriesUsed + p.rebuysUsed < maxReentries && (
-                      <Small onClick={() => void rebuy(p.id, 'reentry')} disabled={busy}>
-                        {t('players.rebuy')} {formatMoney(money.rebuyCents, money.currency)}
-                      </Small>
-                    )}
-                    <Small onClick={() => void undo(p.id)} disabled={busy}>
-                      {t('players.undo')}
-                    </Small>
-                    {/* Wie zichzelf per ongeluk uitschakelde in plaats van
-                        weg te halen, komt hier terecht. Zonder deze knop is
-                        "terugdraaien" de enige uitweg en sta je nog steeds
-                        in een tornooi waar je niet in hoort. */}
-                    <Small
-                      danger
-                      onClick={() => setRemoving(removing === p.id ? null : p.id)}
-                      disabled={busy}
-                    >
-                      {t('players.remove')}
-                    </Small>
-                  </div>
+                  <Small onClick={() => setSheetId(p.id)} active={sheetId === p.id} disabled={busy}>
+                    {t('players.actions')}
+                  </Small>
                 )}
               </div>
-
-              {removing === p.id && (
-                <RemoveConfirm
-                  t={t}
-                  busy={busy}
-                  onYes={() => void removeEntry(p.id)}
-                  onNo={() => setRemoving(null)}
-                />
-              )}
             </li>
           ))}
         </ul>
@@ -1011,38 +933,23 @@ export function FloorPlayers({
           </button>
         )
       )}
-    </section>
-  )
-}
 
-/**
- * De bevestiging bij het weghalen van een deelname.
- *
- * Twee knoppen op de rij zelf en geen venster: aan de floor staat er iemand
- * te wachten, en een dialoog die het scherm overneemt is precies wat je dan
- * niet wil. De zin erboven zegt wat er verdwijnt, want dat is het enige wat
- * je hier nog kan verkeerd inschatten.
- */
-function RemoveConfirm({
-  t, busy, onYes, onNo,
-}: {
-  t: ReturnType<typeof useT>
-  busy: boolean
-  onYes: () => void
-  onNo: () => void
-}) {
-  return (
-    <div className="mt-2.5 rounded-lg border border-[color-mix(in_oklab,var(--danger)_35%,transparent)] bg-[color-mix(in_oklab,var(--danger)_8%,transparent)] p-2.5">
-      <p className="text-xs leading-relaxed text-[var(--danger)]">{t('players.removeConfirm')}</p>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <Small danger onClick={onYes} disabled={busy}>
-          {t('players.removeYes')}
-        </Small>
-        <Small onClick={onNo} disabled={busy}>
-          {t('common.cancel')}
-        </Small>
-      </div>
-    </div>
+      {/* ------------------------------------------------------ het paneel
+          Alleen het id staat in de state en de speler wordt hier uit de
+          verse lijst gehaald. Dat is het verschil tussen een paneel dat
+          meebeweegt met een rebuy en een paneel dat nog de stapel van drie
+          handelingen geleden toont. */}
+      {sheetPlayer && (
+        <PlayerSheet
+          player={sheetPlayer}
+          ctx={ctx}
+          others={active.filter((o) => o.id !== sheetPlayer.id)
+            .map((o) => ({ id: o.id, name: o.name }))}
+          onClose={() => setSheetId(null)}
+          onChanged={() => naPaneel(sheetPlayer.id)}
+        />
+      )}
+    </section>
   )
 }
 
@@ -1070,19 +977,33 @@ function looksLikeEmail(v: string): boolean {
  * gevallen klopt dat, en dan is het één blik en geen handeling.
  */
 function NewPlayerForm({
-  draft, busy, clubLocale, onCancel, onSubmit,
+  draft, busy, clubLocale, earlyBonus, startingStack, onCancel, onSubmit,
 }: {
   draft: { name: string; email: string }
   busy: boolean
   clubLocale: string
+  /** Hoeveel bonuschips deze avond geeft voor voorinschrijven. 0 = geen. */
+  earlyBonus: number
+  startingStack: number
   onCancel: () => void
-  onSubmit: (name: string, email: string | null, reason: string | null, locale: string) => void
+  onSubmit: (
+    name: string, email: string | null, reason: string | null, locale: string, early: boolean,
+  ) => void
 }) {
   const t = useT()
   const [name, setName] = useState(draft.name)
   const [email, setEmail] = useState(draft.email)
   const [reason, setReason] = useState<string | null>(null)
   const [askingReason, setAskingReason] = useState(false)
+  /**
+   * De early bird, als vinkje en niet als vraag achteraf.
+   *
+   * Hij staat uit. Dat is de juiste stand: wie vooraf inschreef krijgt zijn
+   * bonus automatisch van de databank en komt hier niet langs. Wie hier wél
+   * langskomt is iemand die aan de deur staat, en of die de bonus hoort te
+   * krijgen weet alleen de floor — vandaar een tik en geen aanname.
+   */
+  const [early, setEarly] = useState(false)
   const [locale, setLocale] = useState(
     LOCALES.includes(clubLocale as Locale) ? (clubLocale as Locale) : 'nl',
   )
@@ -1129,7 +1050,7 @@ function NewPlayerForm({
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && nameOk && emailOk && !busy) {
-                onSubmit(name.trim(), email.trim(), null, locale)
+                onSubmit(name.trim(), email.trim(), null, locale, early)
               }
             }}
             className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-2.5 outline-none focus:border-[var(--brand)]"
@@ -1167,6 +1088,28 @@ function NewPlayerForm({
         <span className="text-xs text-[var(--text-faint)]">{t('players.languageHint')}</span>
       </div>
 
+      {/* ---------------------------------------------------------- early bird
+          Alleen als de avond er een geeft. Een vinkje met "+0 fiches" is een
+          vinkje waar je over moet nadenken zonder dat er iets gebeurt. */}
+      {earlyBonus > 0 && (
+        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-3">
+          <input
+            type="checkbox"
+            checked={early}
+            onChange={(e) => setEarly(e.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-[var(--brand)]"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">{t('players.early')}</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-[var(--text-faint)]">
+              {t('players.earlySub')
+                .replace('{n}', earlyBonus.toLocaleString('nl-BE'))
+                .replace('{totaal}', (startingStack + earlyBonus).toLocaleString('nl-BE'))}
+            </span>
+          </span>
+        </label>
+      )}
+
       {askingReason ? (
         <div className="mt-3 rounded-lg bg-[var(--surface-2)] p-3">
           <p className="mb-2 text-xs uppercase tracking-widest text-[var(--text-faint)]">
@@ -1197,7 +1140,7 @@ function NewPlayerForm({
           <div className="mt-3 flex flex-wrap gap-2">
             <Primary
               disabled={busy || !nameOk || (reason ?? '').trim() === ''}
-              onClick={() => onSubmit(name.trim(), null, (reason ?? '').trim(), locale)}
+              onClick={() => onSubmit(name.trim(), null, (reason ?? '').trim(), locale, early)}
             >
               {t('players.addAnyway')}
             </Primary>
@@ -1210,7 +1153,7 @@ function NewPlayerForm({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Primary
             disabled={busy || !nameOk || !emailOk}
-            onClick={() => onSubmit(name.trim(), email.trim(), null, locale)}
+            onClick={() => onSubmit(name.trim(), email.trim(), null, locale, early)}
           >
             {t('players.addConfirm')}
           </Primary>
